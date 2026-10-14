@@ -109,7 +109,11 @@ Connect real credentials (Anthropic key, Etsy key) and run one live research →
   `Thread._stop()` there (renamed).
 - iOS test host not found: the app's product name had a space (`AI Civ.app`); the display name keeps the space.
 - First real PR attempt included compiled `__pycache__` files and a retry tried to commit twice (fixed, see log).
-- Event-replay test raced background ticks on Postgres (assertion made exact about what it means).
+- Event-replay tests raced background ticks on Postgres (assertions made exact about what they mean).
+- `/api/snapshot` could mix rows from different moments on Postgres (READ COMMITTED); it now reads in one
+  REPEATABLE READ snapshot, so its `sequence` always matches its rows.
+- A research brief could be dispatched twice: the pipeline's recovery path fired while the researcher was still
+  walking it to the terminal. Recovery now waits for the research mission to end, and dispatch is idempotent.
 
 ### Still open
 - **No real model call yet** — add `ANTHROPIC_API_KEY` as a repository secret and run the "Live models" workflow.

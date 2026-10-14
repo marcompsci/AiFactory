@@ -140,7 +140,7 @@ def health(p: Principal = Depends(principal)):
 
 @app.get("/api/snapshot")
 def snapshot(p: Principal = Depends(principal)):
-    with db.get_engine().connect() as conn:
+    with db.consistent_read() as conn:
         seq = conn.execute(select(func.max(db.events.c.sequence)).where(db.events.c.organization_id == p.organization_id)).scalar() or 0
         agents = _rows(conn.execute(select(db.agents, db.agent_positions.c.district, db.agent_positions.c.waypoint,
                                            db.agent_positions.c.movement_state)

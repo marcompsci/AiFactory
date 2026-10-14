@@ -29,7 +29,9 @@ def sandbox():
     return sb
 
 
-def test_container_has_no_network_and_a_read_only_root(sandbox, tmp_path):
+def test_container_has_no_network_and_a_read_only_root(sandbox, tmp_path, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-must-not-leak")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp-must-not-leak")
     (tmp_path / "test_probe.py").write_text(
         "import socket, pathlib, pytest\n"
         "def test_no_network():\n"
@@ -40,9 +42,10 @@ def test_container_has_no_network_and_a_read_only_root(sandbox, tmp_path):
         "        pathlib.Path('/usr/evil').write_text('x')\n"
         "def test_workspace_is_writable():\n"
         "    pathlib.Path('out.txt').write_text('ok')\n"
-        "def test_no_secrets_in_env():\n"
+        "def test_host_secrets_do_not_reach_the_container():\n"
         "    import os\n"
-        "    assert not [k for k in os.environ if 'KEY' in k or 'TOKEN' in k]\n"
+        "    assert 'ANTHROPIC_API_KEY' not in os.environ and 'GITHUB_TOKEN' not in os.environ\n"
+        "    assert not [v for v in os.environ.values() if 'must-not-leak' in v]\n"
     )
     r = sandbox.run(["python", "-m", "pytest", "-q", "-p", "no:cacheprovider"], tmp_path, 120, tmp_path)
     assert r.exit_code == 0, r.output

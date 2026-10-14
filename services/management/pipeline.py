@@ -101,6 +101,10 @@ class Pipeline:
     def _researched(self, conn, o, gm, q) -> int:
         pkg = _pkg(conn, o.id, "research_brief")
         if pkg is None:
+            m = _mission(conn, o.research_mission_id)
+            if m is not None and m.status not in ("COMPLETED", "FAILED", "CANCELLED"):
+                return 0  # the researcher is still carrying the brief to the dispatch terminal
+            # recovery: the research mission ended without dispatching the brief
             logistics.create_package(conn, org_id=o.organization_id, package_type="research_brief", origin="data-observatory",
                                      destination="nexus-spire", opportunity_id=o.id, artifact_references=o.artifact_references)
             return 1

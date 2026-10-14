@@ -617,6 +617,23 @@ def get_engine() -> Engine:
         return _engine
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def consistent_read():
+    """A connection whose reads all see one point in time, so a snapshot and its event `sequence` agree.
+    Postgres: a REPEATABLE READ, read-only transaction. SQLite: writers in this process are held off meanwhile."""
+    engine = get_engine()
+    if engine.dialect.name == "postgresql":
+        with engine.connect().execution_options(isolation_level="REPEATABLE READ", postgresql_readonly=True) as conn:
+            with conn.begin():
+                yield conn
+    else:
+        with write_lock, engine.connect() as conn:
+            yield conn
+
+
 def reset_engine() -> None:
     """Tests only."""
     global _engine

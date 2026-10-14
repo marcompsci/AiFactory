@@ -247,10 +247,13 @@ def test_recovery_after_worker_interruption(monkeypatch, isolated_env):
 
 def test_reconnecting_client_can_hydrate_and_replay(client):
     mid = start(client)
-    pending_approval(client, mid)
+    wait_for(lambda: mission_status(client, mid)["status"] == "WAITING_FOR_APPROVAL")
     snap = client.get("/api/snapshot").json()
     assert snap["sequence"] > 0 and len(snap["agents"]) == 9 and len(snap["districts"]) == 7  # V4: GM + 2 researchers, Owner's Tower
-    assert client.get(f"/api/events?after={snap['sequence']}").json()["events"] == []
+    # whatever happened after the snapshot is exactly what replay returns, in order (background ticks may add events)
+    later = [e["sequence"] for e in client.get(f"/api/events?after={snap['sequence']}").json()["events"]]
+    assert later == list(range(snap["sequence"] + 1, snap["sequence"] + 1 + len(later)))
+    assert next(m for m in snap["missions"] if m["id"] == mid)["status"] == "WAITING_FOR_APPROVAL"
 
 
 def test_remote_clients_refused_in_dev_mode():

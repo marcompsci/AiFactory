@@ -99,9 +99,12 @@ def research(env: TaskEnv) -> dict:
                       "carrier_agent_id": env.agent.id})
     _walk(env, "data-observatory", "data-observatory:dispatch")  # carries the holographic package to the dispatch terminal
     with transaction() as conn:
-        pid = logistics.create_package(conn, org_id=env.ctx.org_id, package_type="research_brief", origin="data-observatory",
-                                       destination="nexus-spire", opportunity_id=oid, mission_id=env.mission.id, task_id=env.task.id,
-                                       artifact_references=[aid], priority=4, carrier_agent_id=env.agent.id)
+        existing = conn.execute(select(db.logistics_packages.c.id).where(db.logistics_packages.c.opportunity_id == oid,
+                                                                         db.logistics_packages.c.package_type == "research_brief")).first()
+        pid = existing.id if existing else logistics.create_package(
+            conn, org_id=env.ctx.org_id, package_type="research_brief", origin="data-observatory",
+            destination="nexus-spire", opportunity_id=oid, mission_id=env.mission.id, task_id=env.task.id,
+            artifact_references=[aid], priority=4, carrier_agent_id=env.agent.id)
         emit(conn, "research.completed", mission_id=env.mission.id, agent_id=env.agent.id, execution_mode=env.mission.execution_mode,
              payload={"opportunity_id": oid, "package_id": pid, "score": total})
         submit_report(conn, org_id=env.ctx.org_id, agent_id=env.agent.id, kind="completed_package", mission_id=env.mission.id,
