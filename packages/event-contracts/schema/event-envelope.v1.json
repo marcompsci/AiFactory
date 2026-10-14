@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aiciv.local/contracts/event-envelope.v1.json",
+  "title": "AI Civilization event envelope v1",
+  "description": "Every event the backend publishes, whether over the realtime stream or from the reconciliation endpoint, uses this envelope. PostgreSQL is the source of truth; this envelope is a projection of a row in the events table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "organization_id",
+    "mission_id",
+    "agent_id",
+    "event_type",
+    "sequence",
+    "occurred_at",
+    "correlation_id",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "string", "format": "uuid" },
+    "schema_version": { "const": 1 },
+    "organization_id": { "type": "string", "format": "uuid" },
+    "mission_id": { "type": ["string", "null"], "format": "uuid" },
+    "agent_id": { "type": ["string", "null"], "format": "uuid" },
+    "event_type": {
+      "enum": [
+        "mission.created",
+        "mission.started",
+        "mission.status_changed",
+        "mission.completed",
+        "mission.failed",
+        "mission.cancelled",
+        "task.assigned",
+        "task.started",
+        "task.progress",
+        "task.completed",
+        "task.failed",
+        "agent.message",
+        "agent.status_changed",
+        "agent.movement_requested",
+        "agent.arrived",
+        "tool.started",
+        "tool.completed",
+        "tool.failed",
+        "approval.requested",
+        "approval.granted",
+        "approval.rejected",
+        "artifact.created",
+        "usage.recorded",
+        "system.emergency_stop"
+      ]
+    },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": "string", "format": "uuid" },
+    "payload": { "type": "object" },
+    "execution_mode": {
+      "description": "live = real tool execution / real model call. simulation = clearly labeled stand-in (no provider credentials, or ambient world motion).",
+      "enum": ["live", "simulation"]
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "plaza": { "id": "plaza", "position": [0, 0, 0] },
+  "districts": [
+    {
+      "id": "nexus-spire",
+      "name": "Nexus Spire",
+      "purpose": "Mission coordination and global monitoring",
+      "position": [0, 0, 0],
+      "color": "#A66BFF",
+      "architecture": "spire",
+      "towers": 1,
+      "height": 34,
+      "workstations": [
+        { "id": "nexus-command", "label": "Command Dais", "offset": [0, 0, 6] }
+      ]
+    },
+    {
+      "id": "code-forge",
+      "name": "Code Forge",
+      "purpose": "Software engineering and architecture",
+      "position": [-30, 0, -18],
+      "color": "#32D8FF",
+      "architecture": "blocks",
+      "towers": 5,
+      "height": 22,
+      "workstations": [
+        { "id": "forge-blueprint", "label": "Blueprint Table", "offset": [-3, 0, 7] },
+        { "id": "forge-anvil", "label": "Commit Anvil", "offset": [3, 0, 7] }
+      ]
+    },
+    {
+      "id": "sentinel-citadel",
+      "name": "Sentinel Citadel",
+      "purpose": "Testing, quality assurance and security",
+      "position": [30, 0, -18],
+      "color": "#FFBD69",
+      "architecture": "fortress",
+      "towers": 4,
+      "height": 18,
+      "workstations": [
+        { "id": "citadel-testbay", "label": "Test Bay", "offset": [0, 0, 7] }
+      ]
+    },
+    {
+      "id": "vision-quarter",
+      "name": "Vision Quarter",
+      "purpose": "Creative work and interface design",
+      "position": [-30, 0, 20],
+      "color": "#FF6178",
+      "architecture": "twisted",
+      "towers": 3,
+      "height": 20,
+      "workstations": [
+        { "id": "vision-studio", "label": "Light Studio", "offset": [0, 0, -7] }
+      ]
+    },
+    {
+      "id": "data-observatory",
+      "name": "Data Observatory",
+      "purpose": "Research, retrieval and analysis",
+      "position": [30, 0, 20],
+      "color": "#5BF2A5",
+      "architecture": "dome",
+      "towers": 2,
+      "height": 16,
+      "workstations": [
+        { "id": "observatory-lens", "label": "Deep Lens", "offset": [0, 0, -7] }
+      ]
+    },
+    {
+      "id": "memory-vault",
+      "name": "Memory Vault",
+      "purpose": "Knowledge storage, artifacts and history",
+      "position": [0, 0, 36],
+      "color": "#8FA8FF",
+      "architecture": "vault",
+      "towers": 3,
+      "height": 12,
+      "workstations": [
+        { "id": "vault-archive", "label": "Archive Core", "offset": [0, 0, -7] }
+      ]
+    }
+  ]
+}

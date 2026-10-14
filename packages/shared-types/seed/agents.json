@@ -1,0 +1,164 @@
+{
+  "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+  "project_id": "5d6e7f80-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+  "agents": [
+    {
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "key": "commander",
+      "name": "Vega",
+      "role": "Mission Commander",
+      "home_district": "nexus-spire",
+      "avatar": {
+        "shape": "crown",
+        "color": "#A66BFF",
+        "height": 1.9
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "inspect_repository",
+        "prepare_pull_request",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.5,
+        "max_concurrent_tasks": 1
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "key": "architect",
+      "name": "Orin",
+      "role": "Software Architect",
+      "home_district": "code-forge",
+      "avatar": {
+        "shape": "pillar",
+        "color": "#32D8FF",
+        "height": 2.1
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "inspect_repository",
+        "list_files",
+        "read_file",
+        "search_code",
+        "inspect_diff",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.5,
+        "max_concurrent_tasks": 1
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "key": "developer",
+      "name": "Kade",
+      "role": "Developer",
+      "home_district": "code-forge",
+      "avatar": {
+        "shape": "cube",
+        "color": "#5BF2A5",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "list_files",
+        "read_file",
+        "search_code",
+        "create_worktree",
+        "edit_file",
+        "inspect_diff"
+      ],
+      "limits": {
+        "max_usd_per_mission": 1.0,
+        "max_concurrent_tasks": 1
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "key": "qa",
+      "name": "Sentry",
+      "role": "QA Tester",
+      "home_district": "sentinel-citadel",
+      "avatar": {
+        "shape": "shield",
+        "color": "#FFBD69",
+        "height": 1.8
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "run_tests",
+        "run_build",
+        "read_file",
+        "inspect_diff",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.3,
+        "max_concurrent_tasks": 1
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "key": "researcher",
+      "name": "Lumen",
+      "role": "Researcher",
+      "home_district": "data-observatory",
+      "avatar": {
+        "shape": "orb",
+        "color": "#32D8FF",
+        "height": 1.6
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "retrieve_approved_source",
+        "read_file",
+        "search_code",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.3,
+        "max_concurrent_tasks": 1
+      }
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "key": "designer",
+      "name": "Iris",
+      "role": "Designer",
+      "home_district": "vision-quarter",
+      "avatar": {
+        "shape": "prism",
+        "color": "#FF6178",
+        "height": 1.75
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "read_file",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.3,
+        "max_concurrent_tasks": 1
+      }
+    }
+  ]
+}

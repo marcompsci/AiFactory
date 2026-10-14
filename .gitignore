@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+.data/
+.data-e2e/
+test-results/
+playwright-report/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store

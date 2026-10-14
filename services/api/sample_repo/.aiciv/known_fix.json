@@ -1,0 +1,6 @@
+{
+  "_comment": "Used ONLY in simulation mode (no model credentials). The orchestrator labels this patch source as 'fixture', never as model output.",
+  "path": "calc/stats.py",
+  "old": "    return ordered[mid]\n\n\ndef clamp",
+  "new": "    return (ordered[mid - 1] + ordered[mid]) / 2\n\n\ndef clamp"
+}

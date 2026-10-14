@@ -1,0 +1,32 @@
+# Local stack. `docker compose up` runs the API (SQLite volume) and the web app.
+# `docker compose --profile postgres up` also starts Postgres; set DATABASE_URL in .env to use it.
+services:
+  api:
+    build: { context: ., dockerfile: infrastructure/docker/api.Dockerfile }
+    env_file: [.env]
+    environment:
+      AICIV_ALLOWED_ORIGINS: http://localhost:3000
+    ports: ["8000:8000"]
+    volumes: ["aiciv-data:/data"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args: { NEXT_PUBLIC_API_URL: http://localhost:8000 }
+    ports: ["3000:3000"]
+    depends_on: [api]
+  postgres:
+    profiles: [postgres]
+    image: pgvector/pgvector:pg16
+    environment: { POSTGRES_PASSWORD: aiciv, POSTGRES_DB: aiciv }
+    ports: ["5432:5432"]
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+  redis:
+    profiles: [postgres]
+    image: redis:7-alpine
+volumes:
+  aiciv-data:
+  pg-data:

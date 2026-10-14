@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ground: #070b18;
+  --color-surface: #111a2e;
+  --color-violet: #a66bff;
+  --color-cyan: #32d8ff;
+  --color-ok: #5bf2a5;
+  --color-warn: #ffbd69;
+  --color-bad: #ff6178;
+  --color-ink: #eaf2ff;
+  --color-ink-2: rgb(234 242 255 / 0.66);
+  --color-ink-3: rgb(234 242 255 / 0.42);
+  --color-line: rgb(50 216 255 / 0.14);
+  --font-display: "Unbounded", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  color-scheme: dark;
+  --sheet-peek: 168px;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--color-ground);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+body {
+  overflow: hidden;
+}
+
+/* Glass panels sit over the city; one recipe everywhere so hierarchy comes from content, not chrome. */
+.glass {
+  background: rgb(17 26 46 / 0.9);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--color-line);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(50 216 255 / 0.25) transparent;
+}
+
+.diff-add {
+  color: var(--color-ok);
+  background: rgb(91 242 165 / 0.08);
+}
+.diff-del {
+  color: var(--color-bad);
+  background: rgb(255 97 120 / 0.08);
+}
+.diff-hunk {
+  color: var(--color-violet);
+}
+
+/* World-space labels rendered by drei <Html>. */
+.world-label {
+  pointer-events: none;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  transform: translate3d(-50%, -100%, 0);
+}
+
+@keyframes approval-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 189 105 / 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgb(255 189 105 / 0);
+  }
+}
+.approval-pulse {
+  animation: approval-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .approval-pulse {
+    animation: none;
+  }
+  * {
+    transition-duration: 0ms !important;
+  }
+}
