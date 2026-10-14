@@ -81,6 +81,12 @@ class MissionRunner:
 
     # ---------------------------------------------------------------- lifecycle
     def run(self) -> str:
+        """Missions run as LangGraph graphs (checkpointed per mission, approval = interrupt)."""
+        from .graph import run_mission_graph
+        return run_mission_graph(self)
+
+    def run_direct(self) -> str:
+        """The same lifecycle without LangGraph (kept for debugging and as the reference behavior)."""
         m = self.mission()
         if m is None or m.status in ("COMPLETED", "FAILED", "CANCELLED") or m.paused:
             return m.status if m else "MISSING"
@@ -200,50 +206,58 @@ class MissionRunner:
         return True
 
     def _execute(self) -> str:
+        while True:
+            out = self._wave()
+            if out != "continue":
+                return out
+
+    def _wave(self) -> str:
+        """One scheduling step: run every ready task in parallel and wait. Returns "continue" or the mission status
+        the step ended in. This is the unit LangGraph checkpoints (services/orchestrator/graph.py)."""
+        self.check_cancel()
+        m = self.mission()
+        if m.paused:
+            return "PAUSED"
+        if m.status != "RUNNING":
+            return m.status
+        tasks = self.tasks()
+        deps = self.deps()
+        by_id = {t.id: t for t in tasks}
+        failed = [t for t in tasks if t.status == "FAILED"]
+        if failed:
+            self._fail(f"task '{failed[0].key}' failed after {failed[0].attempt} attempt(s)")
+            return "FAILED"
+        ready = [t for t in tasks
+                 if (t.status == "PENDING" and all(by_id[d].status in DONE for d in deps.get(t.id, ())))
+                 or t.status == "RUNNING"]  # RUNNING here = resumed after approval
+        if not ready:
+            if any(t.status == "WAITING_FOR_APPROVAL" for t in tasks):
+                with transaction() as conn:
+                    ops.set_mission_status(conn, self.mission_id, "WAITING_FOR_APPROVAL")
+                return "WAITING_FOR_APPROVAL"
+            if all(t.status in TERMINAL_TASK for t in tasks):
+                self._complete()
+                return "COMPLETED"
+            self._fail("no runnable tasks (dependency failed)")
+            return "FAILED"
         pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix=f"m{self.mission_id[:4]}")
         try:
-            while True:
-                self.check_cancel()
-                m = self.mission()
-                if m.paused:
-                    return m.status
-                if m.status != "RUNNING":
-                    return m.status
-                tasks = self.tasks()
-                deps = self.deps()
-                by_id = {t.id: t for t in tasks}
-                failed = [t for t in tasks if t.status == "FAILED"]
-                if failed:
-                    self._fail(f"task '{failed[0].key}' failed after {failed[0].attempt} attempt(s)")
-                    return "FAILED"
-                ready = [t for t in tasks
-                         if (t.status == "PENDING" and all(by_id[d].status in DONE for d in deps.get(t.id, ())))
-                         or t.status == "RUNNING"]  # RUNNING here = resumed after approval
-                if not ready:
-                    if any(t.status == "WAITING_FOR_APPROVAL" for t in tasks):
-                        with transaction() as conn:
-                            ops.set_mission_status(conn, self.mission_id, "WAITING_FOR_APPROVAL")
-                        return "WAITING_FOR_APPROVAL"
-                    if all(t.status in TERMINAL_TASK for t in tasks):
-                        self._complete()
-                        return "COMPLETED"
-                    self._fail("no runnable tasks (dependency failed)")
-                    return "FAILED"
-                futures = {pool.submit(self._run_task, t.id): t for t in ready}
-                timeout = max(t.timeout_seconds for t in ready) + 30
-                done, not_done = wait(futures, timeout=timeout)
-                for f in not_done:
-                    t = futures[f]
-                    with transaction() as conn:
-                        ops.set_task_status(conn, t.id, "FAILED", error=f"timed out after {t.timeout_seconds}s")
-                for f in done:
-                    exc = f.exception()
-                    if isinstance(exc, Cancelled):
-                        raise exc
-                    if exc:
-                        log.exception("task crashed", exc_info=exc)
+            futures = {pool.submit(self._run_task, t.id): t for t in ready}
+            timeout = max(t.timeout_seconds for t in ready) + 30
+            done, not_done = wait(futures, timeout=timeout)
+            for f in not_done:
+                t = futures[f]
+                with transaction() as conn:
+                    ops.set_task_status(conn, t.id, "FAILED", error=f"timed out after {t.timeout_seconds}s")
+            for f in done:
+                exc = f.exception()
+                if isinstance(exc, Cancelled):
+                    raise exc
+                if exc:
+                    log.exception("task crashed", exc_info=exc)
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
+        return "continue"
 
     # ---------------------------------------------------------------- one task
     def _run_task(self, task_id: str) -> None:

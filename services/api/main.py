@@ -296,7 +296,17 @@ def cancel(mission_id: str, p: Principal = Depends(operator)):
     with db.get_engine().connect() as conn:
         _mission_or_404(conn, mission_id, p)
     cancel_mission(mission_id)
+    state.worker.enqueue(mission_id)  # lets a graph paused at an approval interrupt reach END
     return {"ok": True}
+
+
+@app.get("/api/missions/{mission_id}/graph")
+def mission_graph(mission_id: str, p: Principal = Depends(principal)):
+    """The LangGraph view of a mission: current node, pending interrupts and checkpoint history."""
+    from services.orchestrator.graph import graph_state
+    with db.get_engine().connect() as conn:
+        _mission_or_404(conn, mission_id, p)
+    return graph_state(mission_id)
 
 
 @app.post("/api/missions/{mission_id}/pause")

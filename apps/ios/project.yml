@@ -21,8 +21,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.civilization.app
-        PRODUCT_NAME: AI Civ
-        PRODUCT_MODULE_NAME: AICiv
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"

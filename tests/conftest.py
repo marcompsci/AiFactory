@@ -24,6 +24,8 @@ def isolated_env(tmp_path, monkeypatch):
     config.get_settings.cache_clear()
     db.reset_engine()
     auth.mutation_limiter._state.clear()
+    from services.orchestrator.graph import reset_checkpointer
+    reset_checkpointer()
     yield tmp_path
     db.reset_engine()
     config.get_settings.cache_clear()

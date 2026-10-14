@@ -259,3 +259,39 @@ def test_remote_clients_refused_in_dev_mode():
     from starlette.testclient import TestClient as TC
     with TC(main.app, client=("192.168.1.20", 5000)) as c:
         assert c.get("/api/health").status_code == 403
+
+
+def test_missions_run_as_langgraph_threads_with_approval_interrupts(client):
+    mid = start(client)
+    a = pending_approval(client, mid)
+    g = client.get(f"/api/missions/{mid}/graph").json()
+    assert g["engine"] == "langgraph" and g["thread_id"] == mid
+    assert g["next"] == ["await_approval"], g
+    assert g["interrupts"] == [{"mission_id": mid, "waiting_for": "approval"}]
+    assert g["checkpoints"] >= 4  # input, prepare, at least one execute wave, the interrupt
+    client.post(f"/api/approvals/{a['id']}/grant")
+    wait_for(lambda: mission_status(client, mid)["status"] == "COMPLETED")
+    g2 = client.get(f"/api/missions/{mid}/graph").json()
+    assert g2["next"] == [] and g2["values"]["outcome"] == "COMPLETED"
+    assert g2["checkpoints"] > g["checkpoints"]
+    sources = [s["source"] for s in g2["steps"]]
+    assert "input" in sources and "loop" in sources
+
+
+def test_graph_checkpoint_survives_process_restart(monkeypatch, isolated_env):
+    """The interrupt is stored in the checkpointer, so a brand-new process resumes the same graph thread."""
+    from services.api.main import app
+    from services.orchestrator.graph import reset_checkpointer
+
+    app.state.gateway = None
+    with TestClient(app) as c:
+        mid = start(c)
+        a = pending_approval(c, mid)
+        before = c.get(f"/api/missions/{mid}/graph").json()
+    reset_checkpointer()  # new process: no in-memory graph state
+    with TestClient(app) as c:
+        assert c.get(f"/api/missions/{mid}/graph").json()["next"] == ["await_approval"]
+        c.post(f"/api/approvals/{a['id']}/grant")
+        wait_for(lambda: mission_status(c, mid)["status"] == "COMPLETED")
+        after = c.get(f"/api/missions/{mid}/graph").json()
+    assert after["checkpoints"] > before["checkpoints"]

@@ -10,7 +10,14 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r requirements-dev.txt
-      - run: python -m pytest
+      - name: pytest (SQLite)
+        run: |
+          set +e
+          python -m pytest -o addopts="" -q -rfE -p no:cacheprovider 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          grep -E "^(FAILED|ERROR) " pytest.log | head -30 | sed 's/^/::error::/'
+          grep -E "^E  " pytest.log | head -20 | sed 's/^/::error::/'
+          exit $status
   frontend:
     runs-on: ubuntu-latest
     steps:
