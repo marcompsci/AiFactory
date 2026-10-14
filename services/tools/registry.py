@@ -75,14 +75,15 @@ class ToolSpec:
     protected: bool
     description: str
     fn: Callable[..., dict]
+    release_gate: bool = False  # needs a valid owner release authorization for the exact artifact
 
 
 REGISTRY: dict[str, ToolSpec] = {}
 
 
-def tool(name: str, protected: bool = False, description: str = ""):
+def tool(name: str, protected: bool = False, description: str = "", release_gate: bool = False):
     def deco(fn: Callable[..., dict]) -> Callable[..., dict]:
-        REGISTRY[name] = ToolSpec(name, protected, description, fn)
+        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate)
         return fn
     return deco
 
@@ -288,7 +289,7 @@ def retrieve_approved_source(ctx: ToolContext, source: str) -> dict:
 
 # ------------------------------------------------------------------ enforcement
 
-def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec) -> None:
+def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec, args: dict | None = None) -> None:
     org = conn.execute(select(db.organizations).where(db.organizations.c.id == ctx.org_id)).first()
     if org is None or org.emergency_stopped:
         raise ToolDenied("emergency stop engaged")
@@ -311,6 +312,12 @@ def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec) -> None:
             db.approvals.c.task_id == ctx.task_id, db.approvals.c.status == "GRANTED")).first()
         if not granted:
             raise ToolDenied(f"{spec.name} is protected and has no granted approval")
+    if spec.release_gate:
+        from services.management.release import ReleaseDenied, check_authorization
+        try:
+            check_authorization(conn, ctx.org_id, (args or {}).get("authorization_id", ""), mission.opportunity_id)
+        except ReleaseDenied as exc:
+            raise ToolDenied(f"release refused: {exc}") from exc
 
 
 def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
@@ -323,7 +330,7 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
     denied: ToolDenied | None = None
     with transaction() as conn:
         try:
-            _check_permissions(conn, ctx, spec)
+            _check_permissions(conn, ctx, spec, args)
         except ToolDenied as exc:
             denied = exc
     if denied is not None:
@@ -338,17 +345,17 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
         raise denied
     with transaction() as conn:
         # Re-checked inside the same transaction that records the start, so nothing can change in between.
-        _check_permissions(conn, ctx, spec)
+        _check_permissions(conn, ctx, spec, args)
         conn.execute(insert(db.tool_executions).values(id=exec_id, organization_id=ctx.org_id, mission_id=ctx.mission_id,
                                                        task_id=ctx.task_id, agent_id=ctx.agent_id, tool_name=name,
                                                        arguments=safe_args, status="RUNNING"))
         emit(conn, "tool.started", mission_id=ctx.mission_id, agent_id=ctx.agent_id, execution_mode=ctx.execution_mode,
-             payload={"tool_execution_id": exec_id, "tool": name, "arguments": safe_args, "protected": spec.protected})
+             payload={"tool_execution_id": exec_id, "tool": name, "arguments": safe_args, "protected": spec.protected or spec.release_gate})
     started = time.monotonic()
     try:
         result = spec.fn(ctx, **args)
         status, error = "COMPLETED", None
-    except (ToolFailed, SandboxViolation, OSError, re.error, TypeError) as exc:
+    except (ToolFailed, SandboxViolation, OSError, re.error, TypeError, ValueError) as exc:
         result, status, error = {}, "FAILED", f"{type(exc).__name__}: {exc}"
     duration = int((time.monotonic() - started) * 1000)
     excerpt = redact(json.dumps(result, default=str))[:4000] if status == "COMPLETED" else error
@@ -375,3 +382,5 @@ def _summarize(name: str, result: dict) -> str:
     if name == "prepare_pull_request":
         return f"commit {str(result.get('commit', ''))[:10]} on {result.get('branch')}"
     return "ok"
+
+from . import studio_tools  # noqa: E402,F401  (registers the V4 tools)

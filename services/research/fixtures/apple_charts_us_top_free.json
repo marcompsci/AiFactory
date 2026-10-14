@@ -1,0 +1,16 @@
+{
+  "_fixture_notice": "FIXTURE DATA for tests and offline demos. Hand-written to resemble the shape of Apple's public RSS chart feed. Not real market data; never present it as live research.",
+  "collected_at": "2026-10-01T00:00:00Z",
+  "region": "US",
+  "chart": "top-free",
+  "results": [
+    {"rank": 1, "previous_rank": 1, "name": "Fixture Social", "genre": "Social Networking", "rating": 4.6},
+    {"rank": 4, "previous_rank": 9, "name": "Fixture Focus Garden", "genre": "Productivity", "rating": 4.2},
+    {"rank": 7, "previous_rank": 7, "name": "Fixture Notes Pro", "genre": "Productivity", "rating": 4.7},
+    {"rank": 11, "previous_rank": 25, "name": "Fixture Deep Work Timer", "genre": "Productivity", "rating": 4.0},
+    {"rank": 15, "previous_rank": 14, "name": "Fixture Photo Studio", "genre": "Photo & Video", "rating": 4.5},
+    {"rank": 22, "previous_rank": 40, "name": "Fixture Habit Streaks", "genre": "Productivity", "rating": 4.1},
+    {"rank": 30, "previous_rank": 31, "name": "Fixture Budget Buddy", "genre": "Finance", "rating": 4.4},
+    {"rank": 38, "previous_rank": null, "name": "Fixture Study Sprint", "genre": "Productivity", "rating": 3.9}
+  ]
+}

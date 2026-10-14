@@ -15,7 +15,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "rm -rf .data-e2e && AICIV_DATA_DIR=.data-e2e AICIV_TRAVEL_SECONDS=0.5 AICIV_ALLOWED_ORIGINS=http://localhost:3100 python -m uvicorn services.api.main:app --port 8100",
+      command: "rm -rf .data-e2e && AICIV_DATA_DIR=.data-e2e AICIV_TRAVEL_SECONDS=0.5 AICIV_RESEARCH_MODE=fixture AICIV_BELT_SPEED=40 AICIV_TICK_SCALE=0.2 AICIV_ALLOWED_ORIGINS=http://localhost:3100 python -m uvicorn services.api.main:app --port 8100",
       cwd: "../..",
       url: "http://localhost:8100/api/health",
       reuseExistingServer: false,

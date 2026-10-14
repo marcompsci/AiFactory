@@ -84,5 +84,30 @@ export const api = {
   agent: (id: string) => call<Json>(`/api/agents/${id}`),
   costs: () => call<Json>("/api/costs"),
   memory: (q = "") => call<{ entries: Json[] }>(`/api/memory?q=${encodeURIComponent(q)}`),
+  research: (source: string, query: string, region = "US") =>
+    call<Json>("/api/research", { method: "POST", body: JSON.stringify({ source, query, region }) }),
+  opportunities: () => call<{ opportunities: Json[] }>("/api/opportunities"),
+  opportunity: (id: string) => call<Json>(`/api/opportunities/${id}`),
+  ownerDecision: (id: string, decision: string, artifact_digest: string, note?: string) =>
+    call<Json>(`/api/opportunities/${id}/owner-decision`, { method: "POST", body: JSON.stringify({ decision, artifact_digest, note }) }),
+  ownerCommit: (id: string, approve: boolean) => call<Json>(`/api/opportunities/${id}/owner-commit`, { method: "POST", body: JSON.stringify({ approve }) }),
+  reopen: (id: string) => call<Json>(`/api/opportunities/${id}/reopen`, { method: "POST" }),
+  hierarchy: () => call<Json>("/api/hierarchy"),
+  logistics: () => call<Json>("/api/logistics"),
+  routeStatus: (id: string, status: "UP" | "DOWN") =>
+    call<Json>(`/api/logistics/routes/${encodeURIComponent(id)}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  /** Fetches a bundle file with the caller's credentials (iframes can't send headers). */
+  bundleFile: async (artifactId: string, path: string): Promise<string> => {
+    const { apiUrl, token } = loadConnection();
+    const r = await fetch(`${apiUrl.replace(/\/$/, "")}/api/artifacts/${artifactId}/files/${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!r.ok) throw new ApiError(r.status, "preview unavailable");
+    return r.text();
+  },
+  bundleDownload: async (artifactId: string): Promise<Blob> => {
+    const { apiUrl, token } = loadConnection();
+    const r = await fetch(`${apiUrl.replace(/\/$/, "")}/api/artifacts/${artifactId}/download`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!r.ok) throw new ApiError(r.status, "download failed");
+    return r.blob();
+  },
   emergencyStop: (engaged: boolean) => call<Json>("/api/emergency-stop", { method: "POST", body: JSON.stringify({ engaged }) }),
 };

@@ -8,7 +8,7 @@ export interface Workstation {
   offset: Vec3;
 }
 
-export type Architecture = "spire" | "blocks" | "fortress" | "twisted" | "dome" | "vault";
+export type Architecture = "spire" | "blocks" | "fortress" | "twisted" | "dome" | "vault" | "tower";
 
 export interface District {
   id: string;
@@ -30,9 +30,30 @@ export function add(a: Vec3, b: Vec3): Vec3 {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
+export const BELT_HEIGHT = 1.2;
+const TERMINAL_SPREAD = 3;
+
+/** Dispatch / receiving terminals at a district's gate. Mirrors services/logistics/graph.py. */
+export function terminalPosition(districtId: string, kind: "dispatch" | "receiving"): Vec3 {
+  const [gx, , gz] = gatePosition(districtId);
+  const n = Math.hypot(gx, gz) || 1;
+  const px = -gz / n;
+  const pz = gx / n;
+  const s = kind === "dispatch" ? TERMINAL_SPREAD : -TERMINAL_SPREAD;
+  return [gx + px * s, 0, gz + pz * s];
+}
+
 export function workstationPosition(districtId: string, workstationId?: string | null): Vec3 {
   const d = DISTRICT_BY_ID[districtId];
   if (!d) return [0, 0, 0];
+  if (workstationId?.endsWith(":dispatch") || workstationId?.endsWith(":receiving")) {
+    const kind = workstationId.endsWith(":dispatch") ? "dispatch" : "receiving";
+    const t = terminalPosition(districtId, kind);
+    // stand just in front of the terminal, on the plaza side
+    const [gx, , gz] = gatePosition(districtId);
+    const n = Math.hypot(gx, gz) || 1;
+    return [t[0] - (gx / n) * 1.6, 0, t[2] - (gz / n) * 1.6];
+  }
   const ws = d.workstations.find((w) => w.id === workstationId) ?? null;
   return ws ? add(d.position, ws.offset) : homePosition(districtId);
 }
@@ -55,6 +76,6 @@ export function homePosition(districtId: string, slot = 0): Vec3 {
 export function gatePosition(districtId: string): Vec3 {
   const d = DISTRICT_BY_ID[districtId];
   if (!d) return [0, 0, 0];
-  if (d.position[0] === 0 && d.position[2] === 0) return [0, 0, 9];
+  if (d.position[0] === 0 && d.position[2] === 0) return [9, 0, 0]; // east: north/south belong to Memory Vault and the Owner's Tower
   return [d.position[0] * 0.72, 0, d.position[2] * 0.72];
 }

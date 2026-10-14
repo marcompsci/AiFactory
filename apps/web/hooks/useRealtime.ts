@@ -32,6 +32,11 @@ export function useRealtime(reconnectKey: number) {
       for (const m of missions) qc.invalidateQueries({ queryKey: ["mission", m] });
       if (events.some((e) => e.event_type === "usage.recorded")) qc.invalidateQueries({ queryKey: ["costs"] });
       if (events.some((e) => e.agent_id)) qc.invalidateQueries({ queryKey: ["agent"] });
+      if (events.some((e) => /^(opportunity|release|manager|research|package)\./.test(e.event_type))) {
+        qc.invalidateQueries({ queryKey: ["opportunity"] });
+        qc.invalidateQueries({ queryKey: ["opportunities"] });
+        qc.invalidateQueries({ queryKey: ["hierarchy"] });
+      }
     };
 
     const replay = async () => {
@@ -55,7 +60,13 @@ export function useRealtime(reconnectKey: number) {
         return;
       }
       if (closed) return;
-      store().hydrate(snap.agents, snap.sequence, snap.execution_mode, snap.approvals.map((a: { id: string }) => a.id));
+      const lg = snap.logistics;
+      store().hydrate(snap.agents, snap.sequence, snap.execution_mode, snap.approvals.map((a: { id: string }) => a.id), {
+        packages: lg?.packages ?? [],
+        ownerQueue: (snap.opportunities ?? []).filter((o: { status: string }) => o.status === "OWNER_APPROVAL").map((o: { id: string }) => o.id),
+        logistics: lg ? { nodes: lg.nodes, routes: lg.routes, beltSpeed: lg.belt_speed } : undefined,
+        serverTime: lg?.server_time,
+      });
       qc.setQueryData(["snapshot"], snap);
       // History for the activity feed only; the world itself is already at snap.sequence.
       api.events(Math.max(0, snap.sequence - 200)).then((h) => store().seedFeed(h.events)).catch(() => {});

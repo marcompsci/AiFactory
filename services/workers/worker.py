@@ -24,7 +24,8 @@ ACTIVE = ["CREATED", "VALIDATING", "PLANNING", "QUEUED", "RUNNING"]
 
 
 class MissionWorker:
-    def __init__(self, gateway=None) -> None:
+    def __init__(self, gateway=None, on_finish=None) -> None:
+        self.on_finish = on_finish  # pokes the scheduler so the pipeline reacts to finished missions at once
         self.pool = ThreadPoolExecutor(max_workers=get_settings().max_concurrent_missions, thread_name_prefix="mission")
         self._inflight: set[str] = set()
         self._rerun: set[str] = set()
@@ -44,6 +45,8 @@ class MissionWorker:
             try:
                 status = MissionRunner(mission_id, self.gateway).run()
                 log.info("mission %s -> %s", mission_id, status)
+                if self.on_finish:
+                    self.on_finish()
             except Exception:
                 log.exception("mission %s crashed", mission_id)
                 try:

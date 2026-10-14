@@ -249,11 +249,11 @@ def test_reconnecting_client_can_hydrate_and_replay(client):
     mid = start(client)
     pending_approval(client, mid)
     snap = client.get("/api/snapshot").json()
-    assert snap["sequence"] > 0 and len(snap["agents"]) == 6 and len(snap["districts"]) == 6
+    assert snap["sequence"] > 0 and len(snap["agents"]) == 9 and len(snap["districts"]) == 7  # V4: GM + 2 researchers, Owner's Tower
     assert client.get(f"/api/events?after={snap['sequence']}").json()["events"] == []
 
 
-def test_remote_clients_refused_in_dev_mode(client):
+def test_remote_clients_refused_in_dev_mode():
     # TestClient's host is "testclient"; simulate a LAN address instead
     from services.api import main
     from starlette.testclient import TestClient as TC

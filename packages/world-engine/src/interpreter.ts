@@ -35,6 +35,24 @@ export interface WorldAgent {
   position: Vec3;
   indicator: Indicator | null;
   currentTask: string | null;
+  /** Title of a holographic package the agent is carrying to a dispatch terminal (V4). */
+  carrying: string | null;
+}
+
+export type PackageStatus = "QUEUED" | "IN_TRANSIT" | "ARRIVED" | "RECEIVED" | "DELIVERY_FAILED" | "CANCELLED";
+
+export interface WorldPackage {
+  id: string;
+  type: string;
+  status: PackageStatus;
+  origin: string;
+  destination: string;
+  route: string[];
+  routeStartedAt: string | null; // server time (ISO)
+  eta: string | null;
+  opportunityId: string | null;
+  priority: number;
+  updatedAt: number;
 }
 
 export interface WorldState {
@@ -45,6 +63,10 @@ export interface WorldState {
   celebrate: { district: string; at: number } | null;
   pendingApprovals: string[];
   mode: ExecutionMode;
+  packages: Record<string, WorldPackage>;
+  /** Opportunities whose release package is waiting at the Owner's Tower. */
+  ownerQueue: string[];
+  routeStatus: Record<string, "UP" | "DOWN">;
 }
 
 export interface AgentSeed {
@@ -84,9 +106,11 @@ export function initialWorld(agents: AgentSeed[], lastSequence = 0, mode: Execut
       position: pos,
       indicator: null,
       currentTask: null,
+      carrying: null,
     };
   }
-  return { lastSequence, agents: map, activeWorkstations: {}, districtActivity: {}, celebrate: null, pendingApprovals: [], mode };
+  return { lastSequence, agents: map, activeWorkstations: {}, districtActivity: {}, celebrate: null, pendingApprovals: [], mode,
+    packages: {}, ownerQueue: [], routeStatus: {} };
 }
 
 function homeSlot(state: WorldState, agent: WorldAgent): number {
@@ -190,6 +214,69 @@ export function applyEvent(state: WorldState, e: EventEnvelope, now: number): Ap
     case "mission.cancelled":
       next.activeWorkstations = {};
       break;
+    // ---------------------------------------------------------------- V4: research, logistics, release
+    case "research.opportunity_identified":
+      setAgent({ carrying: str(p.title) || "Research brief", indicator: { kind: "complete", text: `Found: ${str(p.title)}`, at: now } });
+      break;
+    case "package.dispatched":
+    case "package.in_transit":
+    case "package.rerouted": {
+      const id = str(p.package_id);
+      const prev = state.packages[id];
+      next.packages = {
+        ...state.packages,
+        [id]: {
+          id,
+          type: str(p.package_type) || prev?.type || "package",
+          status: "IN_TRANSIT",
+          origin: str(p.origin) || prev?.origin || "",
+          destination: str(p.destination) || prev?.destination || "",
+          route: (p.route as string[]) ?? prev?.route ?? [],
+          routeStartedAt: (p.route_started_at as string) ?? prev?.routeStartedAt ?? null,
+          eta: (p.eta as string) ?? prev?.eta ?? null,
+          opportunityId: (p.opportunity_id as string) ?? prev?.opportunityId ?? null,
+          priority: Number(p.priority ?? prev?.priority ?? 5),
+          updatedAt: now,
+        },
+      };
+      if (e.event_type === "package.dispatched" && p.agent_id) {
+        const carrier = state.agents[str(p.agent_id)];
+        if (carrier) next.agents = { ...next.agents, [carrier.id]: { ...next.agents[carrier.id], carrying: null } };
+      }
+      if (prev?.origin || p.origin) next.districtActivity = bump(next, str(p.origin) || prev!.origin, 0.25);
+      break;
+    }
+    case "package.arrived":
+    case "package.received":
+    case "package.delivery_failed": {
+      const id = str(p.package_id);
+      const prev = state.packages[id];
+      const status: PackageStatus = e.event_type === "package.arrived" ? "ARRIVED" : e.event_type === "package.received" ? "RECEIVED" : "DELIVERY_FAILED";
+      next.packages = {
+        ...state.packages,
+        [id]: { ...(prev ?? { id, type: str(p.package_type), origin: str(p.origin), destination: str(p.destination), route: [], routeStartedAt: null,
+          eta: null, opportunityId: (p.opportunity_id as string) ?? null, priority: 5 }), status, updatedAt: now } as WorldPackage,
+      };
+      if (status === "ARRIVED") next.districtActivity = bump(next, str(p.destination) || prev?.destination || "", 0.4);
+      break;
+    }
+    case "logistics.route_status_changed":
+      next.routeStatus = { ...state.routeStatus, [str(p.route_id)]: str(p.status) === "DOWN" ? "DOWN" : "UP" };
+      break;
+    case "release.owner_approval_requested":
+      if (!state.ownerQueue.includes(str(p.opportunity_id))) next.ownerQueue = [...state.ownerQueue, str(p.opportunity_id)];
+      next.districtActivity = bump(next, "owners-tower", 1);
+      break;
+    case "release.owner_approved":
+    case "release.owner_rejected":
+      next.ownerQueue = state.ownerQueue.filter((x) => x !== str(p.opportunity_id));
+      break;
+    case "opportunity.status_changed":
+      if (str(p.from) === "OWNER_APPROVAL") next.ownerQueue = state.ownerQueue.filter((x) => x !== str(p.opportunity_id));
+      break;
+    case "release.executed":
+      next.celebrate = { district: "owners-tower", at: now };
+      break;
     default:
       break;
   }
@@ -197,8 +284,28 @@ export function applyEvent(state: WorldState, e: EventEnvelope, now: number): Ap
 }
 
 /** Rebuild agent positions from an authoritative snapshot (used on connect / reconnect). */
-export function hydrate(agents: AgentSeed[], sequence: number, mode: ExecutionMode, pendingApprovals: string[] = []): WorldState {
+export interface PackageSeed {
+  id: string;
+  package_type: string;
+  status: PackageStatus;
+  origin_district: string;
+  destination_district: string;
+  route: string[];
+  route_started_at: string | null;
+  eta: string | null;
+  opportunity_id: string | null;
+  priority: number;
+}
+
+export function hydrate(agents: AgentSeed[], sequence: number, mode: ExecutionMode, pendingApprovals: string[] = [],
+  packages: PackageSeed[] = [], ownerQueue: string[] = [], routeStatus: Record<string, "UP" | "DOWN"> = {}): WorldState {
   const w = initialWorld(agents, sequence, mode);
   w.pendingApprovals = pendingApprovals;
+  w.packages = Object.fromEntries(packages.map((p) => [p.id, {
+    id: p.id, type: p.package_type, status: p.status, origin: p.origin_district, destination: p.destination_district, route: p.route ?? [],
+    routeStartedAt: p.route_started_at, eta: p.eta, opportunityId: p.opportunity_id, priority: p.priority, updatedAt: 0,
+  }]));
+  w.ownerQueue = ownerQueue;
+  w.routeStatus = routeStatus;
   return w;
 }

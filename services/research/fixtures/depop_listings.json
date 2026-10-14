@@ -1,0 +1,9 @@
+{
+  "_fixture_notice": "FIXTURE DATA for tests and offline demos. Depop has no public API; this stands in for an authorized partner feed. Not real market data.",
+  "collected_at": "2026-10-01T00:00:00Z",
+  "region": "US",
+  "results": [
+    {"title": "Fixture vintage skate tee", "likes": 120, "sold_flag": true},
+    {"title": "Fixture y2k cargo pants", "likes": 340, "sold_flag": false}
+  ]
+}

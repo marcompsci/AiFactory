@@ -9,6 +9,22 @@ hand work to each other, and stop to ask you before anything is published.
 This repository holds the first vertical slice of the AI Civilization V3.0 spec: one complete,
 verifiable mission path from prompt to reviewable commit, rendered as a navigable city.
 
+## New in V4.0: a company that answers to you
+
+- **Atlas, the General Manager** (Claude Opus 5.5) runs a chain of command: department supervisors, specialists, and two
+  Haiku research agents. It supervises with cheap deterministic rules and only calls Opus when judgment is needed.
+- **Research division** studies the App Store charts, Etsy and Depop through permitted sources only, cites every finding,
+  never invents sales, and scores opportunities on nine weighted factors.
+- **Conveyor belts** connect every building. Research briefs, proposals, code, test reports and release packages physically
+  travel between districts; the backend decides where every package is.
+- **The Owner's Tower** is your private review room. Nothing ships until you approve the exact build Atlas reviewed — and if
+  that build changes afterward, your approval is cancelled automatically.
+
+<p><img src="docs/screenshots/owners-tower.png" alt="The Owner's Tower review with a live prototype preview" width="49%"> <img src="docs/screenshots/company-and-belts.png" alt="Company tab with the chain of command and opportunities" width="49%"></p>
+
+Try it: open **Company → Start research**, watch the packet travel, then approve it in **Owner**. The recorded acceptance run
+is in [docs/acceptance/v4-acceptance-log.md](docs/acceptance/v4-acceptance-log.md).
+
 ## What works today
 
 - **The city.** Six districts (Nexus Spire, Code Forge, Sentinel Citadel, Vision Quarter, Data Observatory,
@@ -76,7 +92,7 @@ The top bar's **Simulation** badge disappears and costs start showing in System 
 ## Tests
 
 ```bash
-python -m pytest                                       # 62 backend unit + integration tests
+python -m pytest                                       # 97 backend unit + integration tests
 npx vitest run                                         # world engine + event contract
 npx playwright test -c tests/e2e/playwright.config.ts  # real browser against a real API
 ```

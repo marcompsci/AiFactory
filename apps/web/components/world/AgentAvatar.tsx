@@ -79,6 +79,34 @@ function Body({ shape, color, height }: { shape: string; color: string; height: 
           </mesh>
         </group>
       );
+    case "monolith":
+      return (
+        <group>
+          <mesh position={[0, height / 2, 0]}>
+            <boxGeometry args={[0.7, height, 0.35]} />
+            {mat}
+          </mesh>
+          <mesh position={[0, height + 0.25, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.55, 0.05, 8, 32]} />
+            <meshBasicMaterial color="#F4D58D" toneMapped={false} />
+          </mesh>
+        </group>
+      );
+    case "drone":
+      return (
+        <group position={[0, height * 0.8, 0]}>
+          <mesh>
+            <sphereGeometry args={[0.3, 16, 12]} />
+            {mat}
+          </mesh>
+          {[0, Math.PI / 2].map((r) => (
+            <mesh key={r} rotation={[0, r, 0]}>
+              <boxGeometry args={[1.3, 0.06, 0.12]} />
+              {mat}
+            </mesh>
+          ))}
+        </group>
+      );
     default:
       return (
         <mesh position={[0, height * 0.55, 0]}>
@@ -153,6 +181,13 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
     >
       <group ref={body}>
         <Body shape={agent.shape} color={agent.color} height={agent.height} />
+        {agent.carrying ? (
+          // the holographic package an agent carries to its dispatch terminal
+          <mesh position={[0, agent.height + 0.6, 0]} rotation={[0.4, 0.6, 0]}>
+            <boxGeometry args={[0.6, 0.6, 0.6]} />
+            <meshStandardMaterial color="#5BF2A5" emissive="#5BF2A5" emissiveIntensity={1.1} transparent opacity={0.7} />
+          </mesh>
+        ) : null}
       </group>
       {/* status ring = execution state; independent of whether the avatar is walking */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>

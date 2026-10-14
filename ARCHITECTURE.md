@@ -86,3 +86,84 @@ complete work, and an animation finishing never means a task finished.
 | `services/tools/sandbox.py` | ProcessSandbox, DockerSandbox, path confinement |
 | `services/model_gateway/gateway.py` | provider adapters, retries, error normalization, cost estimates, context fitting |
 | `services/memory/store.py` | verified (must cite a tool execution/artifact) vs hypothesis memory, TTL, deletion |
+
+---
+
+# V4.0 — management, market intelligence, logistics, two-stage release
+
+```
+ OWNER ──(Owner's Tower: APPROVE / REQUEST_CHANGES / REJECT / DEFER, bound to a sha256)──┐
+   │                                                                                     │
+ Atlas, General Manager (claude-opus-5-5) ── rules first; Opus only for packet review and release review
+   ├─ Vega   (Operations)          ── releases only with a valid owner authorization
+   ├─ Orin   (App Studio)  └─ Kade ── builds the prototype + deterministic bundle
+   ├─ Sentry (Quality & Security)  ── tests the exact bundle
+   ├─ Lumen  (Research)    └─ Pip, Wren (claude-haiku-5-5) ── permitted market data only
+   └─ Iris   (Design)
+```
+
+## Opportunity workflow (`services/management/pipeline.py`)
+
+`RESEARCHED → MANAGER_REVIEW → ROUTED → DEPARTMENT_ACCEPTED → IN_PRODUCTION → QUALITY_REVIEW → MANAGER_APPROVAL → OWNER_APPROVAL → RELEASE_AUTHORIZED`,
+plus `REVISION_REQUESTED`, `REJECTED` (reopenable), `DEFERRED`, `CANCELLED`. Transitions are validated (`core/state.py`).
+
+Each stage starts only when the right package has **arrived** at the right building:
+
+| Package | From → To | Consumed by | Next |
+|---|---|---|---|
+| research_brief | Data Observatory → Nexus Spire | Atlas | packet review (rules, then optional Opus veto) |
+| product_proposal | Nexus Spire → Code Forge | Orin (capacity check) | `build_prototype` mission |
+| code_artifact | Code Forge → Sentinel Citadel | Sentry | `qa_prototype` mission on the exact bundle |
+| test_report | Sentinel Citadel → Nexus Spire | Atlas | 12-category release review |
+| release_package | Nexus Spire → Owner's Tower | the owner | owner decision |
+| revision_request | any → Code Forge | Orin | new production mission (max 2 revisions) |
+
+## Durable supervision without a model in the loop
+
+`scheduled_jobs` holds three jobs with persisted due times, run by `management/scheduler.py` and poked early when a mission
+finishes or the owner decides:
+
+- **logistics** (1 s): advances packages from stored route + start time + belt speed; reroutes around DOWN belts; retries failed deliveries with backoff.
+- **pipeline** (1 s): one idempotent step per active opportunity.
+- **supervisor** (15 s): stalled tasks, budget suspensions, goal-drift checkpoints against the approved spec, reassignment to idle peers with the same permissions, release-integrity scan. Pure rules; it never asks a model whether something is still running.
+
+## Conveyor network (`services/logistics/`)
+
+Derived from `districts.json`: every district has a dispatch and a receiving terminal at its gate, spoke belts to a ring of
+junctions, and the ring runs both ways — so every pair of buildings has two independent paths. Routing is Dijkstra with a
+congestion penalty (+50% length per package already on a belt). The browser mirrors the same geometry
+(`packages/world-engine/src/logistics.ts`, parity-tested against the backend) and positions each package from its
+server-side route, start time and belt speed, corrected for clock skew. A package whose animation reaches the end before the
+backend says ARRIVED waits there, pulsing.
+
+## Two-stage release approval
+
+1. **Manager review** — `management/release.py` checks requirements, functionality, tests (on the reviewed digest), security,
+   privacy, accessibility, performance, store metadata, documentation, market rationale, cost and known limitations; verdict
+   `APPROVED_FOR_OWNER_REVIEW | CHANGES_REQUESTED | REJECTED | BLOCKED`. Opus may write the summary and may tighten the verdict, never loosen it.
+2. **Owner decision** — only the `owner` role; the request must carry the digest the owner saw; stored append-only.
+   APPROVE creates a `release_authorizations` row bound to that artifact and digest.
+3. **Enforcement** — `submit_release` is a release-gated tool. Inside `execute_tool` the backend re-checks: owner APPROVE
+   exists, no invalidation, the artifact is still the newest bundle, and the file on disk still hashes to the approved digest.
+   Any mismatch writes an append-only invalidation, emits `release.invalidated`, sends the opportunity back to manager
+   review (rebuild), and denies the call. A rebuilt bundle always gets a fresh review and a fresh owner decision, even if its bytes are identical.
+
+## Research (`services/research/`)
+
+Connectors: Apple's public RSS charts (no key), Etsy Open API v3 (`ETSY_API_KEY`), Depop authorized partner API (only if configured — Depop has no public API),
+App Store Connect for the owner's own apps (ES256 API key). Every finding stores source URL, collection time, region, coverage,
+measurement type (ranking / listing count / popularity proxy / review signal / direct sales) and confidence. Fixtures are only
+used in `fixture` mode or as a labeled fallback in `auto`; their URLs are `fixture://…`, their findings `data_mode=fixture`, and the
+packet, review, Owner's Tower and acceptance log all say so. Runs are rate-limited and daily-capped per source, cached for 6 hours
+(dedupe), and executed through the `query_market_source` tool so permissions, budgets and audit apply.
+
+## Cost routing
+
+| Work | Model / mechanism |
+|---|---|
+| Strategy and complex review | `claude-opus-5-5` (two calls per opportunity at most) |
+| Research extraction and summarization | `claude-haiku-5-5` |
+| Routine development and analysis | `claude-sonnet-5-5` |
+| Scheduling, status, routing, supervision | deterministic code |
+
+Per-agent, per-department, per-mission and daily budgets; per-source research query limits; temperature-0 response cache in the gateway; deduplicated research runs.

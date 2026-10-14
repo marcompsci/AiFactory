@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://aiciv.local/contracts/event-envelope.v1.json",
   "title": "AI Civilization event envelope v1",
-  "description": "Every event the backend publishes, whether over the realtime stream or from the reconciliation endpoint, uses this envelope. PostgreSQL is the source of truth; this envelope is a projection of a row in the events table.",
+  "description": "Every event the backend publishes, whether over the realtime stream or from the reconciliation endpoint, uses this envelope. PostgreSQL is the source of truth; this envelope is a projection of a row in the events table. V4.0 added management, research, logistics and release event types (additive; schema_version stays 1 because no existing field changed meaning).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,11 +18,31 @@
     "payload"
   ],
   "properties": {
-    "event_id": { "type": "string", "format": "uuid" },
-    "schema_version": { "const": 1 },
-    "organization_id": { "type": "string", "format": "uuid" },
-    "mission_id": { "type": ["string", "null"], "format": "uuid" },
-    "agent_id": { "type": ["string", "null"], "format": "uuid" },
+    "event_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "organization_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "mission_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "agent_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
     "event_type": {
       "enum": [
         "mission.created",
@@ -48,16 +68,56 @@
         "approval.rejected",
         "artifact.created",
         "usage.recorded",
-        "system.emergency_stop"
+        "system.emergency_stop",
+        "manager.goal_assigned",
+        "manager.review_started",
+        "manager.review_completed",
+        "manager.revision_requested",
+        "manager.escalation_created",
+        "manager.decision_recorded",
+        "research.started",
+        "research.finding_created",
+        "research.opportunity_identified",
+        "research.completed",
+        "package.dispatched",
+        "package.in_transit",
+        "package.arrived",
+        "package.rerouted",
+        "package.delivery_failed",
+        "package.received",
+        "release.manager_approved",
+        "release.owner_approval_requested",
+        "release.owner_approved",
+        "release.owner_rejected",
+        "release.authorized",
+        "release.invalidated",
+        "release.executed",
+        "opportunity.status_changed",
+        "report.submitted",
+        "logistics.route_status_changed"
       ]
     },
-    "sequence": { "type": "integer", "minimum": 1 },
-    "occurred_at": { "type": "string", "format": "date-time" },
-    "correlation_id": { "type": "string", "format": "uuid" },
-    "payload": { "type": "object" },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "correlation_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "payload": {
+      "type": "object"
+    },
     "execution_mode": {
       "description": "live = real tool execution / real model call. simulation = clearly labeled stand-in (no provider credentials, or ambient world motion).",
-      "enum": ["live", "simulation"]
+      "enum": [
+        "live",
+        "simulation"
+      ]
     }
   }
 }

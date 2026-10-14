@@ -21,3 +21,21 @@ Locally without Playwright's browser download: `PW_CHROME=/path/to/chrome PYTHON
 - Postgres/Supabase mode (migrations, RLS) — no Postgres was available in the build environment.
 - Database-disconnect resilience and 3D frame-time budgets on real phones.
 - Load tests for concurrent missions.
+
+## V4.0 additions
+
+| Suite | What it covers |
+|---|---|
+| `tests/integration/test_v4_acceptance.py` | **Acceptance scenario** end to end (Haiku researcher → cited packet → belt → Opus GM → App Studio prototype → QA real tests on the exact bundle → 12-category GM review → Owner's Tower → release refused until the owner approves that digest → release → tamper → invalidation → rebuild → renewed reviews → old approval refused); Opus used only for judgment and Haiku for research; the model can only tighten; low-confidence research never reaches production; spend beyond delegation escalates to the owner; owner REQUEST_CHANGES / DEFER / reopen; non-owners cannot decide |
+| `tests/unit/test_v4_units.py` | belt graph reachability, ring alternative paths, congestion routing, package lifecycle driven by the backend, reroute around a DOWN belt, failed delivery + retry, state machines, scoring components/weights/flags, connector fixture labeling, live mode never using fixtures, Apple feed parsing, Etsy 429 handling, research cache dedupe + daily limits, reporting chain, append-only owner decisions, deterministic + traversal-safe bundles, the prototype template passing its own tests, verdict rules, model routing, per-agent model override, backend/browser graph parity, logistics tick under load |
+| `packages/world-engine/src/world.test.ts` | client belt graph matches the backend exactly, terminal positions, package sampling, package/owner-queue events |
+| `tests/e2e/app.spec.ts` | V4 owner flow in a real browser: research → Owner's Tower with live prototype preview, digest match and fixture banner → approve → released |
+
+### Last verified run (Oct 14, 2026)
+
+- `pytest`: **97 passed** (two consecutive full runs before the load test was added: 96 + 96)
+- `vitest`: **13 passed**
+- `playwright`: **5 passed**
+- `tsc --noEmit`, `next build`: clean
+- Performance: logistics tick with 200 packages in flight **40 ms** (interval 1 s); full acceptance pipeline from research to Owner's Tower ≈ 1.5 s with test belt speed
+- Recorded acceptance log: [`docs/acceptance/v4-acceptance-log.md`](docs/acceptance/v4-acceptance-log.md) (286 events)

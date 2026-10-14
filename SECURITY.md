@@ -23,6 +23,23 @@ web page says can widen what a tool call is allowed to do.
 | Dependency scanning | `npm audit --audit-level=high` in CI | `.github/workflows/ci.yml` |
 | Memory trust | `verified` entries must cite a tool execution or artifact; model text is stored as `hypothesis`; nothing is promoted automatically | `test_verified_memory_requires_source` |
 
+## V4.0 controls
+
+| Control | Implementation | Verified by |
+|---|---|---|
+| Owner-only release decisions | `owner` role required; admins and the General Manager cannot decide | `test_viewer_cannot_approve_releases` |
+| Exact-artifact approval | owner request must carry the reviewed digest; authorization bound to artifact id + sha256 | acceptance test steps 6, 8 |
+| Release enforced at the tool boundary | `submit_release` checks authorization, invalidations, newest bundle and on-disk hash inside `execute_tool` | acceptance test steps 5, 9 |
+| Tamper detection | supervisor and the gate re-hash bundles; mismatch → append-only invalidation → rebuild + renewed reviews | acceptance test step 8 |
+| Append-only decisions | Postgres triggers / SQLite triggers forbid UPDATE/DELETE on owner decisions, authorizations, invalidations | `test_owner_decisions_are_append_only` |
+| Manager cannot loosen rules | Opus output may only reject or tighten | `test_gm_model_can_only_tighten` |
+| Spending beyond delegation | escalates to the owner (`owner-commit`) | `test_spend_beyond_delegated_limit_escalates_to_owner` |
+| Low-confidence research | never routed to production | `test_low_confidence_research_never_reaches_production` |
+| Compliant data access | no scraping; Depop only via configured partner API; Etsy 429 is respected; fixtures labeled everywhere | connector unit tests |
+| Prototype preview isolation | rendered via `srcDoc` in an iframe sandboxed without `allow-same-origin`; API serves bundle files with a CSP | Owner's Tower code + `bundle_file` headers |
+| Bundle extraction | rejects path traversal entries | `test_bundle_is_deterministic_and_safe` |
+| Untrusted research text | fenced in `<untrusted>` in every Haiku/Opus prompt; the spec used for building is read from the approved record, never from tool arguments | `scaffold_prototype` |
+
 ## Known gaps (tracked in PROGRESS.md)
 
 - The process sandbox is a good local default, not a security boundary against a hostile kernel exploit.
@@ -30,6 +47,8 @@ web page says can widen what a tool call is allowed to do.
 - Rate limiting and the mission queue are in-process; multi-instance deployments need Redis.
 - Supabase JWT mode maps every user to the seed organization; multi-org membership lookup is not wired yet.
 - Python dependency scanning (`pip-audit`) is not in CI yet.
+- Opus/Haiku calls were exercised with a fake provider in tests; no real model was called in the build environment.
+- Live Etsy, Depop, Apple and App Store Connect access was not exercised (no credentials or network); fixtures cover those paths.
 
 ## Reporting
 

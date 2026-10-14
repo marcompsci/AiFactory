@@ -91,7 +91,7 @@ class TaskEnv:
         with transaction() as conn:
             ops.check_budget(conn, self.mission.id, self.agent.id, self.ctx.org_id)
         try:
-            res = self.gateway.complete(ModelRequest(system=SYSTEM_BASE, prompt=prompt, max_tokens=max_tokens),
+            res = self.gateway.complete(ModelRequest(system=SYSTEM_BASE, prompt=prompt, max_tokens=max_tokens, model=self.agent.model_name),
                                         preferred_provider=self.agent.model_provider)
         except ProviderError as exc:
             raise TaskError(f"model call failed: {exc}") from exc

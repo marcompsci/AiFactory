@@ -54,3 +54,38 @@ def assert_transition(kind: str, current: str, target: str) -> None:
         raise InvalidTransition(f"unknown {kind} state {current!r}")
     if target not in table[current]:
         raise InvalidTransition(f"{kind}: {current} -> {target} is not allowed")
+
+
+# V4.0 OpportunityPacket workflow. Rejection, revision, cancellation, deferral and retry paths are explicit.
+OPPORTUNITY_TRANSITIONS: dict[str, set[str]] = {
+    "RESEARCHED": {"MANAGER_REVIEW", "CANCELLED"},
+    "MANAGER_REVIEW": {"ROUTED", "REJECTED", "CANCELLED"},
+    "ROUTED": {"DEPARTMENT_ACCEPTED", "MANAGER_REVIEW", "CANCELLED"},          # department may hand it back
+    "DEPARTMENT_ACCEPTED": {"IN_PRODUCTION", "CANCELLED"},
+    "IN_PRODUCTION": {"QUALITY_REVIEW", "REVISION_REQUESTED", "REJECTED", "CANCELLED"},
+    "QUALITY_REVIEW": {"MANAGER_APPROVAL", "REVISION_REQUESTED", "CANCELLED"},
+    "MANAGER_APPROVAL": {"OWNER_APPROVAL", "REVISION_REQUESTED", "REJECTED", "CANCELLED"},
+    "OWNER_APPROVAL": {"RELEASE_AUTHORIZED", "REVISION_REQUESTED", "REJECTED", "DEFERRED", "MANAGER_APPROVAL", "CANCELLED"},
+    "RELEASE_AUTHORIZED": {"MANAGER_APPROVAL"},                                  # invalidated: artifact changed after approval
+    "REVISION_REQUESTED": {"IN_PRODUCTION", "REJECTED", "CANCELLED"},
+    "DEFERRED": {"OWNER_APPROVAL", "CANCELLED"},
+    "REJECTED": {"MANAGER_REVIEW"},                                               # owner/GM may reopen (retry)
+    "CANCELLED": set(),
+}
+
+PACKAGE_TRANSITIONS: dict[str, set[str]] = {
+    "QUEUED": {"IN_TRANSIT", "DELIVERY_FAILED", "CANCELLED"},
+    "IN_TRANSIT": {"IN_TRANSIT", "ARRIVED", "DELIVERY_FAILED", "CANCELLED"},     # IN_TRANSIT -> IN_TRANSIT = reroute
+    "DELIVERY_FAILED": {"IN_TRANSIT", "CANCELLED"},
+    "ARRIVED": {"RECEIVED"},
+    "RECEIVED": set(),
+    "CANCELLED": set(),
+}
+
+
+def assert_v4_transition(kind: str, current: str, target: str) -> None:
+    table = {"opportunity": OPPORTUNITY_TRANSITIONS, "package": PACKAGE_TRANSITIONS}[kind]
+    if current == target and kind == "opportunity":
+        return
+    if target not in table.get(current, set()):
+        raise InvalidTransition(f"{kind}: {current} -> {target} is not allowed")

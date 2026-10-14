@@ -3,7 +3,9 @@
 import { DISTRICT_BY_ID } from "@aiciv/world-engine";
 import { useStore, type CameraMode, type Tab } from "@/lib/store";
 import { human, STATUS_COLOR } from "@/lib/format";
-import { ApprovalQueue, LiveActivityFeed } from "./Activity";
+import { LiveActivityFeed } from "./Activity";
+import { CompanyPanel } from "./Company";
+import { OwnerDesk } from "./OwnerTower";
 import { AgentRoster } from "./Agents";
 import { MissionConsole } from "./Missions";
 import { SystemPanel } from "./System";
@@ -111,9 +113,10 @@ export function DistrictCard() {
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "missions", label: "Missions" },
+  { id: "company", label: "Company" },
   { id: "agents", label: "Agents" },
   { id: "activity", label: "Activity" },
-  { id: "approvals", label: "Approvals" },
+  { id: "approvals", label: "Owner" },
   { id: "system", label: "System" },
 ];
 
@@ -122,7 +125,7 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
   const setTab = useStore((s) => s.setTab);
   const sheet = useStore((s) => s.sheet);
   const setSheet = useStore((s) => s.setSheet);
-  const approvals = useStore((s) => s.world.pendingApprovals.length + (s.demoApproval ? 1 : 0));
+  const approvals = useStore((s) => s.world.pendingApprovals.length + s.world.ownerQueue.length + (s.demoApproval ? 1 : 0));
   const running = useStore((s) => Object.values(s.world.agents).filter((a) => a.execState === "EXECUTING").length);
   const height = { peek: "var(--sheet-peek)", half: "52dvh", full: "calc(100dvh - 72px)" }[sheet];
   const cycle = () => setSheet(sheet === "peek" ? "half" : sheet === "half" ? "full" : "peek");
@@ -142,7 +145,7 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
             type="button"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`relative shrink-0 rounded-xl px-3 py-2 text-sm ${tab === t.id ? "bg-white/10 text-ink" : "text-ink-2 hover:text-ink"}`}
+            className={`relative shrink-0 rounded-xl px-2.5 py-2 text-[13px] ${tab === t.id ? "bg-white/10 text-ink" : "text-ink-2 hover:text-ink"}`}
           >
             {t.label}
             {t.id === "approvals" && approvals ? (
@@ -156,7 +159,8 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
         {tab === "missions" ? <MissionConsole /> : null}
         {tab === "agents" ? <AgentRoster /> : null}
         {tab === "activity" ? <LiveActivityFeed /> : null}
-        {tab === "approvals" ? <ApprovalQueue /> : null}
+        {tab === "company" ? <CompanyPanel /> : null}
+        {tab === "approvals" ? <OwnerDesk /> : null}
         {tab === "system" ? <SystemPanel onReconnect={onReconnect} /> : null}
       </div>
     </aside>

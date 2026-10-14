@@ -90,9 +90,71 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: `Saved ${s("kind").replace("_", " ")}: ${s("title")}`, tone: "#A66BFF" };
     case "usage.recorded":
       return { who, text: `${s("model")}: ${s("input_tokens")} in / ${s("output_tokens")} out, est. ${usd(Number(p.estimated_cost_usd))}`, tone: "#8FA8FF" };
+    case "research.started":
+      return { who, text: `Querying ${s("source").replace("_", " ")} for "${s("query")}"${p.cached ? " (cached)" : ""}`, tone: "#5BF2A5" };
+    case "research.finding_created":
+      return { who, text: `Finding: ${s("title")}${p.data_mode === "fixture" ? " [fixture data]" : ""}`, tone: "#5BF2A5" };
+    case "research.opportunity_identified":
+      return { who, text: `Opportunity: ${s("title")} (score ${Number(p.score).toFixed(2)})`, tone: "#5BF2A5" };
+    case "research.completed":
+      return { who, text: p.status === "unavailable" ? `Source unavailable: ${s("reason")}` : "Research complete", tone: "#5BF2A5" };
+    case "package.dispatched":
+    case "package.in_transit":
+      return { who, text: `${human(s("package_type"))} on the belt: ${s("origin")} → ${s("destination")}`, tone: "#32D8FF" };
+    case "package.rerouted":
+      return { who, text: `${human(s("package_type"))} rerouted around a belt problem`, tone: "#FFBD69" };
+    case "package.arrived":
+      return { who, text: `${human(s("package_type"))} arrived at ${s("destination")}`, tone: "#32D8FF" };
+    case "package.received":
+      return { who, text: `${human(s("package_type"))} taken in at ${s("district")}`, tone: "#8FA8FF" };
+    case "package.delivery_failed":
+      return { who, text: `${human(s("package_type"))} could not be delivered: ${s("reason")}`, tone: "#FF6178" };
+    case "manager.decision_recorded":
+      return { who, text: `${human(s("decision_type"))}: ${s("outcome").replaceAll("_", " ").toLowerCase()}`, tone: "#EAF2FF" };
+    case "manager.review_started":
+      return { who, text: "Started a review", tone: "#A66BFF" };
+    case "manager.review_completed":
+      return { who, text: `Review: ${s("outcome").replaceAll("_", " ").toLowerCase()}`, tone: "#A66BFF" };
+    case "manager.goal_assigned":
+      return { who, text: "Assigned a measurable goal", tone: "#A66BFF" };
+    case "manager.revision_requested":
+      return { who, text: "Sent work back for revision", tone: "#FFBD69" };
+    case "manager.escalation_created":
+      return { who, text: `Escalated: ${s("rationale") || s("reason")}`, tone: "#FFBD69" };
+    case "release.manager_approved":
+      return { who, text: "Release approved by the manager; heading to your tower", tone: "#F4D58D" };
+    case "release.owner_approval_requested":
+      return { who, text: `Waiting for your decision: ${s("title")}`, tone: "#F4D58D" };
+    case "release.owner_approved":
+      return { who, text: "You approved the release", tone: "#5BF2A5" };
+    case "release.owner_rejected":
+      return { who, text: "You rejected the release", tone: "#FF6178" };
+    case "release.authorized":
+      return { who, text: `Release authorized for bundle ${s("artifact_digest").slice(0, 10)}`, tone: "#5BF2A5" };
+    case "release.invalidated":
+      return { who, text: `Release approval cancelled: ${s("reason")}`, tone: "#FF6178" };
+    case "release.executed":
+      return { who, text: `Released to ${s("channel").replace("_", " ")}`, tone: "#5BF2A5" };
+    case "opportunity.status_changed":
+      return { who, text: `${s("title")}: ${human(s("to"))}`, tone: "#8FA8FF" };
+    case "report.submitted":
+      return { who, text: `Report (${human(s("kind"))}): ${s("body")}`, tone: "#8FA8FF" };
+    case "logistics.route_status_changed":
+      return { who, text: `Belt ${s("status") === "DOWN" ? "down" : "restored"}`, tone: s("status") === "DOWN" ? "#FF6178" : "#5BF2A5" };
     case "system.emergency_stop":
       return { who, text: p.engaged ? "Emergency stop engaged" : "Emergency stop released", tone: "#FF6178" };
     default:
       return { who, text: e.event_type, tone: "#8FA8FF" };
   }
 }
+
+export const PACKAGE_COLORS: Record<string, string> = {
+  research_brief: "#5BF2A5",
+  product_proposal: "#A66BFF",
+  design_spec: "#FF6178",
+  code_artifact: "#32D8FF",
+  test_report: "#FFBD69",
+  revision_request: "#FF6178",
+  approval_request: "#F4D58D",
+  release_package: "#F4D58D",
+};

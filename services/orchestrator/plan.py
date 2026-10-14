@@ -105,8 +105,47 @@ def validate_prompt(prompt: str) -> str:
     return prompt
 
 
-def plan_for(prompt: str) -> list[TaskSpec]:
-    """Only one mission template ships in the vertical slice: repair failing tests in the selected repository."""
-    graph = FIX_FAILING_TEST_GRAPH
+# ---------------------------------------------------------------- V4 mission templates
+def research_graph(agent_key: str) -> list[TaskSpec]:
+    return [TaskSpec("research", agent_key, "Research the market", "data-observatory", "observatory-lens",
+                     ["query_market_source", "create_artifact"], expected_outputs={"opportunity_id": "str|null"},
+                     validation={"cites_sources": True}, timeout_seconds=180)]
+
+
+BUILD_PROTOTYPE_GRAPH: list[TaskSpec] = [
+    TaskSpec("scaffold", "developer", "Build the prototype from the approved spec", "code-forge", "forge-anvil",
+             ["scaffold_prototype", "list_files", "read_file"], expected_outputs={"files": "list[str]"},
+             validation={"matches_spec": True}),
+    TaskSpec("bundle", "developer", "Package a release bundle", "code-forge", "forge-anvil",
+             ["build_release_bundle"], depends_on=["scaffold"], expected_outputs={"artifact_id": "str", "digest": "sha256"}),
+]
+
+QA_PROTOTYPE_GRAPH: list[TaskSpec] = [
+    TaskSpec("qa_verify", "qa", "Test the exact release bundle", "sentinel-citadel", "citadel-testbay",
+             ["stage_bundle", "run_tests", "run_build", "create_artifact"], expected_outputs={"passed": "int", "failed": "int", "bundle_digest": "sha256"},
+             validation={"all_tests_pass": True, "tests_ran_on_reviewed_digest": True}),
+]
+
+RELEASE_GRAPH: list[TaskSpec] = [
+    TaskSpec("release", "commander", "Release the owner-approved bundle", "nexus-spire", "nexus-command",
+             ["submit_release", "create_artifact"], expected_outputs={"destination": "str"}, validation={"owner_authorized": True},
+             max_attempts=1),
+]
+
+KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release")
+
+
+def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list[TaskSpec]:
+    params = params or {}
+    if kind in ("fix_failing_test", "") or kind not in KINDS:
+        graph = FIX_FAILING_TEST_GRAPH
+    elif kind == "market_research":
+        graph = research_graph(params.get("agent_key", "research_apps"))
+    elif kind == "build_prototype":
+        graph = BUILD_PROTOTYPE_GRAPH
+    elif kind == "qa_prototype":
+        graph = QA_PROTOTYPE_GRAPH
+    else:
+        graph = RELEASE_GRAPH
     validate_graph(graph)
     return graph

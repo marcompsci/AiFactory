@@ -110,11 +110,12 @@ export function ApprovalCard({ summary, action, onDecide, busy, demo }: { summar
 /** Floats over the city whenever something is waiting, so approvals are never buried in a tab. */
 export function ApprovalCall() {
   const pending = useStore((s) => s.world.pendingApprovals.length);
+  const releases = useStore((s) => s.world.ownerQueue.length);
   const demo = useStore((s) => s.demoApproval);
   const tab = useStore((s) => s.tab);
   const sheet = useStore((s) => s.sheet);
   const setTab = useStore((s) => s.setTab);
-  const count = demo ? 1 : pending;
+  const count = demo ? 1 : pending + releases;
   if (!count || (tab === "approvals" && sheet !== "peek")) return null;
   return (
     <button
@@ -122,7 +123,8 @@ export function ApprovalCall() {
       onClick={() => setTab("approvals")}
       className="approval-pulse fixed left-1/2 top-[calc(max(12px,env(safe-area-inset-top))+108px)] z-30 -translate-x-1/2 whitespace-nowrap rounded-full lg:top-[calc(max(12px,env(safe-area-inset-top))+4px)] border border-warn/60 bg-ground/85 px-4 py-2 text-sm text-warn backdrop-blur"
     >
-      {count === 1 ? "1 action needs your approval" : `${count} actions need your approval`}
+      {releases && !pending ? (releases === 1 ? "A release is waiting at your tower" : `${releases} releases are waiting at your tower`)
+        : count === 1 ? "1 action needs your approval" : `${count} actions need your approval`}
     </button>
   );
 }

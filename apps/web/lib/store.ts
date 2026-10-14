@@ -1,12 +1,12 @@
 "use client";
 
 import type { EventEnvelope } from "@aiciv/event-contracts";
-import { applyEvent, initialWorld, type AgentSeed, type WorldState } from "@aiciv/world-engine";
+import { applyEvent, hydrate as hydrateWorld, initialWorld, type AgentSeed, type PackageSeed, type WorldState } from "@aiciv/world-engine";
 import { SEED } from "@aiciv/shared-types";
 import { create } from "zustand";
 
 export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "demo";
-export type Tab = "missions" | "agents" | "activity" | "approvals" | "system";
+export type Tab = "missions" | "company" | "agents" | "activity" | "approvals" | "system";
 export type CameraMode = "overview" | "orbit" | "follow" | "fly";
 export type Quality = "auto" | "high" | "low";
 
@@ -22,7 +22,34 @@ interface Settings {
   drones: boolean;
 }
 
+export interface LogisticsNode {
+  id: string;
+  kind: "dispatch" | "receiving" | "junction";
+  district: string | null;
+  position: [number, number, number];
+}
+
+export interface LogisticsRoute {
+  id: string;
+  from_node: string;
+  to_node: string;
+  length: number;
+  status: "UP" | "DOWN";
+  load?: number;
+}
+
+export interface Logistics {
+  nodes: LogisticsNode[];
+  routes: LogisticsRoute[];
+  beltSpeed: number;
+}
+
 interface Store {
+  logistics: Logistics | null;
+  /** serverTime - clientTime in ms, so package positions computed in the browser match the backend clock. */
+  clockOffset: number;
+  selectedPackageId: string | null;
+  selectPackage: (id: string | null) => void;
   status: ConnectionStatus;
   statusDetail: string;
   world: WorldState;
@@ -40,7 +67,8 @@ interface Store {
   demoApproval: DemoApproval | null;
   clock: () => number;
 
-  hydrate: (agents: AgentSeed[], sequence: number, mode: "live" | "simulation", approvals: string[]) => void;
+  hydrate: (agents: AgentSeed[], sequence: number, mode: "live" | "simulation", approvals: string[],
+    extra?: { packages?: PackageSeed[]; ownerQueue?: string[]; logistics?: Logistics; serverTime?: string }) => void;
   ingest: (events: EventEnvelope[]) => void;
   seedFeed: (history: EventEnvelope[]) => void;
   setStatus: (s: ConnectionStatus, detail?: string) => void;
@@ -63,6 +91,10 @@ const seedAgents: AgentSeed[] = SEED.agents.map((a) => ({ ...a }));
 export const useStore = create<Store>((set, get) => ({
   status: "connecting",
   statusDetail: "",
+  logistics: null,
+  clockOffset: 0,
+  selectedPackageId: null,
+  selectPackage: (id) => set({ selectedPackageId: id }),
   world: initialWorld(seedAgents),
   feed: [],
   buffer: [],
@@ -78,10 +110,14 @@ export const useStore = create<Store>((set, get) => ({
   demoApproval: null,
   clock: () => (typeof performance !== "undefined" ? performance.now() : 0),
 
-  hydrate: (agents, sequence, mode, approvals) => {
-    const world = initialWorld(agents, sequence, mode);
-    world.pendingApprovals = approvals;
-    set({ world, buffer: [], needsReplay: false });
+  hydrate: (agents, sequence, mode, approvals, extra = {}) => {
+    const routeStatus = Object.fromEntries((extra.logistics?.routes ?? []).map((r) => [r.id, r.status]));
+    const world = hydrateWorld(agents, sequence, mode, approvals, extra.packages ?? [], extra.ownerQueue ?? [], routeStatus);
+    set({
+      world, buffer: [], needsReplay: false,
+      ...(extra.logistics ? { logistics: extra.logistics } : {}),
+      ...(extra.serverTime ? { clockOffset: Date.parse(extra.serverTime) - Date.now() } : {}),
+    });
   },
 
   ingest: (incoming) => {

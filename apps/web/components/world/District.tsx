@@ -58,6 +58,11 @@ function towersFor(d: D): Tower[] {
       out.push({ pos: [0, 0, 2], size: [7, 7, 7], rot: 0, kind: "dome" });
       for (let i = 0; i < d.towers; i++) out.push({ pos: [i ? 7 : -7, H / 2, 3], size: [1.6, H, 1.6], rot: 0, kind: "cyl" });
       break;
+    case "tower":
+      out.push({ pos: [0, H / 2, -2], size: [5, H, 5], rot: Math.PI / 4, kind: "box" });
+      out.push({ pos: [0, H + 1.5, -2], size: [3.2, 3, 3.2], rot: 0, kind: "cyl" });
+      out.push({ pos: [0, 2.5, 3], size: [12, 5, 6], rot: 0, kind: "box" });
+      break;
     case "vault":
       out.push({ pos: [0, 3, 3], size: [16, 6, 8], rot: 0, kind: "box" });
       for (let i = 0; i < d.towers; i++) out.push({ pos: [(i - 1) * 5.5, 6 + H / 4, 3], size: [3, H / 2, 3], rot: Math.PI / 4, kind: "box" });
@@ -83,7 +88,7 @@ function TowerMesh({ t, color, ghost }: { t: Tower; color: string; ghost: boolea
   return (
     <group position={t.pos} rotation={[0, t.rot, 0]}>
       <mesh geometry={geom}>
-        <meshStandardMaterial color="#0d1528" roughness={0.55} metalness={0.6} transparent opacity={ghost ? 0.12 : 1} />
+        <meshStandardMaterial color={color === "#F4D58D" ? "#2a2414" : "#0d1528"} roughness={0.55} metalness={0.6} transparent opacity={ghost ? 0.12 : 1} />
       </mesh>
       <lineSegments geometry={edges}>
         <lineBasicMaterial color={color} transparent opacity={ghost ? 0.35 : 0.85} toneMapped={false} />
@@ -129,8 +134,24 @@ function Workstation({ id, label, pos, color, active }: { id: string; label: str
   );
 }
 
+/** A light column over the Owner's Tower while a release waits for the owner's decision. */
+function OwnerBeacon({ height, color }: { height: number; color: string }) {
+  const ref = useRef<THREE.Mesh>(null);
+  const reduced = useStore((s) => s.settings.reducedMotion);
+  useFrame(({ clock }) => {
+    if (ref.current) (ref.current.material as THREE.MeshBasicMaterial).opacity = reduced ? 0.35 : 0.25 + Math.abs(Math.sin(clock.elapsedTime * 2)) * 0.3;
+  });
+  return (
+    <mesh ref={ref} position={[0, height + 18, -2]}>
+      <cylinderGeometry args={[0.6, 1.6, 30, 24, 1, true]} />
+      <meshBasicMaterial color={color} transparent opacity={0.4} toneMapped={false} side={THREE.DoubleSide} depthWrite={false} />
+    </mesh>
+  );
+}
+
 export function District({ d }: { d: D }) {
   const activity = useStore((s) => s.world.districtActivity[d.id] ?? 0);
+  const ownerWaiting = useStore((s) => d.id === "owners-tower" && s.world.ownerQueue.length > 0);
   const active = useStore((s) => s.world.activeWorkstations);
   const focused = useStore((s) => s.focusedDistrict === d.id);
   const interior = useStore((s) => s.interior && s.focusedDistrict === d.id);
@@ -196,8 +217,9 @@ export function District({ d }: { d: D }) {
           <Workstation key={w.id} id={w.id} label={w.label} pos={w.offset} color={d.color} active={active[w.id]} />
         ))}
         <pointLight position={[0, 8, 4]} color={d.color} intensity={30 + activity * 120} distance={28} decay={2} />
+        {ownerWaiting ? <OwnerBeacon height={d.height} color={d.color} /> : null}
         {labels ? (
-          <Html position={[0, d.height + 3, -2]} center zIndexRange={[5, 0]}>
+          <Html position={[0, Math.min(d.height + 3, 24), -2]} center zIndexRange={[5, 0]}>
             <button
               type="button"
               onClick={() => focus(d.id)}

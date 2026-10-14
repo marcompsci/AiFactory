@@ -63,7 +63,7 @@ export function Skeleton({ lines = 3 }: { lines?: number }) {
 
 export function Pill({ color, children }: { color: string; children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs" style={{ color, background: `${color}1a` }}>
+    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs" style={{ color, background: `${color}1a` }}>
       <Dot color={color} />
       {children}
     </span>

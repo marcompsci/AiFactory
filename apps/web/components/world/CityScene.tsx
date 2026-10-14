@@ -9,9 +9,10 @@ import * as THREE from "three";
 type OrbitImpl = React.ComponentRef<typeof OrbitControls>;
 import { useStore } from "@/lib/store";
 import { AgentAvatar } from "./AgentAvatar";
+import { Conveyors } from "./Conveyors";
 import { District } from "./District";
 
-const OVERVIEW = { pos: new THREE.Vector3(62, 70, 78), target: new THREE.Vector3(0, 0, 6) };
+const OVERVIEW = { pos: new THREE.Vector3(66, 80, 84), target: new THREE.Vector3(0, 0, -2) };
 
 function Plaza() {
   const ring = useRef<THREE.Mesh>(null);
@@ -214,6 +215,7 @@ export function CityScene() {
       onPointerMissed={() => {
         focus(null);
         select(null);
+        useStore.getState().selectPackage(null);
       }}
       aria-label="3D city of AI agents"
     >
@@ -245,6 +247,7 @@ export function CityScene() {
         {Object.values(agents).map((a) => (
           <AgentAvatar key={a.id} agent={a} positions={positions} />
         ))}
+        <Conveyors />
         <Drones />
       </Suspense>
       <ViewFit />

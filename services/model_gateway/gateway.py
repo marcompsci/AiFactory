@@ -36,6 +36,7 @@ class ModelRequest:
     prompt: str
     max_tokens: int = 1500
     temperature: float = 0.0
+    model: str | None = None  # per-agent model routing; None = the adapter's default
 
 
 @dataclass
@@ -55,15 +56,21 @@ DEFAULT_PRICES = {  # USD per 1M tokens — placeholders, override via env; alwa
     "anthropic": (3.0, 15.0),
     "openai": (0.4, 1.6),
 }
+# Per-model-family placeholders (Opus for management, Haiku for research). Override with AICIV_PRICE_<FAMILY>_IN/OUT.
+FAMILY_PRICES = {"opus": (15.0, 75.0), "sonnet": (3.0, 15.0), "haiku": (1.0, 5.0)}
 
 # Rough char budget so a prompt never exceeds a conservative context window (~4 chars/token).
 MAX_PROMPT_CHARS = 120_000
 
 
-def estimate_cost(provider: str, input_tokens: int, output_tokens: int) -> float:
+def estimate_cost(provider: str, input_tokens: int, output_tokens: int, model: str | None = None) -> float:
     pin, pout = DEFAULT_PRICES.get(provider, (0.0, 0.0))
     pin = float(os.environ.get(f"AICIV_PRICE_{provider.upper()}_IN", pin))
     pout = float(os.environ.get(f"AICIV_PRICE_{provider.upper()}_OUT", pout))
+    family = next((f for f in FAMILY_PRICES if model and f in model), None)
+    if family:
+        pin = float(os.environ.get(f"AICIV_PRICE_{family.upper()}_IN", FAMILY_PRICES[family][0]))
+        pout = float(os.environ.get(f"AICIV_PRICE_{family.upper()}_OUT", FAMILY_PRICES[family][1]))
     return round(input_tokens / 1e6 * pin + output_tokens / 1e6 * pout, 6)
 
 
@@ -109,7 +116,7 @@ class AnthropicAdapter:
                 "/v1/messages",
                 headers={"x-api-key": self.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
                 json={
-                    "model": self.model,
+                    "model": req.model or self.model,
                     "max_tokens": req.max_tokens,
                     "temperature": req.temperature,
                     "system": req.system,
@@ -127,7 +134,7 @@ class AnthropicAdapter:
         text = "".join(block.get("text", "") for block in body.get("content", []) if block.get("type") == "text")
         usage = body.get("usage", {})
         it, ot = int(usage.get("input_tokens", 0)), int(usage.get("output_tokens", 0))
-        return ModelResponse(text, self.provider, self.model, it, ot, estimate_cost(self.provider, it, ot),
+        return ModelResponse(text, self.provider, req.model or self.model, it, ot, estimate_cost(self.provider, it, ot, req.model or self.model),
                              int((time.monotonic() - started) * 1000), body.get("stop_reason"), self.capabilities)
 
 
@@ -147,7 +154,7 @@ class OpenAIAdapter:
                 "/v1/chat/completions",
                 headers={"authorization": f"Bearer {self.api_key}"},
                 json={
-                    "model": self.model,
+                    "model": req.model or self.model,
                     "max_tokens": req.max_tokens,
                     "temperature": req.temperature,
                     "messages": [{"role": "system", "content": req.system}, {"role": "user", "content": fit_context(req.prompt)}],
@@ -164,8 +171,8 @@ class OpenAIAdapter:
         choice = (body.get("choices") or [{}])[0]
         usage = body.get("usage", {})
         it, ot = int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0))
-        return ModelResponse((choice.get("message") or {}).get("content") or "", self.provider, self.model, it, ot,
-                             estimate_cost(self.provider, it, ot), int((time.monotonic() - started) * 1000),
+        return ModelResponse((choice.get("message") or {}).get("content") or "", self.provider, req.model or self.model, it, ot,
+                             estimate_cost(self.provider, it, ot, req.model or self.model), int((time.monotonic() - started) * 1000),
                              choice.get("finish_reason"), self.capabilities)
 
 
@@ -183,6 +190,7 @@ class ModelGateway:
         self.adapters = adapters
         self.max_retries = max_retries
         self.timeout = timeout
+        self._cache: dict = {}  # identical deterministic (temperature 0) requests are answered once
 
     @property
     def available(self) -> bool:
@@ -197,6 +205,20 @@ class ModelGateway:
 
     def complete(self, req: ModelRequest, preferred_provider: str = "anthropic") -> ModelResponse:
         adapter = self.route(preferred_provider)
+        if adapter.provider != preferred_provider:
+            req = ModelRequest(req.system, req.prompt, req.max_tokens, req.temperature, None)  # other provider: its own default model
+        key = (adapter.provider, req.model, req.system, req.prompt, req.max_tokens) if req.temperature == 0 else None
+        if key and key in self._cache:
+            hit = self._cache[key]
+            return ModelResponse(hit.text, hit.provider, hit.model, 0, 0, 0.0, 0, hit.raw_stop_reason, {**hit.capabilities, "cached": True})
+        res = self._complete(adapter, req)
+        if key:
+            if len(self._cache) > 256:
+                self._cache.pop(next(iter(self._cache)))
+            self._cache[key] = res
+        return res
+
+    def _complete(self, adapter, req: ModelRequest) -> ModelResponse:
         attempt = 0
         while True:
             try:

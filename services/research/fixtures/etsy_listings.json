@@ -1,0 +1,11 @@
+{
+  "_fixture_notice": "FIXTURE DATA for tests and offline demos. Shaped like Etsy Open API v3 active-listing results. Not real market data. Etsy does not expose shop sales here; favorites are a popularity proxy only.",
+  "collected_at": "2026-10-01T00:00:00Z",
+  "region": "US",
+  "count": 1840,
+  "results": [
+    {"title": "Fixture printable focus planner", "price": 6.5, "num_favorers": 412},
+    {"title": "Fixture deep work tracker PDF", "price": 4.0, "num_favorers": 233},
+    {"title": "Fixture habit streak stickers", "price": 8.0, "num_favorers": 980}
+  ]
+}

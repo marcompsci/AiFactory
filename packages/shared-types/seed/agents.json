@@ -20,12 +20,15 @@
       "tools": [
         "inspect_repository",
         "prepare_pull_request",
-        "create_artifact"
+        "create_artifact",
+        "submit_release"
       ],
       "limits": {
         "max_usd_per_mission": 0.5,
         "max_concurrent_tasks": 1
-      }
+      },
+      "tier": "supervisor",
+      "department": "operations"
     },
     {
       "id": "a1000000-0000-4000-8000-000000000002",
@@ -53,7 +56,9 @@
       "limits": {
         "max_usd_per_mission": 0.5,
         "max_concurrent_tasks": 1
-      }
+      },
+      "tier": "supervisor",
+      "department": "app_studio"
     },
     {
       "id": "a1000000-0000-4000-8000-000000000003",
@@ -76,12 +81,16 @@
         "search_code",
         "create_worktree",
         "edit_file",
-        "inspect_diff"
+        "inspect_diff",
+        "scaffold_prototype",
+        "build_release_bundle"
       ],
       "limits": {
         "max_usd_per_mission": 1.0,
         "max_concurrent_tasks": 1
-      }
+      },
+      "tier": "specialist",
+      "department": "app_studio"
     },
     {
       "id": "a1000000-0000-4000-8000-000000000004",
@@ -103,12 +112,15 @@
         "run_build",
         "read_file",
         "inspect_diff",
-        "create_artifact"
+        "create_artifact",
+        "stage_bundle"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
         "max_concurrent_tasks": 1
-      }
+      },
+      "tier": "supervisor",
+      "department": "quality"
     },
     {
       "id": "a1000000-0000-4000-8000-000000000005",
@@ -129,12 +141,15 @@
         "retrieve_approved_source",
         "read_file",
         "search_code",
-        "create_artifact"
+        "create_artifact",
+        "query_market_source"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
         "max_concurrent_tasks": 1
-      }
+      },
+      "tier": "supervisor",
+      "department": "research"
     },
     {
       "id": "a1000000-0000-4000-8000-000000000006",
@@ -158,7 +173,141 @@
       "limits": {
         "max_usd_per_mission": 0.3,
         "max_concurrent_tasks": 1
-      }
+      },
+      "tier": "supervisor",
+      "department": "design"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "key": "general_manager",
+      "name": "Atlas",
+      "role": "General Manager",
+      "home_district": "nexus-spire",
+      "avatar": {
+        "shape": "monolith",
+        "color": "#EAF2FF",
+        "height": 2.3
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5"
+      },
+      "tools": [
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 1.5,
+        "max_concurrent_tasks": 3
+      },
+      "department": "executive",
+      "tier": "general_manager"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000008",
+      "key": "research_apps",
+      "name": "Pip",
+      "role": "App Store Researcher",
+      "home_district": "data-observatory",
+      "avatar": {
+        "shape": "drone",
+        "color": "#5BF2A5",
+        "height": 1.4
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "query_market_source",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.2,
+        "max_concurrent_tasks": 1
+      },
+      "department": "research",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000009",
+      "key": "research_marketplaces",
+      "name": "Wren",
+      "role": "Etsy & Depop Researcher",
+      "home_district": "data-observatory",
+      "avatar": {
+        "shape": "drone",
+        "color": "#FFBD69",
+        "height": 1.4
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "query_market_source",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.2,
+        "max_concurrent_tasks": 1
+      },
+      "department": "research",
+      "tier": "specialist"
     }
-  ]
+  ],
+  "departments": [
+    {
+      "key": "executive",
+      "name": "Executive Office",
+      "district": "nexus-spire",
+      "supervisor": "general_manager",
+      "daily_budget_usd": 3.0
+    },
+    {
+      "key": "operations",
+      "name": "Operations",
+      "district": "nexus-spire",
+      "supervisor": "commander",
+      "daily_budget_usd": 1.0
+    },
+    {
+      "key": "research",
+      "name": "Research Division",
+      "district": "data-observatory",
+      "supervisor": "researcher",
+      "daily_budget_usd": 1.0
+    },
+    {
+      "key": "app_studio",
+      "name": "App Studio",
+      "district": "code-forge",
+      "supervisor": "architect",
+      "daily_budget_usd": 2.0
+    },
+    {
+      "key": "quality",
+      "name": "Quality & Security",
+      "district": "sentinel-citadel",
+      "supervisor": "qa",
+      "daily_budget_usd": 1.0
+    },
+    {
+      "key": "design",
+      "name": "Design Studio",
+      "district": "vision-quarter",
+      "supervisor": "designer",
+      "daily_budget_usd": 1.0
+    }
+  ],
+  "reporting": {
+    "general_manager": null,
+    "commander": "general_manager",
+    "architect": "general_manager",
+    "qa": "general_manager",
+    "researcher": "general_manager",
+    "designer": "general_manager",
+    "developer": "architect",
+    "research_apps": "researcher",
+    "research_marketplaces": "researcher"
+  }
 }

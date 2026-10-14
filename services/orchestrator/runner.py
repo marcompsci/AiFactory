@@ -23,8 +23,13 @@ from services.core.events import emit, transaction
 from services.model_gateway.gateway import ModelGateway, ModelRequest, ProviderError
 from services.tools.registry import ToolContext
 
+from services.management.hierarchy import submit_report
+
 from . import ops
 from .handlers import HANDLERS, NeedsApproval, SkipTask, TaskEnv, TaskError, VerificationFailed
+from .studio_handlers import V4_HANDLERS
+
+HANDLERS.update(V4_HANDLERS)
 from .plan import PlanError, plan_for, validate_prompt
 
 log = logging.getLogger("aiciv.runner")
@@ -110,9 +115,9 @@ class MissionRunner:
             project = conn.execute(select(db.projects).where(db.projects.c.id == m.project_id)).first()
         if org.emergency_stopped:
             raise PlanError("emergency stop is engaged")
-        if repo is None or repo.project_id != m.project_id:
+        if m.kind == "fix_failing_test" and (repo is None or repo.project_id != m.project_id):
             raise PlanError("repository is not part of this project")
-        needed = {t for spec in plan_for(m.prompt) for t in spec.permitted_tools}
+        needed = {t for spec in plan_for(m.kind, m.params) for t in spec.permitted_tools}
         missing = needed - set(project.allowed_tools or [])
         if missing:
             raise PlanError(f"project does not allow tools: {sorted(missing)}")
@@ -121,18 +126,20 @@ class MissionRunner:
         with transaction() as conn:
             commander = conn.execute(select(db.agents).where(db.agents.c.key == "commander")).first()
             ops.message(conn, mission_id=self.mission_id, from_agent=commander.id, to_agent=None, kind="status",
-                        body=f"Permissions validated for {repo.full_name}: {len(needed)} tools within project policy.",
+                        body=f"Permissions validated for {repo.full_name if repo and m.kind == 'fix_failing_test' else m.kind.replace('_', ' ')}: {len(needed)} tools within project policy.",
                         mode=m.execution_mode, org_id=m.organization_id)
             ops.set_mission_status(conn, self.mission_id, "PLANNING")
 
     def _plan(self) -> None:
         m = self.mission()
-        graph = plan_for(m.prompt)
+        graph = plan_for(m.kind, m.params)
         with db.get_engine().connect() as conn:
             agents = {a.key: a for a in conn.execute(select(db.agents)).fetchall()}
             existing = conn.execute(select(db.tasks.c.id).where(db.tasks.c.mission_id == self.mission_id)).first()
         rationale = None
-        if m.execution_mode == "live":
+        if m.kind != "fix_failing_test":
+            rationale = f"Plan: {', '.join(t.title.lower() for t in graph)}."
+        elif m.execution_mode == "live":
             try:
                 with transaction() as conn:
                     ops.check_budget(conn, self.mission_id, agents["commander"].id, m.organization_id)
@@ -277,6 +284,9 @@ class MissionRunner:
                 if moving:
                     ops.arrive(conn, agent.id, task.district, task.inputs.get("workstation"), self.mission_id, mode)
                 ops.set_agent_state(conn, agent.id, "EXECUTING", self.mission_id, mode)
+                submit_report(conn, org_id=m.organization_id, agent_id=agent.id, kind="progress", body=f"Started: {task.title}",
+                              mission_id=self.mission_id, task_id=task_id, mode=mode,
+                              data={"attempt": task.attempt + (0 if resumed else 1), "estimate_s": task.timeout_seconds})
 
             env = TaskEnv(ToolContext(self.mission_id, task_id, agent.id, m.organization_id, mode), task, m, agent, self.gateway)
             outcome, outputs, error = "COMPLETED", None, None
@@ -296,7 +306,9 @@ class MissionRunner:
 
             with transaction() as conn:
                 now = db.utcnow()
+                rep = dict(org_id=m.organization_id, agent_id=agent.id, mission_id=self.mission_id, task_id=task_id, mode=mode)
                 if outcome == "COMPLETED":
+                    submit_report(conn, kind="completed_package", body=f"Done: {task.title}", data={"outputs_keys": sorted((outputs or {}).keys())}, **rep)
                     ops.set_task_status(conn, task_id, "COMPLETED", outputs=outputs)
                     ops.set_agent_state(conn, agent.id, "COMPLETED", self.mission_id, mode)
                     conn.execute(update(db.task_runs).where(db.task_runs.c.id == run_id).values(status="COMPLETED", finished_at=now))
@@ -319,6 +331,7 @@ class MissionRunner:
                         emit(conn, "approval.requested", mission_id=self.mission_id, agent_id=agent.id, execution_mode=mode,
                              payload={"approval_id": aid, "task_id": task_id, "action": approval.action, "summary": approval.summary})
                 elif outcome == "BUDGET":
+                    submit_report(conn, kind="resource_request", body=f"Budget reached on {task.title}: {error}", **rep)
                     conn.execute(update(db.task_runs).where(db.task_runs.c.id == run_id).values(status="FAILED", error=error, finished_at=now))
                     ops.set_task_status(conn, task_id, "PENDING", error=error)
                     ops.reset_agent(conn, agent.id, "budget suspension")
@@ -326,6 +339,8 @@ class MissionRunner:
                     emit(conn, "mission.status_changed", mission_id=self.mission_id, execution_mode=mode,
                          payload={"from": "RUNNING", "to": "RUNNING", "paused": True, "pause_reason": error, "suspended_by": "budget"})
                 else:
+                    # Reporting a failure is information for the supervisor, never a penalty for the agent.
+                    submit_report(conn, kind="blocker" if outcome == "FAILED" else "quality_concern", body=f"{task.title}: {(error or '')[:300]}", **rep)
                     conn.execute(update(db.task_runs).where(db.task_runs.c.id == run_id).values(status="FAILED", error=error, finished_at=now))
                     self._retry_or_fail(conn, task, error or "failed", outcome == "VERIFY_FAILED", agent.id, mode)
         finally:
@@ -373,8 +388,11 @@ class MissionRunner:
     def _complete(self) -> None:
         tasks = {t.key: t for t in self.tasks()}
         pub = tasks.get("publish")
-        outcome = "published" if pub is not None and pub.status == "COMPLETED" else (
-            "no_change" if pub is not None and (pub.outputs or {}).get("reason") == "no change to publish" else "not_published")
+        if pub is None:
+            outcome = "completed"
+        else:
+            outcome = "published" if pub.status == "COMPLETED" else (
+                "no_change" if (pub.outputs or {}).get("reason") == "no change to publish" else "not_published")
         with transaction() as conn:
             mode = ops.mission_row(conn, self.mission_id).execution_mode
             ops.set_mission_status(conn, self.mission_id, "COMPLETED", outcome=outcome)

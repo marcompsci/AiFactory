@@ -37,3 +37,24 @@ simulated.
 
 **D10. Typography.** Unbounded for the few display moments (brand, mission and agent names), IBM Plex Sans for UI,
 IBM Plex Mono only for code, tool names and diffs.
+
+## V4.0
+
+**D11. Rules decide, Opus advises.** The General Manager's routing, acceptance and release verdicts are deterministic rules.
+Opus 5.5 is consulted for the packet review and the release summary only, and its output can make a decision stricter, never
+looser. This keeps the manager auditable and cheap, and means no model output can bypass a threshold.
+
+**D12. Packages are the handoff.** A stage starts only when the backend marks the right package ARRIVED at the right building.
+The conveyor is not a decoration over the workflow; it is the workflow's transport layer, and the 3D belt only draws it.
+
+**D13. Approvals bind to artifact + digest.** Deterministic bundles mean identical rebuilds share a digest, so reviews and owner
+approvals are tied to the artifact id as well. A rebuild always needs a new review and a new owner decision.
+
+**D14. Prototype from a tested template.** App Studio's prototype comes from a template with a real tested core, filled in from
+the approved spec. It is honest about this in the README, the preview footer and the checklist. Model-generated code is a later step.
+
+**D15. Local release channel only.** `submit_release` copies the approved bundle to `data/releases/`. App Store submission,
+listing publication and production deploys would be separate tools behind the same release gate; none are built yet.
+
+**D16. Nexus Spire's gate faces east.** The parity test found Nexus Spire and Memory Vault sharing one ring junction; the
+Nexus gate moved to the open east side so every district has its own junction.

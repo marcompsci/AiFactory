@@ -27,17 +27,21 @@ from services.orchestrator import ops
 from services.orchestrator.plan import PlanError, validate_prompt
 from services.orchestrator.runner import cancel_mission
 from services.tools.sandbox import _unshare_available
+from services.management.scheduler import Scheduler
+from services.model_gateway.gateway import ModelGateway
 from services.workers.worker import MissionWorker
 
 logging.basicConfig(level=os.environ.get("AICIV_LOG_LEVEL", "INFO"),
                     format='{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":"%(message)s"}')
 log = logging.getLogger("aiciv.api")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 class State:
     broadcaster: Broadcaster
     publisher: OutboxPublisher
     worker: MissionWorker
+    scheduler: "Scheduler"
 
 
 state = State()
@@ -49,16 +53,26 @@ async def lifespan(app: FastAPI):
     state.broadcaster = Broadcaster()
     state.publisher = OutboxPublisher(state.broadcaster)
     state.publisher.start()
-    state.worker = MissionWorker(getattr(app.state, "gateway", None))
+    gateway = getattr(app.state, "gateway", None)
+    state.worker = MissionWorker(gateway)
+    state.scheduler = Scheduler(state.worker.enqueue, gateway if gateway is not None else ModelGateway())
+    state.worker.on_finish = state.scheduler.poke
     recovered = state.worker.recover()
     if recovered:
         log.info("recovered missions: %s", recovered)
+    state.scheduler.start()
     yield
+    state.scheduler.stop()
     state.publisher.stop()
     state.worker.shutdown()
+    state.scheduler.join(timeout=5)
+    state.publisher.join(timeout=5)
 
 
-app = FastAPI(title="AI Civilization API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="AI Civilization API", version="0.4.0", lifespan=lifespan)
+from services.api.v4 import router as v4_router  # noqa: E402
+
+app.include_router(v4_router)
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().allowed_origins, allow_credentials=False,
                    allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["authorization", "content-type", "last-event-id"])
 
@@ -142,7 +156,24 @@ def snapshot(p: Principal = Depends(principal)):
         repos = _rows(conn.execute(select(db.repositories).where(db.repositories.c.organization_id == p.organization_id)))
         org = conn.execute(select(db.organizations).where(db.organizations.c.id == p.organization_id)).first()
         today = ops.spent_today(conn, p.organization_id)
+        lines = {r.agent_id: r.supervisor_agent_id for r in conn.execute(select(db.agent_reporting_lines))}
+        for a in agents:
+            a["supervisor_agent_id"] = lines.get(a["id"])
+        depts = _rows(conn.execute(select(db.departments).where(db.departments.c.organization_id == p.organization_id)))
+        opps = _rows(conn.execute(select(db.opportunities.c.id, db.opportunities.c.title, db.opportunities.c.status, db.opportunities.c.opportunity_score,
+                                         db.opportunities.c.confidence, db.opportunities.c.data_mode, db.opportunities.c.updated_at)
+                                  .where(db.opportunities.c.organization_id == p.organization_id).order_by(db.opportunities.c.created_at.desc()).limit(25)))
+        from services.logistics import service as logistics_svc
+        load = logistics_svc.load_by_segment(conn)
+        routes = _rows(conn.execute(select(db.logistics_routes)))
+        for r in routes:
+            r["load"] = load.get(r["id"], 0)
+        logistics = {"nodes": _rows(conn.execute(select(db.logistics_nodes))), "routes": routes,
+                     "packages": _rows(conn.execute(select(db.logistics_packages).where(db.logistics_packages.c.status.in_(
+                         ["QUEUED", "IN_TRANSIT", "ARRIVED", "DELIVERY_FAILED"])))),
+                     "belt_speed": logistics_svc.belt_speed(), "server_time": db.utcnow()}
     return {"sequence": seq, "agents": agents, "missions": missions, "approvals": approvals, "repositories": repos,
+            "departments": depts, "opportunities": opps, "logistics": logistics,
             "districts": load_districts(), "emergency_stopped": bool(org.emergency_stopped),
             "costs": {"today_estimated_usd": round(today, 6), "daily_budget_usd": org.daily_budget_usd, "is_estimate": True},
             "execution_mode": "live" if get_settings().model_available else "simulation"}

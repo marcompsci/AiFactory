@@ -125,6 +125,14 @@ def check_budget(conn: Connection, mission_id: str, agent_id: str, org_id: str) 
         raise BudgetExceeded(f"{agent.name}'s per-mission limit ${agent.max_usd_per_mission:.2f} reached (estimated)")
     if spent_today(conn, org_id) >= org.daily_budget_usd:
         raise BudgetExceeded(f"daily cap ${org.daily_budget_usd:.2f} reached (estimated)")
+    if agent.department_id:
+        dept = conn.execute(select(db.departments).where(db.departments.c.id == agent.department_id)).first()
+        day = datetime.now(timezone.utc).date().isoformat()
+        dept_spent = conn.execute(select(func.coalesce(func.sum(db.usage_records.c.estimated_cost_usd), 0.0))
+                                  .join(db.agents, db.agents.c.id == db.usage_records.c.agent_id)
+                                  .where(db.agents.c.department_id == dept.id, db.usage_records.c.created_at >= day)).scalar() or 0.0
+        if dept_spent >= dept.daily_budget_usd:
+            raise BudgetExceeded(f"{dept.name} daily budget ${dept.daily_budget_usd:.2f} reached (estimated)")
 
 
 def record_usage(conn: Connection, *, org_id: str, mission_id: str, agent_id: str, provider: str, model: str,

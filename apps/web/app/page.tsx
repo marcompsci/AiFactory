@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ApprovalCall } from "@/components/command/Activity";
+import { PackageCard } from "@/components/command/Company";
 import { DistrictCard, Dock, TopBar } from "@/components/command/Shell";
 import { useRealtime } from "@/hooks/useRealtime";
 
@@ -25,6 +26,7 @@ function App() {
       <TopBar />
       <ApprovalCall />
       <DistrictCard />
+      <PackageCard />
       <Dock onReconnect={() => setReconnectKey((k) => k + 1)} />
     </main>
   );

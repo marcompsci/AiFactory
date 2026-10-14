@@ -116,3 +116,46 @@ describe("demo script", () => {
     expect(w.pendingApprovals).toEqual([]);
   });
 });
+
+import graph from "./__fixtures__/graph.json";
+import { buildLogistics, packagePosition, terminalPosition } from "./index";
+
+describe("V4 logistics mirror", () => {
+  it("matches the backend conveyor graph exactly (services/logistics/graph.py)", () => {
+    const g = buildLogistics();
+    expect(g.nodes.map((n) => n.id)).toEqual(graph.nodes.map((n) => n.id));
+    g.nodes.forEach((n, i) => n.position.forEach((v, k) => expect(v).toBeCloseTo(graph.nodes[i].position[k], 2)));
+    expect(g.routes.map((r) => [r.id, r.length])).toEqual(graph.routes.map((r) => [r.id, r.length]));
+  });
+
+  it("puts the agent-side terminal next to the belt node", () => {
+    const node = buildLogistics().nodes.find((n) => n.id === "data-observatory:dispatch")!;
+    const t = terminalPosition("data-observatory", "dispatch");
+    expect(Math.hypot(t[0] - node.position[0], t[2] - node.position[2])).toBeLessThan(0.01);
+  });
+
+  it("samples packages along their route and reports the end", () => {
+    const segs = { a: { from: [0, 1, 0] as [number, number, number], to: [10, 1, 0] as [number, number, number], length: 10 } };
+    expect(packagePosition(["a"], segs, 1, 5).position[0]).toBeCloseTo(5);
+    expect(packagePosition(["a"], segs, 10, 5).done).toBe(true);
+  });
+});
+
+describe("V4 package events", () => {
+  it("tracks a package from dispatch to arrival and drops the carried hologram", () => {
+    let w = initialWorld(SEED.agents);
+    const pip = SEED.agents.find((a) => a.key === "research_apps")!.id;
+    w = applyEvent(w, ev(1, "research.opportunity_identified", pip, { title: "Steady Focus", opportunity_id: "o1" }), 0).state;
+    expect(w.agents[pip].carrying).toBe("Steady Focus");
+    w = applyEvent(w, ev(2, "package.dispatched", null, { package_id: "p1", package_type: "research_brief", origin: "data-observatory",
+      destination: "nexus-spire", route: ["x"], route_started_at: "2026-10-14T00:00:00Z", agent_id: pip }), 0).state;
+    expect(w.agents[pip].carrying).toBeNull();
+    expect(w.packages.p1.status).toBe("IN_TRANSIT");
+    w = applyEvent(w, ev(3, "package.arrived", null, { package_id: "p1" }), 0).state;
+    expect(w.packages.p1.status).toBe("ARRIVED");
+    w = applyEvent(w, ev(4, "release.owner_approval_requested", null, { opportunity_id: "o1" }), 0).state;
+    expect(w.ownerQueue).toEqual(["o1"]);
+    w = applyEvent(w, ev(5, "release.owner_approved", null, { opportunity_id: "o1" }), 0).state;
+    expect(w.ownerQueue).toEqual([]);
+  });
+});

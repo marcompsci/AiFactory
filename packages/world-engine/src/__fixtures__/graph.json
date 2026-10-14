@@ -1,0 +1,307 @@
+{
+ "nodes": [
+  {
+   "id": "nexus-spire:dispatch",
+   "kind": "dispatch",
+   "position": [
+    9.0,
+    1.2,
+    3.0
+   ]
+  },
+  {
+   "id": "nexus-spire:receiving",
+   "kind": "receiving",
+   "position": [
+    9.0,
+    1.2,
+    -3.0
+   ]
+  },
+  {
+   "id": "junction:nexus-spire",
+   "kind": "junction",
+   "position": [
+    16.0,
+    1.2,
+    0.0
+   ]
+  },
+  {
+   "id": "code-forge:dispatch",
+   "kind": "dispatch",
+   "position": [
+    -20.057,
+    1.2,
+    -15.532
+   ]
+  },
+  {
+   "id": "code-forge:receiving",
+   "kind": "receiving",
+   "position": [
+    -23.143,
+    1.2,
+    -10.388
+   ]
+  },
+  {
+   "id": "junction:code-forge",
+   "kind": "junction",
+   "position": [
+    -13.72,
+    1.2,
+    -8.232
+   ]
+  },
+  {
+   "id": "sentinel-citadel:dispatch",
+   "kind": "dispatch",
+   "position": [
+    23.143,
+    1.2,
+    -10.388
+   ]
+  },
+  {
+   "id": "sentinel-citadel:receiving",
+   "kind": "receiving",
+   "position": [
+    20.057,
+    1.2,
+    -15.532
+   ]
+  },
+  {
+   "id": "junction:sentinel-citadel",
+   "kind": "junction",
+   "position": [
+    13.72,
+    1.2,
+    -8.232
+   ]
+  },
+  {
+   "id": "vision-quarter:dispatch",
+   "kind": "dispatch",
+   "position": [
+    -23.264,
+    1.2,
+    11.904
+   ]
+  },
+  {
+   "id": "vision-quarter:receiving",
+   "kind": "receiving",
+   "position": [
+    -19.936,
+    1.2,
+    16.896
+   ]
+  },
+  {
+   "id": "junction:vision-quarter",
+   "kind": "junction",
+   "position": [
+    -13.313,
+    1.2,
+    8.875
+   ]
+  },
+  {
+   "id": "data-observatory:dispatch",
+   "kind": "dispatch",
+   "position": [
+    19.936,
+    1.2,
+    16.896
+   ]
+  },
+  {
+   "id": "data-observatory:receiving",
+   "kind": "receiving",
+   "position": [
+    23.264,
+    1.2,
+    11.904
+   ]
+  },
+  {
+   "id": "junction:data-observatory",
+   "kind": "junction",
+   "position": [
+    13.313,
+    1.2,
+    8.875
+   ]
+  },
+  {
+   "id": "memory-vault:dispatch",
+   "kind": "dispatch",
+   "position": [
+    -3.0,
+    1.2,
+    25.92
+   ]
+  },
+  {
+   "id": "memory-vault:receiving",
+   "kind": "receiving",
+   "position": [
+    3.0,
+    1.2,
+    25.92
+   ]
+  },
+  {
+   "id": "junction:memory-vault",
+   "kind": "junction",
+   "position": [
+    0.0,
+    1.2,
+    16.0
+   ]
+  },
+  {
+   "id": "owners-tower:dispatch",
+   "kind": "dispatch",
+   "position": [
+    3.0,
+    1.2,
+    -28.8
+   ]
+  },
+  {
+   "id": "owners-tower:receiving",
+   "kind": "receiving",
+   "position": [
+    -3.0,
+    1.2,
+    -28.8
+   ]
+  },
+  {
+   "id": "junction:owners-tower",
+   "kind": "junction",
+   "position": [
+    0.0,
+    1.2,
+    -16.0
+   ]
+  }
+ ],
+ "routes": [
+  {
+   "id": "nexus-spire:dispatch->junction:nexus-spire",
+   "length": 7.616
+  },
+  {
+   "id": "junction:nexus-spire->nexus-spire:receiving",
+   "length": 7.616
+  },
+  {
+   "id": "code-forge:dispatch->junction:code-forge",
+   "length": 9.667
+  },
+  {
+   "id": "junction:code-forge->code-forge:receiving",
+   "length": 9.667
+  },
+  {
+   "id": "sentinel-citadel:dispatch->junction:sentinel-citadel",
+   "length": 9.667
+  },
+  {
+   "id": "junction:sentinel-citadel->sentinel-citadel:receiving",
+   "length": 9.667
+  },
+  {
+   "id": "vision-quarter:dispatch->junction:vision-quarter",
+   "length": 10.402
+  },
+  {
+   "id": "junction:vision-quarter->vision-quarter:receiving",
+   "length": 10.402
+  },
+  {
+   "id": "data-observatory:dispatch->junction:data-observatory",
+   "length": 10.402
+  },
+  {
+   "id": "junction:data-observatory->data-observatory:receiving",
+   "length": 10.402
+  },
+  {
+   "id": "memory-vault:dispatch->junction:memory-vault",
+   "length": 10.364
+  },
+  {
+   "id": "junction:memory-vault->memory-vault:receiving",
+   "length": 10.364
+  },
+  {
+   "id": "owners-tower:dispatch->junction:owners-tower",
+   "length": 13.147
+  },
+  {
+   "id": "junction:owners-tower->owners-tower:receiving",
+   "length": 13.147
+  },
+  {
+   "id": "junction:code-forge->junction:owners-tower",
+   "length": 15.766
+  },
+  {
+   "id": "junction:owners-tower->junction:code-forge",
+   "length": 15.766
+  },
+  {
+   "id": "junction:owners-tower->junction:sentinel-citadel",
+   "length": 15.766
+  },
+  {
+   "id": "junction:sentinel-citadel->junction:owners-tower",
+   "length": 15.766
+  },
+  {
+   "id": "junction:sentinel-citadel->junction:nexus-spire",
+   "length": 8.542
+  },
+  {
+   "id": "junction:nexus-spire->junction:sentinel-citadel",
+   "length": 8.542
+  },
+  {
+   "id": "junction:nexus-spire->junction:data-observatory",
+   "length": 9.273
+  },
+  {
+   "id": "junction:data-observatory->junction:nexus-spire",
+   "length": 9.273
+  },
+  {
+   "id": "junction:data-observatory->junction:memory-vault",
+   "length": 15.099
+  },
+  {
+   "id": "junction:memory-vault->junction:data-observatory",
+   "length": 15.099
+  },
+  {
+   "id": "junction:memory-vault->junction:vision-quarter",
+   "length": 15.099
+  },
+  {
+   "id": "junction:vision-quarter->junction:memory-vault",
+   "length": 15.099
+  },
+  {
+   "id": "junction:vision-quarter->junction:code-forge",
+   "length": 17.112
+  },
+  {
+   "id": "junction:code-forge->junction:vision-quarter",
+   "length": 17.112
+  }
+ ]
+}
