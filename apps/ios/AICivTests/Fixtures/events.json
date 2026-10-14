@@ -1,0 +1,1200 @@
+{
+ "events": [
+  {
+   "event_id": "13e07960-105d-45d0-8b22-ff7185e10bbe",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "mission.created",
+   "sequence": 1,
+   "occurred_at": "2026-10-14T23:01:57.414073+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "title": "Research 'productivity' on apple charts",
+    "prompt": "Find a validated app opportunity for 'productivity' using permitted apple_charts data (US).",
+    "kind": "market_research",
+    "opportunity_id": null,
+    "execution_mode": "simulation"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "6c4fcd24-8ad6-4848-8847-63f32f9342be",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.decision_recorded",
+   "sequence": 2,
+   "occurred_at": "2026-10-14T23:01:57.416585+00:00",
+   "correlation_id": "6c4fcd24-8ad6-4848-8847-63f32f9342be",
+   "payload": {
+    "decision_id": "69baf148-5fe6-415b-aad1-af52081ec386",
+    "decision_type": "goal_assignment",
+    "subject_type": "mission",
+    "subject_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+    "outcome": "assigned:research_apps",
+    "rationale": "Owner objective \u2192 measurable goal: cited findings from apple_charts and a scored packet if the score clears 0.45.",
+    "method": "rules",
+    "model": null
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "5c861949-621c-4c95-a3ef-13c210b9f56f",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.goal_assigned",
+   "sequence": 3,
+   "occurred_at": "2026-10-14T23:01:57.417149+00:00",
+   "correlation_id": "5c861949-621c-4c95-a3ef-13c210b9f56f",
+   "payload": {
+    "decision_id": "69baf148-5fe6-415b-aad1-af52081ec386",
+    "decision_type": "goal_assignment",
+    "subject_type": "mission",
+    "subject_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+    "outcome": "assigned:research_apps",
+    "rationale": "Owner objective \u2192 measurable goal: cited findings from apple_charts and a scored packet if the score clears 0.45.",
+    "method": "rules",
+    "model": null
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "70c85cbd-1b39-49f3-8b07-e66944660144",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "mission.status_changed",
+   "sequence": 4,
+   "occurred_at": "2026-10-14T23:01:57.428561+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "CREATED",
+    "to": "VALIDATING"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "f16d23b4-ab00-468d-b7c8-25717d16d406",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000001",
+   "event_type": "agent.message",
+   "sequence": 5,
+   "occurred_at": "2026-10-14T23:01:57.433810+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "message_id": "0ab69318-6ebf-49f8-a839-6dd70fdcdff3",
+    "to_agent_id": null,
+    "kind": "status",
+    "body": "Permissions validated for market research: 2 tools within project policy."
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "f3e978d7-f823-45c1-b1ea-1f53fd16798c",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "mission.status_changed",
+   "sequence": 6,
+   "occurred_at": "2026-10-14T23:01:57.434797+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "VALIDATING",
+    "to": "PLANNING"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "9f33ce49-f3b9-48c3-8c65-24f1ade82331",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "task.assigned",
+   "sequence": 7,
+   "occurred_at": "2026-10-14T23:01:57.438415+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "task_id": "260dd86b-cad3-4bc2-bb76-fed3c7e67532",
+    "key": "research",
+    "title": "Research the market",
+    "district": "data-observatory",
+    "depends_on": []
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "ed63168a-300c-4f70-ad89-acf6132ed9a6",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000001",
+   "event_type": "agent.message",
+   "sequence": 8,
+   "occurred_at": "2026-10-14T23:01:57.439123+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "message_id": "1fd86a67-c468-46c1-9e1d-b7f3e5a9d213",
+    "to_agent_id": null,
+    "kind": "explanation",
+    "body": "Plan: research the market."
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "a8171ee1-7bd8-4eac-9df9-503d7785b5ba",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "mission.status_changed",
+   "sequence": 9,
+   "occurred_at": "2026-10-14T23:01:57.439887+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "PLANNING",
+    "to": "QUEUED"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "065f8213-619f-4ad6-9038-23cfd5e094e3",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "mission.started",
+   "sequence": 10,
+   "occurred_at": "2026-10-14T23:01:57.441730+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "QUEUED",
+    "to": "RUNNING"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "f3fbfc46-94a9-4698-821e-d4f94e197dca",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "task.started",
+   "sequence": 11,
+   "occurred_at": "2026-10-14T23:01:57.455357+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "task_id": "260dd86b-cad3-4bc2-bb76-fed3c7e67532",
+    "key": "research",
+    "title": "Research the market",
+    "status": "RUNNING",
+    "district": "data-observatory",
+    "attempt": 1
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "9c2ef590-7fbe-4808-888a-1b7f3e474622",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.status_changed",
+   "sequence": 12,
+   "occurred_at": "2026-10-14T23:01:57.459423+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "IDLE",
+    "to": "ASSIGNED"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "bebda7a5-bee5-436e-b420-351cf5415b28",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.movement_requested",
+   "sequence": 13,
+   "occurred_at": "2026-10-14T23:01:57.461229+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from_district": "data-observatory",
+    "to_district": "data-observatory",
+    "waypoint": "observatory-lens"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "d1ea53ec-e818-4430-b7ad-fed85352f92e",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.arrived",
+   "sequence": 14,
+   "occurred_at": "2026-10-14T23:01:57.469633+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "district": "data-observatory",
+    "waypoint": "observatory-lens"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "da2deaf3-a8d5-494c-bd63-d001172b65ca",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.status_changed",
+   "sequence": 15,
+   "occurred_at": "2026-10-14T23:01:57.471268+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "ASSIGNED",
+    "to": "EXECUTING"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "898a335b-b44f-4441-abce-c7fd353e2ec2",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "report.submitted",
+   "sequence": 16,
+   "occurred_at": "2026-10-14T23:01:57.473896+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "report_id": "7ed775dc-c050-4feb-90cf-84b051b85386",
+    "kind": "progress",
+    "to_agent_id": "a1000000-0000-4000-8000-000000000005",
+    "body": "Started: Research the market",
+    "data": {
+     "attempt": 1,
+     "estimate_s": 180
+    }
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "b31b3fc4-4e94-44cd-a155-eb6fafbfeca9",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "tool.started",
+   "sequence": 17,
+   "occurred_at": "2026-10-14T23:01:57.480302+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "tool_execution_id": "4cc4684d-0f0d-4873-b2d8-0230076db365",
+    "tool": "query_market_source",
+    "arguments": {
+     "source": "apple_charts",
+     "query": "productivity",
+     "region": "US"
+    },
+    "protected": false
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "150c528f-a9bf-4e4d-9620-a6b1cd51e0d4",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "research.started",
+   "sequence": 18,
+   "occurred_at": "2026-10-14T23:01:57.486896+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "run_id": "e5093f0d-f2a7-411b-8235-4af833c205f7",
+    "source": "apple_charts",
+    "query": "productivity",
+    "region": "US",
+    "cached": false
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "92bfcebd-2f82-4b4c-b9ea-dd2bb584ffbd",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "research.finding_created",
+   "sequence": 19,
+   "occurred_at": "2026-10-14T23:01:57.577345+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "finding_id": "e352eefb-1b73-4e19-9bc1-cd4fd1ccc451",
+    "title": "'productivity' in apple app store top charts (US)",
+    "source_url": "fixture://apple_charts/us/top-free",
+    "data_mode": "fixture",
+    "measurement_type": "ranking",
+    "confidence": "medium"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "acd0c97d-9a02-4873-a187-d17dc952da8d",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "tool.completed",
+   "sequence": 20,
+   "occurred_at": "2026-10-14T23:01:57.580045+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "tool_execution_id": "4cc4684d-0f0d-4873-b2d8-0230076db365",
+    "tool": "query_market_source",
+    "duration_ms": 97,
+    "summary": "ok"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "f0a5fb92-7215-4c1d-ac89-fd249a3fba52",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "artifact.created",
+   "sequence": 21,
+   "occurred_at": "2026-10-14T23:01:57.588793+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "artifact_id": "11b7b285-1042-46ce-adfc-09854f3c550e",
+    "kind": "research_brief",
+    "title": "Research brief \u2014 Steady Focus"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "6e0fc219-1e30-470e-a7cb-c4de03ec5489",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "research.opportunity_identified",
+   "sequence": 22,
+   "occurred_at": "2026-10-14T23:01:57.589403+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "title": "Steady Focus",
+    "score": 0.7643,
+    "confidence": "medium",
+    "data_mode": "fixture",
+    "carrier_agent_id": "a1000000-0000-4000-8000-000000000008"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "c094a9b6-9a3e-441a-ab5d-248f3ca5a89e",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.movement_requested",
+   "sequence": 23,
+   "occurred_at": "2026-10-14T23:01:57.591331+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from_district": "data-observatory",
+    "to_district": "data-observatory",
+    "waypoint": "data-observatory:dispatch"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "a9a3650c-6380-4aed-aceb-8ccf5e2a1ab9",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.arrived",
+   "sequence": 24,
+   "occurred_at": "2026-10-14T23:01:57.593741+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "district": "data-observatory",
+    "waypoint": "data-observatory:dispatch"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "17f0b9c4-8399-45a0-a0dc-a28e79e0e832",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "package.dispatched",
+   "sequence": 25,
+   "occurred_at": "2026-10-14T23:01:57.598451+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "package_id": "6e86354f-7076-457d-8d5e-8b87b3e423bf",
+    "package_type": "research_brief",
+    "origin": "data-observatory",
+    "destination": "nexus-spire",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "priority": 4,
+    "artifact_references": [
+     "11b7b285-1042-46ce-adfc-09854f3c550e"
+    ],
+    "route_length": 27.29,
+    "belt_speed": 400.0,
+    "agent_id": "a1000000-0000-4000-8000-000000000008",
+    "from_node": "data-observatory:dispatch",
+    "route": [
+     "data-observatory:dispatch->junction:data-observatory",
+     "junction:data-observatory->junction:nexus-spire",
+     "junction:nexus-spire->nexus-spire:receiving"
+    ],
+    "route_started_at": "2026-10-14T23:01:57.597423+00:00",
+    "eta": "2026-10-14T23:01:57.665651+00:00"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "026dd442-c522-4b16-83b0-c73a1210bea0",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "package.in_transit",
+   "sequence": 26,
+   "occurred_at": "2026-10-14T23:01:57.598994+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "package_id": "6e86354f-7076-457d-8d5e-8b87b3e423bf",
+    "package_type": "research_brief",
+    "origin": "data-observatory",
+    "destination": "nexus-spire",
+    "route": [
+     "data-observatory:dispatch->junction:data-observatory",
+     "junction:data-observatory->junction:nexus-spire",
+     "junction:nexus-spire->nexus-spire:receiving"
+    ],
+    "route_started_at": "2026-10-14T23:01:57.597423+00:00",
+    "eta": "2026-10-14T23:01:57.665651+00:00",
+    "belt_speed": 400.0,
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "a284bc3e-4696-47dc-bff8-75068aefd71a",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "research.completed",
+   "sequence": 27,
+   "occurred_at": "2026-10-14T23:01:57.599453+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "package_id": "6e86354f-7076-457d-8d5e-8b87b3e423bf",
+    "score": 0.7643
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "6ef3fc92-db65-417d-9aa9-200fd9e30932",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "report.submitted",
+   "sequence": 28,
+   "occurred_at": "2026-10-14T23:01:57.600317+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "report_id": "ee603998-02d2-4b0a-aa3e-d192421c60a2",
+    "kind": "completed_package",
+    "to_agent_id": "a1000000-0000-4000-8000-000000000005",
+    "body": "Opportunity 'Steady Focus' scored 0.76 (medium); brief dispatched to the General Manager.",
+    "data": {
+     "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+     "data_mode": "fixture"
+    }
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "5f80f4ad-9d7e-4a85-8f12-2e3a8f1c6a9d",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "report.submitted",
+   "sequence": 29,
+   "occurred_at": "2026-10-14T23:01:57.602496+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "report_id": "36502b8b-5ea7-472f-b1cc-6cf73080b558",
+    "kind": "completed_package",
+    "to_agent_id": "a1000000-0000-4000-8000-000000000005",
+    "body": "Done: Research the market",
+    "data": {
+     "outputs_keys": [
+      "confidence",
+      "data_mode",
+      "opportunity_id",
+      "package_id",
+      "score"
+     ]
+    }
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "60de9a45-a54f-438b-8969-571bfdf7bf90",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "task.completed",
+   "sequence": 30,
+   "occurred_at": "2026-10-14T23:01:57.604189+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "task_id": "260dd86b-cad3-4bc2-bb76-fed3c7e67532",
+    "key": "research",
+    "title": "Research the market",
+    "status": "COMPLETED",
+    "district": "data-observatory",
+    "attempt": 1
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "b6ac5e2c-dcfa-4639-bf21-7b2821329198",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.status_changed",
+   "sequence": 31,
+   "occurred_at": "2026-10-14T23:01:57.605039+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "EXECUTING",
+    "to": "COMPLETED"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "0f8e7702-4901-4abb-8102-175e29b8fa16",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "mission.completed",
+   "sequence": 32,
+   "occurred_at": "2026-10-14T23:01:57.611378+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "RUNNING",
+    "to": "COMPLETED",
+    "outcome": "completed"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "bdd0df9c-8c4b-4f8c-821a-cf53fb53dd10",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000008",
+   "event_type": "agent.status_changed",
+   "sequence": 33,
+   "occurred_at": "2026-10-14T23:01:57.615239+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "from": "COMPLETED",
+    "to": "IDLE"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "685bdcb5-1b65-423c-8ab5-43d1874e170f",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": null,
+   "event_type": "package.arrived",
+   "sequence": 34,
+   "occurred_at": "2026-10-14T23:01:57.674630+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "package_id": "6e86354f-7076-457d-8d5e-8b87b3e423bf",
+    "package_type": "research_brief",
+    "origin": "data-observatory",
+    "destination": "nexus-spire",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "priority": 4,
+    "artifact_references": [
+     "11b7b285-1042-46ce-adfc-09854f3c550e"
+    ],
+    "district": "nexus-spire"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "64e6284c-de4b-481f-8111-7f142a26e84d",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "agent.movement_requested",
+   "sequence": 35,
+   "occurred_at": "2026-10-14T23:01:57.678806+00:00",
+   "correlation_id": "64e6284c-de4b-481f-8111-7f142a26e84d",
+   "payload": {
+    "from_district": "nexus-spire",
+    "to_district": "nexus-spire",
+    "waypoint": "nexus-spire:receiving"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "3f37549a-274f-4766-bb6b-d9e10e9c7216",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "agent.arrived",
+   "sequence": 36,
+   "occurred_at": "2026-10-14T23:01:57.679555+00:00",
+   "correlation_id": "3f37549a-274f-4766-bb6b-d9e10e9c7216",
+   "payload": {
+    "district": "nexus-spire",
+    "waypoint": "nexus-spire:receiving"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "07f4230d-681a-431f-a8da-312d4d67d4d9",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "package.received",
+   "sequence": 37,
+   "occurred_at": "2026-10-14T23:01:57.680809+00:00",
+   "correlation_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "payload": {
+    "package_id": "6e86354f-7076-457d-8d5e-8b87b3e423bf",
+    "package_type": "research_brief",
+    "origin": "data-observatory",
+    "destination": "nexus-spire",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "priority": 4,
+    "artifact_references": [
+     "11b7b285-1042-46ce-adfc-09854f3c550e"
+    ],
+    "district": "nexus-spire",
+    "agent_id": "a1000000-0000-4000-8000-000000000007"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "3f464c26-2ae4-4be9-b976-3bb4fdffb71b",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "opportunity.status_changed",
+   "sequence": 38,
+   "occurred_at": "2026-10-14T23:01:57.681906+00:00",
+   "correlation_id": "3f464c26-2ae4-4be9-b976-3bb4fdffb71b",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "title": "Steady Focus \u2014 productivity app",
+    "from": "RESEARCHED",
+    "to": "MANAGER_REVIEW",
+    "reason": "research brief received by the General Manager"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "d2cb36a1-8db0-4d2b-8b62-5bedd2b6dce9",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.review_started",
+   "sequence": 39,
+   "occurred_at": "2026-10-14T23:01:57.682470+00:00",
+   "correlation_id": "d2cb36a1-8db0-4d2b-8b62-5bedd2b6dce9",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "subject": "research_brief"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "baf9bf4d-407e-4fc7-afb4-8eca2ab45ccd",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.decision_recorded",
+   "sequence": 40,
+   "occurred_at": "2026-10-14T23:01:57.685684+00:00",
+   "correlation_id": "baf9bf4d-407e-4fc7-afb4-8eca2ab45ccd",
+   "payload": {
+    "decision_id": "56d890b0-7f26-4fb5-8a31-f6a187b0793a",
+    "decision_type": "opportunity_review",
+    "subject_type": "opportunity",
+    "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "outcome": "route",
+    "rationale": "Score 0.76 \u2265 0.55, confidence medium, estimated cost $1.50 within my limit. Routing to app_studio. Evidence is labeled fixture data, so this run is a rehearsal, not a market decision.",
+    "method": "rules",
+    "model": null
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "55f5cd46-c57b-4351-88f7-d3d24278fb21",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.review_completed",
+   "sequence": 41,
+   "occurred_at": "2026-10-14T23:01:57.686249+00:00",
+   "correlation_id": "55f5cd46-c57b-4351-88f7-d3d24278fb21",
+   "payload": {
+    "decision_id": "56d890b0-7f26-4fb5-8a31-f6a187b0793a",
+    "decision_type": "opportunity_review",
+    "subject_type": "opportunity",
+    "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "outcome": "route",
+    "rationale": "Score 0.76 \u2265 0.55, confidence medium, estimated cost $1.50 within my limit. Routing to app_studio. Evidence is labeled fixture data, so this run is a rehearsal, not a market decision.",
+    "method": "rules",
+    "model": null
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "11f50bfe-0886-4f0b-b53b-91953ec26d33",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.decision_recorded",
+   "sequence": 42,
+   "occurred_at": "2026-10-14T23:01:57.687574+00:00",
+   "correlation_id": "11f50bfe-0886-4f0b-b53b-91953ec26d33",
+   "payload": {
+    "decision_id": "88a07af6-abec-45e0-b4f9-8ed629e24d8a",
+    "decision_type": "routing",
+    "subject_type": "opportunity",
+    "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "outcome": "route:app_studio",
+    "rationale": "Routed to App Studio in code-forge. Score 0.76 \u2265 0.55, confidence medium, estimated cost $1.50 within my limit. Routing to app_studio. Evidence is labeled fixture data, so this run is a rehearsal, not a market decision.",
+    "method": "rules",
+    "model": null
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "1fbbcfdc-844a-45a5-992f-34236b01832a",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "opportunity.status_changed",
+   "sequence": 43,
+   "occurred_at": "2026-10-14T23:01:57.688356+00:00",
+   "correlation_id": "1fbbcfdc-844a-45a5-992f-34236b01832a",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "title": "Steady Focus \u2014 productivity app",
+    "from": "MANAGER_REVIEW",
+    "to": "ROUTED",
+    "reason": "routed to App Studio"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "00d420e4-e050-4ff7-8f90-f4bceda6bf9a",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "package.dispatched",
+   "sequence": 44,
+   "occurred_at": "2026-10-14T23:01:57.691008+00:00",
+   "correlation_id": "00d420e4-e050-4ff7-8f90-f4bceda6bf9a",
+   "payload": {
+    "package_id": "46efc628-a0ba-4c9d-9d90-7e614d5538c4",
+    "package_type": "product_proposal",
+    "origin": "nexus-spire",
+    "destination": "code-forge",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "priority": 4,
+    "artifact_references": [
+     "11b7b285-1042-46ce-adfc-09854f3c550e"
+    ],
+    "route_length": 57.36,
+    "belt_speed": 400.0,
+    "agent_id": "a1000000-0000-4000-8000-000000000007",
+    "from_node": "nexus-spire:dispatch",
+    "route": [
+     "nexus-spire:dispatch->junction:nexus-spire",
+     "junction:nexus-spire->junction:sentinel-citadel",
+     "junction:sentinel-citadel->junction:owners-tower",
+     "junction:owners-tower->junction:code-forge",
+     "junction:code-forge->code-forge:receiving"
+    ],
+    "route_started_at": "2026-10-14T23:01:57.690265+00:00",
+    "eta": "2026-10-14T23:01:57.833657+00:00"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "0bca3b89-3d9f-4bd6-9803-c5ad30c3f83c",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": null,
+   "event_type": "package.in_transit",
+   "sequence": 45,
+   "occurred_at": "2026-10-14T23:01:57.691548+00:00",
+   "correlation_id": "0bca3b89-3d9f-4bd6-9803-c5ad30c3f83c",
+   "payload": {
+    "package_id": "46efc628-a0ba-4c9d-9d90-7e614d5538c4",
+    "package_type": "product_proposal",
+    "origin": "nexus-spire",
+    "destination": "code-forge",
+    "route": [
+     "nexus-spire:dispatch->junction:nexus-spire",
+     "junction:nexus-spire->junction:sentinel-citadel",
+     "junction:sentinel-citadel->junction:owners-tower",
+     "junction:owners-tower->junction:code-forge",
+     "junction:code-forge->code-forge:receiving"
+    ],
+    "route_started_at": "2026-10-14T23:01:57.690265+00:00",
+    "eta": "2026-10-14T23:01:57.833657+00:00",
+    "belt_speed": 400.0,
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "0c1dc079-0649-478a-b565-971c68c75fd9",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": null,
+   "event_type": "package.arrived",
+   "sequence": 46,
+   "occurred_at": "2026-10-14T23:01:57.862703+00:00",
+   "correlation_id": "0c1dc079-0649-478a-b565-971c68c75fd9",
+   "payload": {
+    "package_id": "46efc628-a0ba-4c9d-9d90-7e614d5538c4",
+    "package_type": "product_proposal",
+    "origin": "nexus-spire",
+    "destination": "code-forge",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "priority": 4,
+    "artifact_references": [
+     "11b7b285-1042-46ce-adfc-09854f3c550e"
+    ],
+    "district": "code-forge"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "71f22960-7e62-4e7c-a870-7796d5765e40",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000002",
+   "event_type": "agent.movement_requested",
+   "sequence": 47,
+   "occurred_at": "2026-10-14T23:01:57.873664+00:00",
+   "correlation_id": "71f22960-7e62-4e7c-a870-7796d5765e40",
+   "payload": {
+    "from_district": "code-forge",
+    "to_district": "code-forge",
+    "waypoint": "code-forge:receiving"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "f4bcc0b3-6c5e-454f-a9ec-66fbc1ab36a6",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000002",
+   "event_type": "agent.arrived",
+   "sequence": 48,
+   "occurred_at": "2026-10-14T23:01:57.874534+00:00",
+   "correlation_id": "f4bcc0b3-6c5e-454f-a9ec-66fbc1ab36a6",
+   "payload": {
+    "district": "code-forge",
+    "waypoint": "code-forge:receiving"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "4d0311e9-2393-4544-a0fc-f900efb3ca52",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000002",
+   "event_type": "package.received",
+   "sequence": 49,
+   "occurred_at": "2026-10-14T23:01:57.875478+00:00",
+   "correlation_id": "4d0311e9-2393-4544-a0fc-f900efb3ca52",
+   "payload": {
+    "package_id": "46efc628-a0ba-4c9d-9d90-7e614d5538c4",
+    "package_type": "product_proposal",
+    "origin": "nexus-spire",
+    "destination": "code-forge",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "priority": 4,
+    "artifact_references": [
+     "11b7b285-1042-46ce-adfc-09854f3c550e"
+    ],
+    "district": "code-forge",
+    "agent_id": "a1000000-0000-4000-8000-000000000002"
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "25ab413b-752e-4f74-8cba-36c8957280a1",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000002",
+   "event_type": "manager.decision_recorded",
+   "sequence": 50,
+   "occurred_at": "2026-10-14T23:01:57.876369+00:00",
+   "correlation_id": "25ab413b-752e-4f74-8cba-36c8957280a1",
+   "payload": {
+    "decision_id": "5b7779cc-062d-447c-a39b-0064787d3c96",
+    "decision_type": "acceptance",
+    "subject_type": "opportunity",
+    "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "outcome": "accepted",
+    "rationale": "Orin accepted for App Studio: capacity available, template exists for the spec.",
+    "method": "rules",
+    "model": null
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "7ca9c9e1-e7d3-4811-804e-2530819a353f",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000002",
+   "event_type": "opportunity.status_changed",
+   "sequence": 51,
+   "occurred_at": "2026-10-14T23:01:57.877167+00:00",
+   "correlation_id": "7ca9c9e1-e7d3-4811-804e-2530819a353f",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "title": "Steady Focus \u2014 productivity app",
+    "from": "ROUTED",
+    "to": "DEPARTMENT_ACCEPTED",
+    "reason": "App Studio accepted"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "676fd92d-6995-472a-b4e8-b43bc31024d1",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": null,
+   "event_type": "mission.created",
+   "sequence": 52,
+   "occurred_at": "2026-10-14T23:01:57.878313+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "title": "Build Steady Focus",
+    "prompt": "Build the prototype for 'Steady Focus \u2014 productivity app' exactly as specified: ['log a focus session of 5-120 minutes', 'show daily goal progress', 'count a streak with one freeze']",
+    "kind": "build_prototype",
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "execution_mode": "simulation"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "76583941-83a3-4f23-a7e1-ba7d5ecfaff9",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "manager.goal_assigned",
+   "sequence": 53,
+   "occurred_at": "2026-10-14T23:01:57.879532+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "department": "app_studio",
+    "goal": [
+     "log a focus session of 5-120 minutes",
+     "show daily goal progress",
+     "count a streak with one freeze"
+    ],
+    "measurable": [
+     "all spec features present",
+     "QA tests pass on the exact bundle",
+     "manager checklist has no failures"
+    ]
+   },
+   "execution_mode": "live"
+  },
+  {
+   "event_id": "200ff1b4-ac03-464f-90ac-7cc891cb5b3b",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": null,
+   "agent_id": "a1000000-0000-4000-8000-000000000007",
+   "event_type": "opportunity.status_changed",
+   "sequence": 54,
+   "occurred_at": "2026-10-14T23:01:57.881091+00:00",
+   "correlation_id": "200ff1b4-ac03-464f-90ac-7cc891cb5b3b",
+   "payload": {
+    "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+    "title": "Steady Focus \u2014 productivity app",
+    "from": "DEPARTMENT_ACCEPTED",
+    "to": "IN_PRODUCTION",
+    "reason": "production mission started"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "3e091e20-19a8-4918-816f-9c2df951e3c6",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": null,
+   "event_type": "mission.status_changed",
+   "sequence": 55,
+   "occurred_at": "2026-10-14T23:01:57.885239+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "from": "CREATED",
+    "to": "VALIDATING"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "e4c47a87-1ada-4737-ae67-5faaff658b2d",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": "a1000000-0000-4000-8000-000000000001",
+   "event_type": "agent.message",
+   "sequence": 56,
+   "occurred_at": "2026-10-14T23:01:57.887366+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "message_id": "1723833d-1380-40dc-afb8-59a540437f01",
+    "to_agent_id": null,
+    "kind": "status",
+    "body": "Permissions validated for build prototype: 4 tools within project policy."
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "3764d313-6fa3-4452-ac7e-9a7edd4447a6",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": null,
+   "event_type": "mission.status_changed",
+   "sequence": 57,
+   "occurred_at": "2026-10-14T23:01:57.888261+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "from": "VALIDATING",
+    "to": "PLANNING"
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "107d23d8-1f38-4936-9c38-3b4a8d087fc3",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": "a1000000-0000-4000-8000-000000000003",
+   "event_type": "task.assigned",
+   "sequence": 58,
+   "occurred_at": "2026-10-14T23:01:57.891617+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "task_id": "31e948fd-f514-4d2e-8072-232444a971a3",
+    "key": "scaffold",
+    "title": "Build the prototype from the approved spec",
+    "district": "code-forge",
+    "depends_on": []
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "688d4bc2-7ac4-4a18-940d-e502dc677534",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": "a1000000-0000-4000-8000-000000000003",
+   "event_type": "task.assigned",
+   "sequence": 59,
+   "occurred_at": "2026-10-14T23:01:57.892201+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "task_id": "2d2a1899-e0d4-4531-a5a7-cd763e79b193",
+    "key": "bundle",
+    "title": "Package a release bundle",
+    "district": "code-forge",
+    "depends_on": [
+     "scaffold"
+    ]
+   },
+   "execution_mode": "simulation"
+  },
+  {
+   "event_id": "84878e6c-616e-445f-bcfa-8be27daab267",
+   "schema_version": 1,
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "agent_id": "a1000000-0000-4000-8000-000000000001",
+   "event_type": "agent.message",
+   "sequence": 60,
+   "occurred_at": "2026-10-14T23:01:57.892844+00:00",
+   "correlation_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "payload": {
+    "message_id": "56200d97-0260-4508-b702-5bffd8b5b222",
+    "to_agent_id": null,
+    "kind": "explanation",
+    "body": "Plan: build the prototype from the approved spec, package a release bundle."
+   },
+   "execution_mode": "simulation"
+  }
+ ]
+}

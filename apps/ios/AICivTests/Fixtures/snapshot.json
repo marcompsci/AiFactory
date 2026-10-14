@@ -1,0 +1,1149 @@
+{
+ "sequence": 140,
+ "agents": [
+  {
+   "id": "a1000000-0000-4000-8000-000000000002",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "architect",
+   "name": "Orin",
+   "role": "Software Architect",
+   "home_district": "code-forge",
+   "avatar": {
+    "shape": "pillar",
+    "color": "#32D8FF",
+    "height": 2.1
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-sonnet-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.5,
+   "max_concurrent_tasks": 1,
+   "department_id": "33eef7c6-4629-524d-96d2-2fe9bed864f4",
+   "tier": "supervisor",
+   "created_at": "2026-10-14T23:01:57.356416+00:00",
+   "updated_at": "2026-10-14T23:01:57.356426+00:00",
+   "district": "code-forge",
+   "waypoint": "code-forge:receiving",
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "inspect_diff",
+    "inspect_repository",
+    "list_files",
+    "read_file",
+    "search_code"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000007"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000001",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "commander",
+   "name": "Vega",
+   "role": "Mission Commander",
+   "home_district": "nexus-spire",
+   "avatar": {
+    "shape": "crown",
+    "color": "#A66BFF",
+    "height": 1.9
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-sonnet-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.5,
+   "max_concurrent_tasks": 1,
+   "department_id": "6bcd18eb-36e6-5d42-a559-0e1eb90a7f2b",
+   "tier": "supervisor",
+   "created_at": "2026-10-14T23:01:57.352636+00:00",
+   "updated_at": "2026-10-14T23:01:57.352644+00:00",
+   "district": "nexus-spire",
+   "waypoint": null,
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "inspect_repository",
+    "prepare_pull_request",
+    "submit_release"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000007"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000006",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "designer",
+   "name": "Iris",
+   "role": "Designer",
+   "home_district": "vision-quarter",
+   "avatar": {
+    "shape": "prism",
+    "color": "#FF6178",
+    "height": 1.75
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-sonnet-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.3,
+   "max_concurrent_tasks": 1,
+   "department_id": "e4b3bee3-3c85-57a3-8847-e020957ecee7",
+   "tier": "supervisor",
+   "created_at": "2026-10-14T23:01:57.364493+00:00",
+   "updated_at": "2026-10-14T23:01:57.364498+00:00",
+   "district": "vision-quarter",
+   "waypoint": null,
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "read_file"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000007"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000003",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "developer",
+   "name": "Kade",
+   "role": "Developer",
+   "home_district": "code-forge",
+   "avatar": {
+    "shape": "cube",
+    "color": "#5BF2A5",
+    "height": 1.7
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-sonnet-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 1.0,
+   "max_concurrent_tasks": 1,
+   "department_id": "33eef7c6-4629-524d-96d2-2fe9bed864f4",
+   "tier": "specialist",
+   "created_at": "2026-10-14T23:01:57.358459+00:00",
+   "updated_at": "2026-10-14T23:01:57.958764+00:00",
+   "district": "code-forge",
+   "waypoint": "forge-anvil",
+   "movement_state": "STATIONARY",
+   "tools": [
+    "build_release_bundle",
+    "create_worktree",
+    "edit_file",
+    "inspect_diff",
+    "list_files",
+    "read_file",
+    "scaffold_prototype",
+    "search_code"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000002"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000007",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "general_manager",
+   "name": "Atlas",
+   "role": "General Manager",
+   "home_district": "nexus-spire",
+   "avatar": {
+    "shape": "monolith",
+    "color": "#EAF2FF",
+    "height": 2.3
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-opus-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 1.5,
+   "max_concurrent_tasks": 3,
+   "department_id": "9cbe4975-9be8-5e7c-8245-daa4a5e954a2",
+   "tier": "general_manager",
+   "created_at": "2026-10-14T23:01:57.365594+00:00",
+   "updated_at": "2026-10-14T23:01:57.365599+00:00",
+   "district": "nexus-spire",
+   "waypoint": "nexus-spire:receiving",
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact"
+   ],
+   "supervisor_agent_id": null
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000004",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "qa",
+   "name": "Sentry",
+   "role": "QA Tester",
+   "home_district": "sentinel-citadel",
+   "avatar": {
+    "shape": "shield",
+    "color": "#FFBD69",
+    "height": 1.8
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-sonnet-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.3,
+   "max_concurrent_tasks": 1,
+   "department_id": "46d9004a-ce17-527e-a5cd-04be303662d2",
+   "tier": "supervisor",
+   "created_at": "2026-10-14T23:01:57.360950+00:00",
+   "updated_at": "2026-10-14T23:01:58.586739+00:00",
+   "district": "sentinel-citadel",
+   "waypoint": "citadel-testbay",
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "inspect_diff",
+    "read_file",
+    "run_build",
+    "run_tests",
+    "stage_bundle"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000007"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000008",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "research_apps",
+   "name": "Pip",
+   "role": "App Store Researcher",
+   "home_district": "data-observatory",
+   "avatar": {
+    "shape": "drone",
+    "color": "#5BF2A5",
+    "height": 1.4
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-haiku-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.2,
+   "max_concurrent_tasks": 1,
+   "department_id": "9e2f456c-ffef-5e53-b801-7a5806255a03",
+   "tier": "specialist",
+   "created_at": "2026-10-14T23:01:57.366651+00:00",
+   "updated_at": "2026-10-14T23:01:57.614944+00:00",
+   "district": "data-observatory",
+   "waypoint": "data-observatory:dispatch",
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "query_market_source"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000005"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000009",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "research_marketplaces",
+   "name": "Wren",
+   "role": "Etsy & Depop Researcher",
+   "home_district": "data-observatory",
+   "avatar": {
+    "shape": "drone",
+    "color": "#FFBD69",
+    "height": 1.4
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-haiku-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.2,
+   "max_concurrent_tasks": 1,
+   "department_id": "9e2f456c-ffef-5e53-b801-7a5806255a03",
+   "tier": "specialist",
+   "created_at": "2026-10-14T23:01:57.367779+00:00",
+   "updated_at": "2026-10-14T23:01:57.367782+00:00",
+   "district": "data-observatory",
+   "waypoint": null,
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "query_market_source"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000005"
+  },
+  {
+   "id": "a1000000-0000-4000-8000-000000000005",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "researcher",
+   "name": "Lumen",
+   "role": "Researcher",
+   "home_district": "data-observatory",
+   "avatar": {
+    "shape": "orb",
+    "color": "#32D8FF",
+    "height": 1.6
+   },
+   "model_provider": "anthropic",
+   "model_name": "claude-sonnet-5-5",
+   "execution_state": "IDLE",
+   "max_usd_per_mission": 0.3,
+   "max_concurrent_tasks": 1,
+   "department_id": "9e2f456c-ffef-5e53-b801-7a5806255a03",
+   "tier": "supervisor",
+   "created_at": "2026-10-14T23:01:57.362851+00:00",
+   "updated_at": "2026-10-14T23:01:57.362856+00:00",
+   "district": "data-observatory",
+   "waypoint": null,
+   "movement_state": "STATIONARY",
+   "tools": [
+    "create_artifact",
+    "query_market_source",
+    "read_file",
+    "retrieve_approved_source",
+    "search_code"
+   ],
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000007"
+  }
+ ],
+ "missions": [
+  {
+   "id": "d92f0de5-7c1c-481b-a101-d05976adb98a",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "project_id": "5d6e7f80-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+   "repository_id": null,
+   "title": "QA Steady Focus",
+   "prompt": "Run the automated tests against the exact release bundle.",
+   "status": "COMPLETED",
+   "execution_mode": "simulation",
+   "budget_usd": 1.0,
+   "spent_usd_estimated": 0.0,
+   "idempotency_key": null,
+   "failure_reason": null,
+   "outcome": "completed",
+   "paused": 0,
+   "pause_reason": null,
+   "kind": "qa_prototype",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "params": {
+    "artifact_id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2"
+   },
+   "created_by": "a1000000-0000-4000-8000-000000000007",
+   "created_at": "2026-10-14T23:01:58.148900+00:00",
+   "updated_at": "2026-10-14T23:01:58.583186+00:00"
+  },
+  {
+   "id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "project_id": "5d6e7f80-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+   "repository_id": null,
+   "title": "Build Steady Focus",
+   "prompt": "Build the prototype for 'Steady Focus \u2014 productivity app' exactly as specified: ['log a focus session of 5-120 minutes', 'show daily goal progress', 'count a streak with one freeze']",
+   "status": "COMPLETED",
+   "execution_mode": "simulation",
+   "budget_usd": 1.0,
+   "spent_usd_estimated": 0.0,
+   "idempotency_key": null,
+   "failure_reason": null,
+   "outcome": "completed",
+   "paused": 0,
+   "pause_reason": null,
+   "kind": "build_prototype",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "params": {
+    "revision": 0
+   },
+   "created_by": "a1000000-0000-4000-8000-000000000007",
+   "created_at": "2026-10-14T23:01:57.877893+00:00",
+   "updated_at": "2026-10-14T23:01:57.956352+00:00"
+  },
+  {
+   "id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "project_id": "5d6e7f80-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+   "repository_id": null,
+   "title": "Research 'productivity' on apple charts",
+   "prompt": "Find a validated app opportunity for 'productivity' using permitted apple_charts data (US).",
+   "status": "COMPLETED",
+   "execution_mode": "simulation",
+   "budget_usd": 1.0,
+   "spent_usd_estimated": 0.0,
+   "idempotency_key": null,
+   "failure_reason": null,
+   "outcome": "completed",
+   "paused": 0,
+   "pause_reason": null,
+   "kind": "market_research",
+   "opportunity_id": null,
+   "params": {
+    "source": "apple_charts",
+    "query": "productivity",
+    "region": "US",
+    "agent_key": "research_apps"
+   },
+   "created_by": "00000000-0000-4000-8000-000000000000",
+   "created_at": "2026-10-14T23:01:57.413212+00:00",
+   "updated_at": "2026-10-14T23:01:57.610519+00:00"
+  }
+ ],
+ "approvals": [],
+ "repositories": [
+  {
+   "id": "7e8f9a0b-1c2d-4e3f-8a9b-0c1d2e3f4a5b",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "project_id": "5d6e7f80-1a2b-4c3d-8e9f-0a1b2c3d4e5f",
+   "provider": "local",
+   "full_name": "sample/calc",
+   "default_branch": "main",
+   "created_at": "2026-10-14T23:01:57.347710+00:00"
+  }
+ ],
+ "departments": [
+  {
+   "id": "33eef7c6-4629-524d-96d2-2fe9bed864f4",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "app_studio",
+   "name": "App Studio",
+   "district": "code-forge",
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000002",
+   "daily_budget_usd": 2.0,
+   "max_concurrent_missions": 1,
+   "created_at": "2026-10-14T23:01:57.350143+00:00"
+  },
+  {
+   "id": "e4b3bee3-3c85-57a3-8847-e020957ecee7",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "design",
+   "name": "Design Studio",
+   "district": "vision-quarter",
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000006",
+   "daily_budget_usd": 1.0,
+   "max_concurrent_missions": 1,
+   "created_at": "2026-10-14T23:01:57.350739+00:00"
+  },
+  {
+   "id": "9cbe4975-9be8-5e7c-8245-daa4a5e954a2",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "executive",
+   "name": "Executive Office",
+   "district": "nexus-spire",
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000007",
+   "daily_budget_usd": 3.0,
+   "max_concurrent_missions": 1,
+   "created_at": "2026-10-14T23:01:57.348997+00:00"
+  },
+  {
+   "id": "6bcd18eb-36e6-5d42-a559-0e1eb90a7f2b",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "operations",
+   "name": "Operations",
+   "district": "nexus-spire",
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000001",
+   "daily_budget_usd": 1.0,
+   "max_concurrent_missions": 1,
+   "created_at": "2026-10-14T23:01:57.349449+00:00"
+  },
+  {
+   "id": "46d9004a-ce17-527e-a5cd-04be303662d2",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "quality",
+   "name": "Quality & Security",
+   "district": "sentinel-citadel",
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000004",
+   "daily_budget_usd": 1.0,
+   "max_concurrent_missions": 1,
+   "created_at": "2026-10-14T23:01:57.350437+00:00"
+  },
+  {
+   "id": "9e2f456c-ffef-5e53-b801-7a5806255a03",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "key": "research",
+   "name": "Research Division",
+   "district": "data-observatory",
+   "supervisor_agent_id": "a1000000-0000-4000-8000-000000000005",
+   "daily_budget_usd": 1.0,
+   "max_concurrent_missions": 1,
+   "created_at": "2026-10-14T23:01:57.349770+00:00"
+  }
+ ],
+ "opportunities": [
+  {
+   "id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "title": "Steady Focus \u2014 productivity app",
+   "status": "OWNER_APPROVAL",
+   "opportunity_score": 0.7643,
+   "confidence": "medium",
+   "data_mode": "fixture",
+   "updated_at": "2026-10-14T23:01:58.863469+00:00"
+  }
+ ],
+ "logistics": {
+  "nodes": [
+   {
+    "id": "nexus-spire:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "nexus-spire",
+    "position": [
+     9.0,
+     1.2,
+     3.0
+    ]
+   },
+   {
+    "id": "nexus-spire:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "nexus-spire",
+    "position": [
+     9.0,
+     1.2,
+     -3.0
+    ]
+   },
+   {
+    "id": "junction:nexus-spire",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "nexus-spire",
+    "position": [
+     16.0,
+     1.2,
+     0.0
+    ]
+   },
+   {
+    "id": "code-forge:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "code-forge",
+    "position": [
+     -20.05651273371742,
+     1.2,
+     -15.532478777137632
+    ]
+   },
+   {
+    "id": "code-forge:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "code-forge",
+    "position": [
+     -23.143487266282577,
+     1.2,
+     -10.387521222862366
+    ]
+   },
+   {
+    "id": "junction:code-forge",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "code-forge",
+    "position": [
+     -13.719886811400706,
+     1.2,
+     -8.231932086840423
+    ]
+   },
+   {
+    "id": "sentinel-citadel:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "sentinel-citadel",
+    "position": [
+     23.143487266282577,
+     1.2,
+     -10.387521222862366
+    ]
+   },
+   {
+    "id": "sentinel-citadel:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "sentinel-citadel",
+    "position": [
+     20.05651273371742,
+     1.2,
+     -15.532478777137632
+    ]
+   },
+   {
+    "id": "junction:sentinel-citadel",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "sentinel-citadel",
+    "position": [
+     13.719886811400706,
+     1.2,
+     -8.231932086840423
+    ]
+   },
+   {
+    "id": "vision-quarter:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "vision-quarter",
+    "position": [
+     -23.264100588675685,
+     1.2,
+     11.903849116986468
+    ]
+   },
+   {
+    "id": "vision-quarter:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "vision-quarter",
+    "position": [
+     -19.93589941132431,
+     1.2,
+     16.89615088301353
+    ]
+   },
+   {
+    "id": "junction:vision-quarter",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "vision-quarter",
+    "position": [
+     -13.312804709405498,
+     1.2,
+     8.875203139603666
+    ]
+   },
+   {
+    "id": "data-observatory:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "data-observatory",
+    "position": [
+     19.93589941132431,
+     1.2,
+     16.89615088301353
+    ]
+   },
+   {
+    "id": "data-observatory:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "data-observatory",
+    "position": [
+     23.264100588675685,
+     1.2,
+     11.903849116986468
+    ]
+   },
+   {
+    "id": "junction:data-observatory",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "data-observatory",
+    "position": [
+     13.312804709405498,
+     1.2,
+     8.875203139603666
+    ]
+   },
+   {
+    "id": "memory-vault:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "memory-vault",
+    "position": [
+     -3.0,
+     1.2,
+     25.919999999999998
+    ]
+   },
+   {
+    "id": "memory-vault:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "memory-vault",
+    "position": [
+     3.0,
+     1.2,
+     25.919999999999998
+    ]
+   },
+   {
+    "id": "junction:memory-vault",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "memory-vault",
+    "position": [
+     0.0,
+     1.2,
+     16.0
+    ]
+   },
+   {
+    "id": "owners-tower:dispatch",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "dispatch",
+    "district": "owners-tower",
+    "position": [
+     3.0,
+     1.2,
+     -28.799999999999997
+    ]
+   },
+   {
+    "id": "owners-tower:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "receiving",
+    "district": "owners-tower",
+    "position": [
+     -3.0,
+     1.2,
+     -28.799999999999997
+    ]
+   },
+   {
+    "id": "junction:owners-tower",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "kind": "junction",
+    "district": "owners-tower",
+    "position": [
+     0.0,
+     1.2,
+     -16.0
+    ]
+   }
+  ],
+  "routes": [
+   {
+    "id": "nexus-spire:dispatch->junction:nexus-spire",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "nexus-spire:dispatch",
+    "to_node": "junction:nexus-spire",
+    "length": 7.616,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:nexus-spire->nexus-spire:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:nexus-spire",
+    "to_node": "nexus-spire:receiving",
+    "length": 7.616,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "code-forge:dispatch->junction:code-forge",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "code-forge:dispatch",
+    "to_node": "junction:code-forge",
+    "length": 9.667,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:code-forge->code-forge:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:code-forge",
+    "to_node": "code-forge:receiving",
+    "length": 9.667,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "sentinel-citadel:dispatch->junction:sentinel-citadel",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "sentinel-citadel:dispatch",
+    "to_node": "junction:sentinel-citadel",
+    "length": 9.667,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:sentinel-citadel->sentinel-citadel:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:sentinel-citadel",
+    "to_node": "sentinel-citadel:receiving",
+    "length": 9.667,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "vision-quarter:dispatch->junction:vision-quarter",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "vision-quarter:dispatch",
+    "to_node": "junction:vision-quarter",
+    "length": 10.402,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:vision-quarter->vision-quarter:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:vision-quarter",
+    "to_node": "vision-quarter:receiving",
+    "length": 10.402,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "data-observatory:dispatch->junction:data-observatory",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "data-observatory:dispatch",
+    "to_node": "junction:data-observatory",
+    "length": 10.402,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:data-observatory->data-observatory:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:data-observatory",
+    "to_node": "data-observatory:receiving",
+    "length": 10.402,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "memory-vault:dispatch->junction:memory-vault",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "memory-vault:dispatch",
+    "to_node": "junction:memory-vault",
+    "length": 10.364,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:memory-vault->memory-vault:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:memory-vault",
+    "to_node": "memory-vault:receiving",
+    "length": 10.364,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "owners-tower:dispatch->junction:owners-tower",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "owners-tower:dispatch",
+    "to_node": "junction:owners-tower",
+    "length": 13.147,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:owners-tower->owners-tower:receiving",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:owners-tower",
+    "to_node": "owners-tower:receiving",
+    "length": 13.147,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:code-forge->junction:owners-tower",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:code-forge",
+    "to_node": "junction:owners-tower",
+    "length": 15.766,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:owners-tower->junction:code-forge",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:owners-tower",
+    "to_node": "junction:code-forge",
+    "length": 15.766,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:owners-tower->junction:sentinel-citadel",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:owners-tower",
+    "to_node": "junction:sentinel-citadel",
+    "length": 15.766,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:sentinel-citadel->junction:owners-tower",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:sentinel-citadel",
+    "to_node": "junction:owners-tower",
+    "length": 15.766,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:sentinel-citadel->junction:nexus-spire",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:sentinel-citadel",
+    "to_node": "junction:nexus-spire",
+    "length": 8.542,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:nexus-spire->junction:sentinel-citadel",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:nexus-spire",
+    "to_node": "junction:sentinel-citadel",
+    "length": 8.542,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:nexus-spire->junction:data-observatory",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:nexus-spire",
+    "to_node": "junction:data-observatory",
+    "length": 9.273,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:data-observatory->junction:nexus-spire",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:data-observatory",
+    "to_node": "junction:nexus-spire",
+    "length": 9.273,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:data-observatory->junction:memory-vault",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:data-observatory",
+    "to_node": "junction:memory-vault",
+    "length": 15.099,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:memory-vault->junction:data-observatory",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:memory-vault",
+    "to_node": "junction:data-observatory",
+    "length": 15.099,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:memory-vault->junction:vision-quarter",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:memory-vault",
+    "to_node": "junction:vision-quarter",
+    "length": 15.099,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:vision-quarter->junction:memory-vault",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:vision-quarter",
+    "to_node": "junction:memory-vault",
+    "length": 15.099,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:vision-quarter->junction:code-forge",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:vision-quarter",
+    "to_node": "junction:code-forge",
+    "length": 17.112,
+    "status": "UP",
+    "load": 0
+   },
+   {
+    "id": "junction:code-forge->junction:vision-quarter",
+    "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+    "from_node": "junction:code-forge",
+    "to_node": "junction:vision-quarter",
+    "length": 17.112,
+    "status": "UP",
+    "load": 0
+   }
+  ],
+  "packages": [],
+  "belt_speed": 400.0,
+  "server_time": "2026-10-14T23:01:59.099206+00:00"
+ },
+ "districts": [
+  {
+   "id": "nexus-spire",
+   "name": "Nexus Spire",
+   "purpose": "Mission coordination and global monitoring",
+   "position": [
+    0,
+    0,
+    0
+   ],
+   "color": "#A66BFF",
+   "architecture": "spire",
+   "towers": 1,
+   "height": 34,
+   "workstations": [
+    {
+     "id": "nexus-command",
+     "label": "Command Dais",
+     "offset": [
+      0,
+      0,
+      6
+     ]
+    }
+   ]
+  },
+  {
+   "id": "code-forge",
+   "name": "Code Forge",
+   "purpose": "Software engineering and architecture",
+   "position": [
+    -30,
+    0,
+    -18
+   ],
+   "color": "#32D8FF",
+   "architecture": "blocks",
+   "towers": 5,
+   "height": 22,
+   "workstations": [
+    {
+     "id": "forge-blueprint",
+     "label": "Blueprint Table",
+     "offset": [
+      -3,
+      0,
+      7
+     ]
+    },
+    {
+     "id": "forge-anvil",
+     "label": "Commit Anvil",
+     "offset": [
+      3,
+      0,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": "sentinel-citadel",
+   "name": "Sentinel Citadel",
+   "purpose": "Testing, quality assurance and security",
+   "position": [
+    30,
+    0,
+    -18
+   ],
+   "color": "#FFBD69",
+   "architecture": "fortress",
+   "towers": 4,
+   "height": 18,
+   "workstations": [
+    {
+     "id": "citadel-testbay",
+     "label": "Test Bay",
+     "offset": [
+      0,
+      0,
+      7
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vision-quarter",
+   "name": "Vision Quarter",
+   "purpose": "Creative work and interface design",
+   "position": [
+    -30,
+    0,
+    20
+   ],
+   "color": "#FF6178",
+   "architecture": "twisted",
+   "towers": 3,
+   "height": 20,
+   "workstations": [
+    {
+     "id": "vision-studio",
+     "label": "Light Studio",
+     "offset": [
+      0,
+      0,
+      -7
+     ]
+    }
+   ]
+  },
+  {
+   "id": "data-observatory",
+   "name": "Data Observatory",
+   "purpose": "Research, retrieval and analysis",
+   "position": [
+    30,
+    0,
+    20
+   ],
+   "color": "#5BF2A5",
+   "architecture": "dome",
+   "towers": 2,
+   "height": 16,
+   "workstations": [
+    {
+     "id": "observatory-lens",
+     "label": "Deep Lens",
+     "offset": [
+      0,
+      0,
+      -7
+     ]
+    }
+   ]
+  },
+  {
+   "id": "memory-vault",
+   "name": "Memory Vault",
+   "purpose": "Knowledge storage, artifacts and history",
+   "position": [
+    0,
+    0,
+    36
+   ],
+   "color": "#8FA8FF",
+   "architecture": "vault",
+   "towers": 3,
+   "height": 12,
+   "workstations": [
+    {
+     "id": "vault-archive",
+     "label": "Archive Core",
+     "offset": [
+      0,
+      0,
+      -7
+     ]
+    }
+   ]
+  },
+  {
+   "id": "owners-tower",
+   "name": "Owner's Tower",
+   "purpose": "Your private executive review and final release approval",
+   "position": [
+    0,
+    0,
+    -40
+   ],
+   "color": "#F4D58D",
+   "architecture": "tower",
+   "towers": 1,
+   "height": 40,
+   "workstations": [
+    {
+     "id": "tower-review",
+     "label": "Executive Suite",
+     "offset": [
+      0,
+      0,
+      8
+     ]
+    }
+   ]
+  }
+ ],
+ "emergency_stopped": false,
+ "costs": {
+  "today_estimated_usd": 0.0,
+  "daily_budget_usd": 5.0,
+  "is_estimate": true
+ },
+ "execution_mode": "simulation"
+}

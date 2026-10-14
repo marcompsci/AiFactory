@@ -1,0 +1,15 @@
+{
+ "status": "ok",
+ "database": "sqlite",
+ "auth_mode": "dev",
+ "execution_mode": "simulation",
+ "providers": [],
+ "sandbox": "process",
+ "network_isolation": true,
+ "outbox_backlog": 0,
+ "publisher_alive": true,
+ "realtime_subscribers": 0,
+ "supabase_broadcast": false,
+ "emergency_stopped": false,
+ "latest_sequence": 140
+}

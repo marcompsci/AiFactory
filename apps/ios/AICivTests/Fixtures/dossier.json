@@ -1,0 +1,586 @@
+{
+ "opportunity": {
+  "id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+  "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+  "source_platform": "apple_app_store",
+  "research_agent_id": "a1000000-0000-4000-8000-000000000008",
+  "research_mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+  "title": "Steady Focus \u2014 productivity app",
+  "description": "Short focus sessions, a daily goal, and a streak worth keeping.",
+  "evidence": [
+   {
+    "finding_id": "e352eefb-1b73-4e19-9bc1-cd4fd1ccc451",
+    "title": "'productivity' in apple app store top charts (US)",
+    "source_url": "fixture://apple_charts/us/top-free",
+    "collected_at": "2026-10-01T00:00:00Z",
+    "measurement_type": "ranking",
+    "data_mode": "fixture",
+    "geographic_scope": "US",
+    "coverage": "FIXTURE: 8 hand-written chart rows",
+    "confidence": "medium"
+   }
+  ],
+  "confidence": "medium",
+  "opportunity_score": 0.7643,
+  "proposed_department": "app_studio",
+  "estimated_effort": "~1 hour of agent time (template prototype)",
+  "estimated_cost_usd": 1.5,
+  "risk_flags": [
+   "fixture_data: evidence is labeled fixture data, not live market research"
+  ],
+  "artifact_references": [
+   "11b7b285-1042-46ce-adfc-09854f3c550e"
+  ],
+  "spec": {
+   "app_name": "Steady Focus",
+   "tagline": "Short focus sessions, a daily goal, and a streak worth keeping.",
+   "category": "Productivity",
+   "features": [
+    "focus_sessions",
+    "streaks",
+    "daily_goal"
+   ],
+   "keywords": [
+    "focus",
+    "streak",
+    "timer",
+    "habit",
+    "study"
+   ],
+   "target_user": "students and remote workers",
+   "platform": "iOS (web prototype first)",
+   "region": "US",
+   "acceptance": [
+    "log a focus session of 5-120 minutes",
+    "show daily goal progress",
+    "count a streak with one freeze"
+   ]
+  },
+  "status": "OWNER_APPROVAL",
+  "data_mode": "fixture",
+  "production_mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+  "qa_mission_id": "d92f0de5-7c1c-481b-a101-d05976adb98a",
+  "release_mission_id": null,
+  "release_artifact_id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2",
+  "revision_count": 0,
+  "created_at": "2026-10-14T23:01:57.585995+00:00",
+  "updated_at": "2026-10-14T23:01:58.863469+00:00"
+ },
+ "scores": [
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "demand",
+   "score": 1.0,
+   "weight": 2.0,
+   "evidence": [
+    "5 of the top 50 free apps are in 'productivity' (rank is a popularity proxy, not sales)"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "differentiation",
+   "score": 0.62,
+   "weight": 1.0,
+   "evidence": [
+    "incumbent average rating 4.18: room to stand out on quality"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "feasibility",
+   "score": 0.85,
+   "weight": 1.5,
+   "evidence": [
+    "App Studio has a tested template for this category"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "momentum",
+   "score": 0.7,
+   "weight": 1.5,
+   "evidence": [
+    "3 climbing, 1 new entries since the previous chart"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "monetization",
+   "score": 0.55,
+   "weight": 1.0,
+   "evidence": [
+    "productivity apps commonly use subscriptions; no revenue data observed"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "owner_alignment",
+   "score": 0.9,
+   "weight": 1.0,
+   "evidence": [
+    "owner priorities: productivity, fitness, skateboarding"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "policy_risk",
+   "score": 0.85,
+   "weight": 1.0,
+   "evidence": [
+    "no special App Review category rules"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "production_cost",
+   "score": 0.85,
+   "weight": 0.75,
+   "evidence": [
+    "estimated build cost $1.50 (model + compute estimate)"
+   ]
+  },
+  {
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "component": "saturation",
+   "score": 0.3333,
+   "weight": 1.0,
+   "evidence": [
+    "2 incumbents in the top 10"
+   ]
+  }
+ ],
+ "findings": [
+  {
+   "id": "e352eefb-1b73-4e19-9bc1-cd4fd1ccc451",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "run_id": "e5093f0d-f2a7-411b-8235-4af833c205f7",
+   "source_platform": "apple_app_store",
+   "title": "'productivity' in apple app store top charts (US)",
+   "summary": "5 matching apps in the top 50 free chart; best rank 4",
+   "source_url": "fixture://apple_charts/us/top-free",
+   "collected_at": "2026-10-01T00:00:00Z",
+   "geographic_scope": "US",
+   "data_coverage": "FIXTURE: 8 hand-written chart rows",
+   "measurement_type": "ranking",
+   "metrics": {
+    "entries": [
+     {
+      "rank": 4,
+      "previous_rank": 9,
+      "name": "Fixture Focus Garden",
+      "genre": "Productivity",
+      "rating": 4.2
+     },
+     {
+      "rank": 7,
+      "previous_rank": 7,
+      "name": "Fixture Notes Pro",
+      "genre": "Productivity",
+      "rating": 4.7
+     },
+     {
+      "rank": 11,
+      "previous_rank": 25,
+      "name": "Fixture Deep Work Timer",
+      "genre": "Productivity",
+      "rating": 4.0
+     },
+     {
+      "rank": 22,
+      "previous_rank": 40,
+      "name": "Fixture Habit Streaks",
+      "genre": "Productivity",
+      "rating": 4.1
+     },
+     {
+      "rank": 38,
+      "previous_rank": null,
+      "name": "Fixture Study Sprint",
+      "genre": "Productivity",
+      "rating": 3.9
+     }
+    ],
+    "chart_size": 50
+   },
+   "confidence": "medium",
+   "data_mode": "fixture",
+   "created_at": "2026-10-14T23:01:57.576879+00:00"
+  }
+ ],
+ "decisions": [
+  {
+   "id": "56d890b0-7f26-4fb5-8a31-f6a187b0793a",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "manager_agent_id": "a1000000-0000-4000-8000-000000000007",
+   "decision_type": "opportunity_review",
+   "subject_type": "opportunity",
+   "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "outcome": "route",
+   "rationale": "Score 0.76 \u2265 0.55, confidence medium, estimated cost $1.50 within my limit. Routing to app_studio. Evidence is labeled fixture data, so this run is a rehearsal, not a market decision.",
+   "method": "rules",
+   "model": null,
+   "inputs": {
+    "score": 0.7643,
+    "confidence": "medium",
+    "risk_flags": [
+     "fixture_data: evidence is labeled fixture data, not live market research"
+    ]
+   },
+   "created_at": "2026-10-14T23:01:57.685395+00:00"
+  },
+  {
+   "id": "88a07af6-abec-45e0-b4f9-8ed629e24d8a",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "manager_agent_id": "a1000000-0000-4000-8000-000000000007",
+   "decision_type": "routing",
+   "subject_type": "opportunity",
+   "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "outcome": "route:app_studio",
+   "rationale": "Routed to App Studio in code-forge. Score 0.76 \u2265 0.55, confidence medium, estimated cost $1.50 within my limit. Routing to app_studio. Evidence is labeled fixture data, so this run is a rehearsal, not a market decision.",
+   "method": "rules",
+   "model": null,
+   "inputs": {},
+   "created_at": "2026-10-14T23:01:57.687359+00:00"
+  },
+  {
+   "id": "5b7779cc-062d-447c-a39b-0064787d3c96",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "manager_agent_id": "a1000000-0000-4000-8000-000000000002",
+   "decision_type": "acceptance",
+   "subject_type": "opportunity",
+   "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "outcome": "accepted",
+   "rationale": "Orin accepted for App Studio: capacity available, template exists for the spec.",
+   "method": "rules",
+   "model": null,
+   "inputs": {},
+   "created_at": "2026-10-14T23:01:57.876155+00:00"
+  },
+  {
+   "id": "55ec9be4-08b6-4d59-a923-77e480fc8787",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "manager_agent_id": "a1000000-0000-4000-8000-000000000007",
+   "decision_type": "drift_check",
+   "subject_type": "mission",
+   "subject_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "outcome": "on_track",
+   "rationale": "Build matches the approved specification.",
+   "method": "rules",
+   "model": null,
+   "inputs": {},
+   "created_at": "2026-10-14T23:01:58.161348+00:00"
+  },
+  {
+   "id": "b2c29770-cb33-43ac-a506-c69a7babf0be",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "manager_agent_id": "a1000000-0000-4000-8000-000000000007",
+   "decision_type": "release_review",
+   "subject_type": "opportunity",
+   "subject_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "outcome": "APPROVED_FOR_OWNER_REVIEW",
+   "rationale": "9 pass, 3 warn, 0 fail across 12 categories.",
+   "method": "rules",
+   "model": null,
+   "inputs": {
+    "artifact_digest": "d7e8ae43cb60c873959348d8f0a6578c0bc02eb4a7011b639c536c8de105d32a",
+    "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271"
+   },
+   "created_at": "2026-10-14T23:01:58.789690+00:00"
+  }
+ ],
+ "manager_review": {
+  "id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+  "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+  "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+  "artifact_id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2",
+  "artifact_digest": "d7e8ae43cb60c873959348d8f0a6578c0bc02eb4a7011b639c536c8de105d32a",
+  "verdict": "APPROVED_FOR_OWNER_REVIEW",
+  "summary": "9 pass, 3 warn, 0 fail across 12 categories.",
+  "method": "rules",
+  "model": null,
+  "created_at": "2026-10-14T23:01:58.785710+00:00"
+ },
+ "checklist": [
+  {
+   "id": "f5ee66c9-590e-40eb-8f4d-12beda12d384",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "accessibility",
+   "status": "pass",
+   "evidence": "lang attribute: yes; viewport meta: yes; labels for inputs: yes; live region: yes; visible focus style: yes"
+  },
+  {
+   "id": "30c87247-6c8e-46d2-af61-11f34720fe77",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "cost",
+   "status": "pass",
+   "evidence": "estimated spend $0.0000 vs plan $1.50"
+  },
+  {
+   "id": "6886d105-fc20-490a-861d-97a72bb0cd20",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "documentation",
+   "status": "pass",
+   "evidence": "README has features, run instructions and limitations"
+  },
+  {
+   "id": "e9d16074-7814-43e0-a066-449852860e89",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "functional",
+   "status": "pass",
+   "evidence": "core module present: True; behavior covered by 8 passing tests"
+  },
+  {
+   "id": "92256143-c8dd-4629-bdf0-434132067e3f",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "known_limitations",
+   "status": "warn",
+   "evidence": "web prototype from the App Studio template; data on device only; no App Store binary; evidence is fixture data"
+  },
+  {
+   "id": "527f4eaf-ab09-4def-8ab5-4c9841e5c9e9",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "market_rationale",
+   "status": "warn",
+   "evidence": "score 0.76, confidence medium, 1 cited findings; FIXTURE evidence \u2014 not live market research"
+  },
+  {
+   "id": "e80baff9-da31-4425-af12-096ce27cf67d",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "performance",
+   "status": "pass",
+   "evidence": "bundle 4582 bytes; preview page 2973 bytes; no external scripts"
+  },
+  {
+   "id": "e349b84f-f2e2-4179-a54b-1d32c029df79",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "privacy",
+   "status": "pass",
+   "evidence": "PRIVACY.md present; analytics SDKs: none"
+  },
+  {
+   "id": "ba79a9d0-f64f-40ee-b802-e0c8b1fad53b",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "requirements",
+   "status": "pass",
+   "evidence": "spec features ['focus_sessions', 'streaks', 'daily_goal'] all present; name matches spec"
+  },
+  {
+   "id": "48b86497-6578-4b0a-90eb-34fb90cd368b",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "security",
+   "status": "pass",
+   "evidence": "secrets found: none; denied tool calls during build/QA: 0; network URLs in code: none"
+  },
+  {
+   "id": "4e4af308-249d-48ae-89e1-ceffba15c2e7",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "store_requirements",
+   "status": "warn",
+   "evidence": "metadata within App Store limits (name \u226430, subtitle \u226430, keywords \u2264100), icon and privacy policy present"
+  },
+  {
+   "id": "d613ed1d-731b-4851-9abf-ea154a9eac6d",
+   "review_id": "1f41c7dc-7302-4e56-89d5-666af4220271",
+   "category": "tests",
+   "status": "pass",
+   "evidence": "QA: 8 passed in 0.01s on digest d7e8ae43cb60 (matches the reviewed bundle d7e8ae43cb60)"
+  }
+ ],
+ "bundle": {
+  "artifact_id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2",
+  "digest": "d7e8ae43cb60c873959348d8f0a6578c0bc02eb4a7011b639c536c8de105d32a",
+  "title": "Steady Focus bundle d7e8ae43cb"
+ },
+ "artifacts": [
+  {
+   "id": "11b7b285-1042-46ce-adfc-09854f3c550e",
+   "kind": "research_brief",
+   "title": "Research brief \u2014 Steady Focus",
+   "digest": null,
+   "created_at": "2026-10-14T23:01:57.588452+00:00"
+  },
+  {
+   "id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2",
+   "kind": "release_bundle",
+   "title": "Steady Focus bundle d7e8ae43cb",
+   "digest": "d7e8ae43cb60c873959348d8f0a6578c0bc02eb4a7011b639c536c8de105d32a",
+   "created_at": "2026-10-14T23:01:57.939783+00:00"
+  },
+  {
+   "id": "6d645df4-b16f-4a43-bc00-04ce4387c07b",
+   "kind": "manager_review",
+   "title": "Manager review \u2014 approved for owner review",
+   "digest": null,
+   "created_at": "2026-10-14T23:01:58.788507+00:00"
+  }
+ ],
+ "test_report": {
+  "bundle_digest": "d7e8ae43cb60c873959348d8f0a6578c0bc02eb4a7011b639c536c8de105d32a",
+  "artifact_id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2",
+  "build_exit_code": 0,
+  "passed": 8,
+  "failed": 0,
+  "errors": 0,
+  "summary_line": "8 passed in 0.01s",
+  "report_artifact_id": "d0fd8029-4ab6-4eec-bef2-9a8c64335be9",
+  "network_isolated": true
+ },
+ "estimated_spend_usd": 0.0,
+ "packages": [
+  {
+   "id": "6e86354f-7076-457d-8d5e-8b87b3e423bf",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "task_id": "260dd86b-cad3-4bc2-bb76-fed3c7e67532",
+   "package_type": "research_brief",
+   "priority": 4,
+   "origin_district": "data-observatory",
+   "destination_district": "nexus-spire",
+   "status": "RECEIVED",
+   "route": [
+    "data-observatory:dispatch->junction:data-observatory",
+    "junction:data-observatory->junction:nexus-spire",
+    "junction:nexus-spire->nexus-spire:receiving"
+   ],
+   "route_started_at": "2026-10-14T23:01:57.597423+00:00",
+   "eta": "2026-10-14T23:01:57.665651+00:00",
+   "current_node": "nexus-spire:receiving",
+   "artifact_references": [
+    "11b7b285-1042-46ce-adfc-09854f3c550e"
+   ],
+   "attempts": 0,
+   "next_attempt_at": null,
+   "dispatched_at": "2026-10-14T23:01:57.597423+00:00",
+   "delivered_at": "2026-10-14T23:01:57.673059+00:00",
+   "created_at": "2026-10-14T23:01:57.595530+00:00"
+  },
+  {
+   "id": "46efc628-a0ba-4c9d-9d90-7e614d5538c4",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "mission_id": null,
+   "task_id": null,
+   "package_type": "product_proposal",
+   "priority": 4,
+   "origin_district": "nexus-spire",
+   "destination_district": "code-forge",
+   "status": "RECEIVED",
+   "route": [
+    "nexus-spire:dispatch->junction:nexus-spire",
+    "junction:nexus-spire->junction:sentinel-citadel",
+    "junction:sentinel-citadel->junction:owners-tower",
+    "junction:owners-tower->junction:code-forge",
+    "junction:code-forge->code-forge:receiving"
+   ],
+   "route_started_at": "2026-10-14T23:01:57.690265+00:00",
+   "eta": "2026-10-14T23:01:57.833657+00:00",
+   "current_node": "code-forge:receiving",
+   "artifact_references": [
+    "11b7b285-1042-46ce-adfc-09854f3c550e"
+   ],
+   "attempts": 0,
+   "next_attempt_at": null,
+   "dispatched_at": "2026-10-14T23:01:57.690265+00:00",
+   "delivered_at": "2026-10-14T23:01:57.861083+00:00",
+   "created_at": "2026-10-14T23:01:57.688847+00:00"
+  },
+  {
+   "id": "1fb40a05-dbd4-4475-a307-d7088a1570ff",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "task_id": null,
+   "package_type": "code_artifact",
+   "priority": 3,
+   "origin_district": "code-forge",
+   "destination_district": "sentinel-citadel",
+   "status": "RECEIVED",
+   "route": [
+    "code-forge:dispatch->junction:code-forge",
+    "junction:code-forge->junction:owners-tower",
+    "junction:owners-tower->junction:sentinel-citadel",
+    "junction:sentinel-citadel->sentinel-citadel:receiving"
+   ],
+   "route_started_at": "2026-10-14T23:01:57.968448+00:00",
+   "eta": "2026-10-14T23:01:58.095613+00:00",
+   "current_node": "sentinel-citadel:receiving",
+   "artifact_references": [
+    "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2"
+   ],
+   "attempts": 0,
+   "next_attempt_at": null,
+   "dispatched_at": "2026-10-14T23:01:57.968448+00:00",
+   "delivered_at": "2026-10-14T23:01:58.136634+00:00",
+   "created_at": "2026-10-14T23:01:57.967680+00:00"
+  },
+  {
+   "id": "ccbaa50d-ca22-43fa-b07c-50906be3a95d",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "mission_id": "d92f0de5-7c1c-481b-a101-d05976adb98a",
+   "task_id": null,
+   "package_type": "test_report",
+   "priority": 3,
+   "origin_district": "sentinel-citadel",
+   "destination_district": "nexus-spire",
+   "status": "RECEIVED",
+   "route": [
+    "sentinel-citadel:dispatch->junction:sentinel-citadel",
+    "junction:sentinel-citadel->junction:nexus-spire",
+    "junction:nexus-spire->nexus-spire:receiving"
+   ],
+   "route_started_at": "2026-10-14T23:01:58.597680+00:00",
+   "eta": "2026-10-14T23:01:58.662242+00:00",
+   "current_node": "nexus-spire:receiving",
+   "artifact_references": [
+    "d0fd8029-4ab6-4eec-bef2-9a8c64335be9",
+    "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2"
+   ],
+   "attempts": 0,
+   "next_attempt_at": null,
+   "dispatched_at": "2026-10-14T23:01:58.597680+00:00",
+   "delivered_at": "2026-10-14T23:01:58.714269+00:00",
+   "created_at": "2026-10-14T23:01:58.596773+00:00"
+  },
+  {
+   "id": "d6010711-5b2e-4ef2-a40e-e88e2bade92f",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "opportunity_id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "mission_id": null,
+   "task_id": null,
+   "package_type": "release_package",
+   "priority": 2,
+   "origin_district": "nexus-spire",
+   "destination_district": "owners-tower",
+   "status": "RECEIVED",
+   "route": [
+    "nexus-spire:dispatch->junction:nexus-spire",
+    "junction:nexus-spire->junction:sentinel-citadel",
+    "junction:sentinel-citadel->junction:owners-tower",
+    "junction:owners-tower->owners-tower:receiving"
+   ],
+   "route_started_at": "2026-10-14T23:01:58.858957+00:00",
+   "eta": "2026-10-14T23:01:58.971635+00:00",
+   "current_node": "owners-tower:receiving",
+   "artifact_references": [
+    "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2"
+   ],
+   "attempts": 0,
+   "next_attempt_at": null,
+   "dispatched_at": "2026-10-14T23:01:58.858957+00:00",
+   "delivered_at": "2026-10-14T23:01:58.971684+00:00",
+   "created_at": "2026-10-14T23:01:58.856657+00:00"
+  }
+ ],
+ "owner_decisions": [],
+ "authorizations": [],
+ "releases": [],
+ "awaiting_owner": true,
+ "risks": [
+  "fixture_data: evidence is labeled fixture data, not live market research",
+  "web prototype from the App Studio template; data on device only; no App Store binary; evidence is fixture data",
+  "score 0.76, confidence medium, 1 cited findings; FIXTURE evidence \u2014 not live market research",
+  "metadata within App Store limits (name \u226430, subtitle \u226430, keywords \u2264100), icon and privacy policy present"
+ ]
+}

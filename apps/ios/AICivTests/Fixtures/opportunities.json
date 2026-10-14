@@ -1,0 +1,71 @@
+{
+ "opportunities": [
+  {
+   "id": "6752a593-a5d5-44db-8ba4-7b61e6bd3e13",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "source_platform": "apple_app_store",
+   "research_agent_id": "a1000000-0000-4000-8000-000000000008",
+   "research_mission_id": "35fa660c-876f-4aa5-b8d4-a523e2174657",
+   "title": "Steady Focus \u2014 productivity app",
+   "description": "Short focus sessions, a daily goal, and a streak worth keeping.",
+   "evidence": [
+    {
+     "finding_id": "e352eefb-1b73-4e19-9bc1-cd4fd1ccc451",
+     "title": "'productivity' in apple app store top charts (US)",
+     "source_url": "fixture://apple_charts/us/top-free",
+     "collected_at": "2026-10-01T00:00:00Z",
+     "measurement_type": "ranking",
+     "data_mode": "fixture",
+     "geographic_scope": "US",
+     "coverage": "FIXTURE: 8 hand-written chart rows",
+     "confidence": "medium"
+    }
+   ],
+   "confidence": "medium",
+   "opportunity_score": 0.7643,
+   "proposed_department": "app_studio",
+   "estimated_effort": "~1 hour of agent time (template prototype)",
+   "estimated_cost_usd": 1.5,
+   "risk_flags": [
+    "fixture_data: evidence is labeled fixture data, not live market research"
+   ],
+   "artifact_references": [
+    "11b7b285-1042-46ce-adfc-09854f3c550e"
+   ],
+   "spec": {
+    "app_name": "Steady Focus",
+    "tagline": "Short focus sessions, a daily goal, and a streak worth keeping.",
+    "category": "Productivity",
+    "features": [
+     "focus_sessions",
+     "streaks",
+     "daily_goal"
+    ],
+    "keywords": [
+     "focus",
+     "streak",
+     "timer",
+     "habit",
+     "study"
+    ],
+    "target_user": "students and remote workers",
+    "platform": "iOS (web prototype first)",
+    "region": "US",
+    "acceptance": [
+     "log a focus session of 5-120 minutes",
+     "show daily goal progress",
+     "count a streak with one freeze"
+    ]
+   },
+   "status": "OWNER_APPROVAL",
+   "data_mode": "fixture",
+   "production_mission_id": "a86fe7e9-c9e2-4bb6-8a97-0484bab1a760",
+   "qa_mission_id": "d92f0de5-7c1c-481b-a101-d05976adb98a",
+   "release_mission_id": null,
+   "release_artifact_id": "19c16fe5-8fb3-4aa8-8c71-bb4bf353c6a2",
+   "revision_count": 0,
+   "created_at": "2026-10-14T23:01:57.585995+00:00",
+   "updated_at": "2026-10-14T23:01:58.863469+00:00"
+  }
+ ]
+}
