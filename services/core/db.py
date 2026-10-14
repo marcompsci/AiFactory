@@ -604,7 +604,16 @@ def get_engine() -> Engine:
                     cur.execute("PRAGMA foreign_keys=ON")
                     cur.close()
             else:
-                _engine = create_engine(url, pool_pre_ping=True)
+                from sqlalchemy.engine.interfaces import BindTyping
+
+                from .pg import configure_connection
+
+                if url.startswith("postgresql://") or url.startswith("postgres://"):
+                    url = "postgresql+psycopg://" + url.split("://", 1)[1]
+                _engine = create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20)
+                # Send parameters untyped so Postgres casts ISO strings / id strings to timestamptz / uuid columns.
+                _engine.dialect.bind_typing = BindTyping.NONE
+                event.listen(_engine, "connect", lambda dbapi_conn, _: configure_connection(dbapi_conn))
         return _engine
 
 
@@ -627,6 +636,10 @@ def init_db() -> None:
                     conn.exec_driver_sql(
                         f"CREATE TRIGGER IF NOT EXISTS {t}_no_{op.lower()} BEFORE {op} ON {t} "
                         f"BEGIN SELECT RAISE(ABORT, '{t} is append-only'); END")
+    else:
+        from .pg import migrate
+
+        migrate(engine)
     seed(engine)
 
 
@@ -669,25 +682,26 @@ def seed(engine: Engine) -> None:
             conn.execute(update(projects).where(projects.c.id == data["project_id"]).values(allowed_tools=all_tools))
         _ensure(conn, repositories, {"id": "7e8f9a0b-1c2d-4e3f-8a9b-0c1d2e3f4a5b"},
                 {"organization_id": org_id, "project_id": data["project_id"], "provider": "local", "full_name": "sample/calc"})
-        dept_ids = {}
-        for dpt in data.get("departments", []):
-            did = str(uuid.uuid5(uuid.NAMESPACE_URL, f"aiciv:dept:{dpt['key']}"))
-            dept_ids[dpt["key"]] = did
-            _ensure(conn, departments, {"id": did}, {"organization_id": org_id, "key": dpt["key"], "name": dpt["name"],
-                                                    "district": dpt["district"], "supervisor_agent_id": by_key[dpt["supervisor"]]["id"],
-                                                    "daily_budget_usd": dpt["daily_budget_usd"]})
+        # Agents first (no department yet), then departments (whose supervisors are agents), then link them —
+        # Postgres enforces both foreign keys.
+        dept_ids = {dpt["key"]: str(uuid.uuid5(uuid.NAMESPACE_URL, f"aiciv:dept:{dpt['key']}")) for dpt in data.get("departments", [])}
         for a in data["agents"]:
             created = _ensure(conn, agents, {"id": a["id"]}, dict(
                 organization_id=org_id, key=a["key"], name=a["name"], role=a["role"], home_district=a["home_district"],
                 avatar=a["avatar"], model_provider=a["model"]["provider"], model_name=model_of(a),
                 max_usd_per_mission=a["limits"]["max_usd_per_mission"], max_concurrent_tasks=a["limits"]["max_concurrent_tasks"],
-                department_id=dept_ids.get(a.get("department")), tier=a.get("tier", "specialist")))
+                department_id=None, tier=a.get("tier", "specialist")))
             if not created:
-                conn.execute(update(agents).where(agents.c.id == a["id"]).values(
-                    department_id=dept_ids.get(a.get("department")), tier=a.get("tier", "specialist"), model_name=model_of(a)))
+                conn.execute(update(agents).where(agents.c.id == a["id"]).values(tier=a.get("tier", "specialist"), model_name=model_of(a)))
             for t in a["tools"]:
                 _ensure(conn, agent_capabilities, {"agent_id": a["id"], "tool_name": t}, {})
             _ensure(conn, agent_positions, {"agent_id": a["id"]}, {"organization_id": org_id, "district": a["home_district"]})
+        for dpt in data.get("departments", []):
+            _ensure(conn, departments, {"id": dept_ids[dpt["key"]]}, {"organization_id": org_id, "key": dpt["key"], "name": dpt["name"],
+                                                                     "district": dpt["district"], "supervisor_agent_id": by_key[dpt["supervisor"]]["id"],
+                                                                     "daily_budget_usd": dpt["daily_budget_usd"]})
+        for a in data["agents"]:
+            conn.execute(update(agents).where(agents.c.id == a["id"]).values(department_id=dept_ids.get(a.get("department"))))
             sup = data.get("reporting", {}).get(a["key"])
             _ensure(conn, agent_reporting_lines, {"agent_id": a["id"]},
                     {"organization_id": org_id, "supervisor_agent_id": by_key[sup]["id"] if sup else None})

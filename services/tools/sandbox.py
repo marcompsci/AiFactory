@@ -9,9 +9,9 @@ Agents never get a shell. Tools build an argv from a fixed allowlist and run it 
     * network: if `unshare --net` works on this host the command runs in an empty network namespace
       (no egress at all); otherwise `network_isolated` is reported False in the tool result
 
-  DockerSandbox (production)
+  DockerSandbox (production, AICIV_SANDBOX=docker)
     * disposable `docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges
-      --pids-limit --memory --cpus --user 65534` with only the workspace bind-mounted
+      --pids-limit --memory --cpus --user <worker uid>` with only the workspace bind-mounted
     * the worker process talks to the container runtime; agents and their tools never see the socket
 """
 from __future__ import annotations
@@ -157,37 +157,79 @@ class ProcessSandbox:
 
 
 class DockerSandbox:
-    """Builds the container invocation used in production. `run` requires a container runtime on the worker host."""
+    """One disposable container per command (AICIV_SANDBOX=docker).
+
+    * `--network none --read-only --cap-drop ALL --security-opt no-new-privileges`, pids/memory/cpu limits,
+      a small tmpfs for /tmp, and nothing from the host environment (no keys, no tokens)
+    * runs as the worker's own uid:gid so files it writes in the workspace stay owned by the worker
+    * the workspace (and, for a git worktree, the repository's shared .git directory) is bind-mounted at the
+      same absolute path it has on the host, so `git -C <path>` and worktree links resolve unchanged
+    * on timeout the container is killed by name, not just abandoned
+    Image: infrastructure/docker/sandbox.Dockerfile (Python 3.12, pytest, git), name from AICIV_SANDBOX_IMAGE.
+    """
 
     name = "docker"
 
-    def __init__(self, image: str = "python:3.12-slim", memory_mb: int = 1024, cpus: float = 1.0, pids: int = 128) -> None:
-        self.image = image
+    def __init__(self, image: str | None = None, memory_mb: int = 1024, cpus: float = 1.0, pids: int = 128) -> None:
+        self.image = image or os.environ.get("AICIV_SANDBOX_IMAGE", "aiciv-sandbox:latest")
         self.memory_mb = memory_mb
         self.cpus = cpus
         self.pids = pids
 
-    def command(self, argv: list[str], cwd: Path, workspace_root: Path) -> list[str]:
+    @staticmethod
+    def _mounts(workspace_root: Path) -> list[Path]:
+        root = workspace_root.resolve()
+        mounts = [root]
+        dotgit = root / ".git"
+        if dotgit.is_file():  # a worktree: its objects and refs live in the main repository's .git
+            gitdir = Path(dotgit.read_text().split("gitdir:", 1)[1].strip())
+            if not gitdir.is_absolute():
+                gitdir = (root / gitdir).resolve()
+            common = gitdir
+            if (gitdir / "commondir").exists():
+                common = (gitdir / (gitdir / "commondir").read_text().strip()).resolve()
+            if root not in common.parents:
+                mounts.append(common)
+        return mounts
+
+    def command(self, argv: list[str], cwd: Path, workspace_root: Path, name: str = "aiciv-sbx") -> list[str]:
         _validate_argv(argv)
-        rel = cwd.resolve().relative_to(workspace_root.resolve())
-        return [
-            "docker", "run", "--rm", "--network", "none", "--read-only", "--cap-drop", "ALL",
+        root = workspace_root.resolve()
+        cwd = cwd.resolve()
+        if cwd != root and root not in cwd.parents:
+            raise SandboxViolation("cwd outside workspace")
+        for i, a in enumerate(argv[:-1]):
+            if a == "-C":
+                p = Path(argv[i + 1]).resolve()
+                if p != root and root not in p.parents:
+                    raise SandboxViolation("git -C path outside workspace")
+        uid = f"{os.getuid()}:{os.getgid()}" if hasattr(os, "getuid") else "65534:65534"
+        cmd = [
+            "docker", "run", "--rm", "--name", name, "--network", "none", "--read-only", "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges", "--pids-limit", str(self.pids),
-            "--memory", f"{self.memory_mb}m", "--cpus", str(self.cpus), "--user", "65534:65534",
+            "--memory", f"{self.memory_mb}m", "--cpus", str(self.cpus), "--user", uid,
             "--tmpfs", "/tmp:rw,size=64m", "-e", "HOME=/tmp", "-e", "PYTHONDONTWRITEBYTECODE=1",
-            "-v", f"{workspace_root.resolve()}:/workspace:rw", "-w", f"/workspace/{rel}",
-            self.image, *argv,
+            "-e", "GIT_CONFIG_NOSYSTEM=1", "-e", "GIT_TERMINAL_PROMPT=0",
+            "-e", "GIT_AUTHOR_NAME=AI Civilization Agent", "-e", "GIT_AUTHOR_EMAIL=agents@aiciv.local",
+            "-e", "GIT_COMMITTER_NAME=AI Civilization Agent", "-e", "GIT_COMMITTER_EMAIL=agents@aiciv.local",
         ]
+        for m in self._mounts(root):
+            cmd += ["-v", f"{m}:{m}:rw"]
+        return [*cmd, "-w", str(cwd), self.image, *argv]
 
     def run(self, argv: list[str], cwd: Path, timeout: int, workspace_root: Path) -> CommandResult:
-        cmd = self.command(argv, cwd, workspace_root)
+        import uuid
+
+        name = f"aiciv-sbx-{uuid.uuid4().hex[:12]}"
+        cmd = self.command(argv, cwd, workspace_root, name)
         started = time.monotonic()
         try:
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
             return CommandResult(argv, p.returncode, p.stdout[-20000:], p.stderr[-8000:], int((time.monotonic() - started) * 1000), False, True)
         except subprocess.TimeoutExpired as exc:
-            return CommandResult(argv, -9, (exc.stdout or "")[-20000:] if isinstance(exc.stdout, str) else "", "timeout",
-                                 int((time.monotonic() - started) * 1000), True, True)
+            subprocess.run(["docker", "kill", name], capture_output=True, timeout=30)
+            out = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+            return CommandResult(argv, -9, out[-20000:], "timeout", int((time.monotonic() - started) * 1000), True, True)
 
 
 def default_sandbox():

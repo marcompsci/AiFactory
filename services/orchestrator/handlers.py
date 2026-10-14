@@ -231,8 +231,12 @@ def publish(env: TaskEnv) -> dict:
     pr = env.tool("prepare_pull_request", title=f"Fix: {env.mission.title}"[:120],
                   body=f"Mission {env.mission.id}\n\n{rev.get('review', '')}")
     art = env.tool("create_artifact", kind="patch", title=f"Patch {pr['commit'][:10]}", content=pr["patch"])
-    env.say(f"Published commit {pr['commit'][:10]} on {pr['branch']}.", kind="status")
-    return {"published": True, "commit": pr["commit"], "branch": pr["branch"], "artifact_id": art["artifact_id"]}
+    if pr.get("pr_url"):
+        env.say(f"Opened draft pull request #{pr['pr_number']} on {pr['repo']} ({pr['pr_branch']} into {pr['pr_base']}): {pr['pr_url']}", kind="status")
+    else:
+        env.say(f"Published commit {pr['commit'][:10]} on {pr['branch']}.", kind="status")
+    return {"published": True, "commit": pr["commit"], "branch": pr["branch"], "artifact_id": art["artifact_id"],
+            **{k: pr[k] for k in ("remote", "repo", "pr_number", "pr_url", "pr_branch", "pr_base") if pr.get(k) is not None}}
 
 
 def archive(env: TaskEnv) -> dict:

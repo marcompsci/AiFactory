@@ -95,9 +95,9 @@ def test_events_are_ordered_valid_and_published(client):
     for t in ["mission.created", "mission.started", "task.assigned", "task.started", "agent.movement_requested", "agent.arrived",
               "tool.started", "tool.completed", "agent.message", "artifact.created", "approval.requested"]:
         assert t in types, t
-    # replay from the middle returns exactly the tail
-    tail = client.get(f"/api/events?after={seqs[10]}").json()["events"]
-    assert [e["sequence"] for e in tail] == seqs[11:]
+    # replay from the middle returns exactly the tail (background ticks may have appended more since)
+    tail = [e["sequence"] for e in client.get(f"/api/events?after={seqs[10]}").json()["events"]]
+    assert tail[:len(seqs) - 11] == seqs[11:] and tail == list(range(seqs[11], seqs[11] + len(tail)))
     # the outbox drains (every event handed to the realtime layer)
     wait_for(lambda: client.get("/api/health").json()["outbox_backlog"] == 0)
 

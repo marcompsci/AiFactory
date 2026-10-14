@@ -29,7 +29,7 @@ class Scheduler(threading.Thread):
         super().__init__(daemon=True, name="scheduler")
         self.pipeline = Pipeline(enqueue, gateway)
         self._poke = threading.Event()
-        self._stop = threading.Event()
+        self._halt = threading.Event()
         self.scale = float(os.environ.get("AICIV_TICK_SCALE", "1"))
         self.jobs: dict[str, Callable[[], dict | int]] = {
             "logistics": self._logistics,
@@ -41,7 +41,7 @@ class Scheduler(threading.Thread):
         self._poke.set()
 
     def stop(self) -> None:
-        self._stop.set()
+        self._halt.set()
         self._poke.set()
 
     def _logistics(self) -> dict:
@@ -77,10 +77,10 @@ class Scheduler(threading.Thread):
         return results
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._halt.is_set():
             poked = self._poke.wait(timeout=max(0.05, 0.25 * self.scale))
             self._poke.clear()
-            if self._stop.is_set():
+            if self._halt.is_set():
                 break
             try:
                 self.run_due(force=poked)

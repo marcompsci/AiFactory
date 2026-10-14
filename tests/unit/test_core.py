@@ -242,17 +242,19 @@ def test_rate_limiter():
 # ------------------------------------------------------------------ memory + redaction
 def test_verified_memory_requires_source():
     from services.core import db
+    from services.core.config import load_seed
     from services.core.events import transaction
     from services.memory import store
     db.init_db()
+    o = load_seed()["organization_id"]
     with transaction() as conn:
         with pytest.raises(ValueError):
-            store.remember(conn, org_id="o", scope="project", trust="verified", content="x", source="model said so")
-        mid = store.remember(conn, org_id="o", scope="project", trust="hypothesis", content="maybe", source="mission:1")
-        assert store.search(conn, "o", "may")[0]["trust"] == "hypothesis"
-        assert store.forget(conn, "o", mid)
-        store.remember(conn, org_id="o", scope="shared", trust="hypothesis", content="old", source="m", ttl_days=-1)
-        assert store.search(conn, "o", "old") == []
+            store.remember(conn, org_id=o, scope="project", trust="verified", content="x", source="model said so")
+        mid = store.remember(conn, org_id=o, scope="project", trust="hypothesis", content="maybe", source="mission:1")
+        assert store.search(conn, o, "may")[0]["trust"] == "hypothesis"
+        assert store.forget(conn, o, mid)
+        store.remember(conn, org_id=o, scope="shared", trust="hypothesis", content="old", source="m", ttl_days=-1)
+        assert store.search(conn, o, "old") == []
         assert store.purge_expired(conn) == 1
 
 

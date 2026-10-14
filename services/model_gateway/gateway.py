@@ -107,7 +107,8 @@ class AnthropicAdapter:
     def __init__(self, api_key: str, model: str, client: httpx.Client | None = None) -> None:
         self.api_key = api_key
         self.model = model
-        self.client = client or httpx.Client(base_url="https://api.anthropic.com")
+        # AICIV_ANTHROPIC_BASE_URL: only for an API-compatible gateway you operate; defaults to Anthropic.
+        self.client = client or httpx.Client(base_url=os.environ.get("AICIV_ANTHROPIC_BASE_URL", "https://api.anthropic.com"))
 
     def complete(self, req: ModelRequest, timeout: float) -> ModelResponse:
         started = time.monotonic()

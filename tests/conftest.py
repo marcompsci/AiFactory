@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -13,11 +14,16 @@ sys.path.insert(0, str(ROOT))
 def isolated_env(tmp_path, monkeypatch):
     """Every test gets its own database and workspace directory, and no real credentials."""
     for k in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "AICIV_API_TOKEN", "SUPABASE_JWT_SECRET", "SUPABASE_URL",
-              "SUPABASE_SERVICE_ROLE_KEY", "DATABASE_URL", "AICIV_SANDBOX"):
+              "SUPABASE_SERVICE_ROLE_KEY", "DATABASE_URL", "AICIV_SANDBOX", "AICIV_GITHUB_REPO", "GITHUB_TOKEN", "AICIV_GITHUB_AUTH",
+              "GITHUB_APP_ID", "GITHUB_APP_PRIVATE_KEY_PATH", "GITHUB_APP_INSTALLATION_ID"):
         monkeypatch.delenv(k, raising=False)
     monkeypatch.setenv("AICIV_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("AICIV_TRAVEL_SECONDS", "0")
     from services.core import config, db
+
+    pg_url = os.environ.get("AICIV_TEST_DATABASE_URL")
+    if pg_url:  # run the whole suite against real Postgres (CI does this; see TESTING.md)
+        monkeypatch.setenv("DATABASE_URL", pg_url)
 
     from services.core import auth
 
@@ -26,6 +32,11 @@ def isolated_env(tmp_path, monkeypatch):
     auth.mutation_limiter._state.clear()
     from services.orchestrator.graph import reset_checkpointer
     reset_checkpointer()
+    if pg_url:
+        from services.core.pg import migrate, truncate_all
+
+        migrate(db.get_engine())
+        truncate_all(db.get_engine())
     yield tmp_path
     db.reset_engine()
     config.get_settings.cache_clear()

@@ -225,9 +225,14 @@ def test_owner_decisions_are_append_only(dbconn):
     from sqlalchemy import exc, insert
 
     from services.core.events import transaction
+    import uuid
+
+    ids = [str(uuid.uuid4()) for _ in range(5)]
     with transaction() as conn:
-        conn.execute(insert(dbconn.owner_decisions).values(id="d1", organization_id="o", opportunity_id="p", manager_review_id="r",
-                                                           artifact_id="a", artifact_digest="x" * 64, decision="APPROVE", decided_by="u"))
+        if conn.dialect.name == "postgresql":  # this test is about the append-only trigger, not the foreign keys
+            conn.exec_driver_sql("set local session_replication_role = replica")
+        conn.execute(insert(dbconn.owner_decisions).values(id=ids[0], organization_id=ids[1], opportunity_id=ids[2], manager_review_id=ids[3],
+                                                           artifact_id=ids[4], artifact_digest="x" * 64, decision="APPROVE", decided_by=ids[1]))
     for stmt in (dbconn.owner_decisions.update().values(decision="REJECT"), dbconn.owner_decisions.delete()):
         with pytest.raises(exc.DatabaseError):
             with transaction() as conn:

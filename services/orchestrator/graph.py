@@ -73,6 +73,12 @@ def reset_checkpointer() -> None:
     """Tests only."""
     global _saver, _saver_key
     with _saver_lock:
+        conn = getattr(_saver, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001
+                pass
         _saver, _saver_key = None, None
 
 

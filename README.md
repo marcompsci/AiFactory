@@ -101,17 +101,19 @@ npx playwright test -c tests/e2e/playwright.config.ts  # real browser against a 
 
 ```
 apps/web                Next.js app: 3D city (React Three Fiber) + command center
+apps/ios                native iPhone app (SwiftUI): Owner's Tower with Face ID, live activity, notifications
 packages/world-engine   districts config, deterministic navigation, event→animation interpreter, demo script
 packages/event-contracts  versioned event envelope (JSON Schema + TypeScript)
 packages/shared-types   agent seed shared by backend and frontend
 services/api            FastAPI app
-services/orchestrator   planning, durable mission runner, per-agent task handlers
+services/orchestrator   planning, LangGraph mission graph + runner steps, per-agent task handlers
 services/workers        background worker + crash recovery
 services/model_gateway  Anthropic / OpenAI adapters, retries, cost estimates
 services/tools          tool registry with permission checks + sandbox
 services/memory         verified vs hypothesis memory
-services/integrations   GitHub App adapter
-infrastructure          Postgres migration (RLS), Dockerfiles
+services/integrations   GitHub: approved missions open draft pull requests
+infrastructure          Postgres migrations (RLS), Dockerfiles incl. the tool sandbox image
+scripts                 live-model smoke test, CI helpers
 tests                   unit, integration, e2e
 ```
 

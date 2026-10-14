@@ -83,3 +83,38 @@ Native iOS shell around the web app, plus push notifications when an agent needs
 
 ### Next milestone
 Connect real credentials (Anthropic key, Etsy key) and run one live research → release cycle; then the native iOS shell with push notifications for the Owner's Tower.
+
+---
+
+## Increment 3 — finishing the open items (Oct 14, 2026)
+
+### Done
+- **Native iOS app** (`apps/ios`): SwiftUI tabs for City (the 3D web city), Company, Owner's Tower (Face ID before
+  approving, network-blocked prototype preview, exact digest), Activity and Settings (token in the Keychain); SSE with
+  ordered/deduplicated/gap-replayed events; local notifications and background refresh when a release reaches your
+  tower. Builds and passes its XCTest suite on GitHub's macOS runner (`ios.yml`), plus an unsigned device build.
+- **LangGraph**: every mission is a LangGraph thread; approvals are `interrupt()`s; checkpoints in SQLite or Postgres;
+  `GET /api/missions/{id}/graph`. DECISIONS.md D3 rewritten.
+- **PostgreSQL**: migrations applied by the API (`schema_migrations`), Postgres types adapted, seeding ordered for
+  foreign keys, pgvector / `auth.uid()` optional. The full suite passes on Postgres 16, locally and in a new CI job.
+- **Container sandbox**: hardened `DockerSandbox` (worker uid, 1:1 mounts for worktrees, kill on timeout) and its
+  image; a whole mission runs with every tool in containers, locally and in a new CI job.
+- **Real pull requests**: approved missions open draft PRs on GitHub — [AiFactory#2](https://github.com/marcompsci/AiFactory/pull/2)
+  (log: `docs/acceptance/github-pr-log.md`).
+- **Live models**: model IDs checked against Anthropic's model list (`claude-opus-5-5`, `claude-sonnet-5-5`,
+  `claude-haiku-5-5`); `scripts/live_smoke.py` and a manual "Live models" workflow make real calls once you add the key.
+
+### Bugs found and fixed
+- CI backend failures on Python 3.12: two background threads stored an `Event` as `self._stop`, which shadows
+  `Thread._stop()` there (renamed).
+- iOS test host not found: the app's product name had a space (`AI Civ.app`); the display name keeps the space.
+- First real PR attempt included compiled `__pycache__` files and a retry tried to commit twice (fixed, see log).
+- Event-replay test raced background ticks on Postgres (assertion made exact about what it means).
+
+### Still open
+- **No real model call yet** — add `ANTHROPIC_API_KEY` as a repository secret and run the "Live models" workflow.
+- The iPhone app is built and unit-tested on a simulator in CI, not yet installed on a physical phone (needs your
+  Apple developer signing; see `apps/ios/README.md`). Remote push needs an APNs key.
+- Supabase-hosted specifics (real `auth.uid()` RLS, Broadcast) and the GitHub App token exchange are untested; the
+  PR run used the environment's own git credentials.
+- Marketplace research still runs on labeled fixtures without Etsy/App Store Connect credentials.

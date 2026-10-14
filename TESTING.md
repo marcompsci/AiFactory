@@ -18,7 +18,7 @@ Locally without Playwright's browser download: `PW_CHROME=/path/to/chrome PYTHON
 
 ## Not yet automated
 
-- Postgres/Supabase mode (migrations, RLS) — no Postgres was available in the build environment.
+- Supabase-hosted Postgres specifically (RLS with a real `auth.uid()`); plain Postgres 16 is covered (see below).
 - Database-disconnect resilience and 3D frame-time budgets on real phones.
 - Load tests for concurrent missions.
 
@@ -39,3 +39,24 @@ Locally without Playwright's browser download: `PW_CHROME=/path/to/chrome PYTHON
 - `tsc --noEmit`, `next build`: clean
 - Performance: logistics tick with 200 packages in flight **40 ms** (interval 1 s); full acceptance pipeline from research to Owner's Tower ≈ 1.5 s with test belt speed
 - Recorded acceptance log: [`docs/acceptance/v4-acceptance-log.md`](docs/acceptance/v4-acceptance-log.md) (286 events)
+
+## Increment 3 additions
+
+| Suite | Command | What it covers |
+|---|---|---|
+| Whole backend suite on **PostgreSQL** | `AICIV_TEST_DATABASE_URL=postgresql://… python -m pytest tests/unit tests/integration` | migrations applied by the app's runner, uuid/timestamptz/numeric round-trips, append-only triggers, LangGraph `PostgresSaver` checkpoints; CI job `postgres` (Postgres 16 service container) |
+| **Docker sandbox**, real containers | `docker build -f infrastructure/docker/sandbox.Dockerfile -t aiciv-sandbox:latest . && AICIV_TEST_DOCKER=1 python -m pytest tests/integration/test_docker_sandbox.py` | no network, read-only root, writable workspace owned by the worker, no secrets in env, timeout kills the container, a whole mission with every tool in containers; CI job `sandbox` |
+| **LangGraph** | in `tests/integration/test_missions.py` | missions are LangGraph threads; approval is an `interrupt()`; the checkpoint survives a process restart and resumes |
+| **GitHub publisher** | `python -m pytest tests/unit/test_github_publisher.py` | push + draft PR flow against a local bare repo and mocked API; dangerous paths refused; retry reuses the PR. Real run: `docs/acceptance/github-pr-log.md` |
+| **Live models** | `ANTHROPIC_API_KEY=… python scripts/live_smoke.py --mission` or the manual "Live models" workflow | one real call per model the roster uses, then one live mission to the approval gate; exits 2 and calls nothing without a key |
+| **iOS** | `.github/workflows/ios.yml` on macOS 15 | XcodeGen project, XCTest unit tests on an iPhone simulator, unsigned device build |
+
+### Last verified run (Oct 14, 2026)
+
+- `pytest` on SQLite (Python 3.13 and 3.12): **106 passed, 3 skipped** (the 3 Docker tests skip without `AICIV_TEST_DOCKER`)
+- `pytest` on PostgreSQL 16: **106 passed, 3 skipped**
+- Docker sandbox tests in real containers: **3 passed** (plus the command-flags unit test)
+- `vitest` **13 passed** · Playwright **5 passed**
+- iOS: build, XCTest and unsigned device build **passed** on GitHub's macOS runner
+- `scripts/live_smoke.py` was exercised against a local stand-in that speaks the Messages API, only to check the
+  script itself; **no real model has been called**

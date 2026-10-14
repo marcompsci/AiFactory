@@ -8,15 +8,22 @@ than partial versions of all six phases.
 Next.js + React Three Fiber. The owner asked for "both" web and native; the PWA gives an installable iPhone
 app now, and a native shell is the next milestone (see PROGRESS.md).
 
-**D3. Durable runner instead of LangGraph (for now).** The mission workflow is a small, fixed graph whose every
-step is persisted (tasks, task_runs, approvals, events), which already gives checkpoints, approval interrupts
-and restart recovery with plain, testable Python. LangGraph is deferred until missions need model-planned,
-branching graphs; the runner's handler interface is where a LangGraph node would plug in. Not silently
-skipped: this is a deliberate substitution and is listed as open work.
+**D3. Missions run on LangGraph; the database stays the source of truth.** (Revised in increment 3; the first
+build used a plain saved-step runner and recorded that as a deliberate swap.) Each mission is a LangGraph thread
+(`thread_id` = mission id) over `prepare → execute (one checkpoint per wave of parallel tasks) → await_approval`
+(`services/orchestrator/graph.py`). `await_approval` calls `interrupt()`; the owner's decision resumes it with
+`Command(resume=...)`; after a crash the worker re-enters the same thread from its last checkpoint. Checkpoints live
+in SQLite locally and in Postgres (`PostgresSaver`) when `DATABASE_URL` is Postgres. Tasks, approvals and events stay
+in our own tables, and every node is an idempotent wrapper around a runner step, so replaying a node never repeats
+finished work and the task graph is still templated, never model-written (D6). `GET /api/missions/{id}/graph`
+shows where a mission's graph is.
 
 **D4. SQLite locally, Postgres in production, one schema.** Lets the whole system run and be tested with no
-infrastructure. Column names match the Postgres migration; Postgres-only features (RLS, pgvector) live in the
-migration.
+infrastructure. Column names match the Postgres migrations, which the API applies itself on start
+(`services/core/pg.py`, recorded in `schema_migrations`, under an advisory lock). On Postgres, ids are real `uuid`,
+times `timestamptz` and money `numeric`; psycopg loaders hand them back as strings / ISO-8601 UTC strings / floats and
+parameters are sent untyped, so the same queries run on both. pgvector and `auth.uid()` are used when present
+(Supabase) and stubbed when not (plain Postgres in CI). The whole test suite runs on both databases in CI.
 
 **D5. Server-Sent Events as the primary realtime channel; Supabase Broadcast as an optional adapter.** SSE works
 on iOS Safari, needs no extra service, carries `id:` for resumption, and the outbox makes it reliable.
@@ -58,3 +65,17 @@ listing publication and production deploys would be separate tools behind the sa
 
 **D16. Nexus Spire's gate faces east.** The parity test found Nexus Spire and Memory Vault sharing one ring junction; the
 Nexus gate moved to the open east side so every district has its own junction.
+
+**D8. Real pull requests: git push from the worker + REST, draft only, approval first.** With `AICIV_GITHUB_REPO`
+set, the protected `prepare_pull_request` tool (which only runs after the owner grants the approval) hands the
+committed patch to `services/integrations/github.py`. The worker — never the sandbox, which has no network — applies
+it under `AICIV_GITHUB_SUBDIR` in a clone of the target repository, refuses paths outside it or under `.github/`,
+pushes `aiciv/mission-<id>` (never the base branch) and opens a **draft** pull request against `AICIV_GITHUB_BASE`.
+A retried task finds the existing pull request instead of opening a second one. Credentials come from a fine-grained
+`GITHUB_TOKEN`, a GitHub App, or the host's own git credentials (`AICIV_GITHUB_AUTH=ambient`); the token reaches git
+through `GIT_CONFIG_*` environment variables, never argv or `.git/config`.
+
+**D9. Container sandbox runs as the worker's uid, with paths mounted 1:1.** `DockerSandbox` mounts the workspace
+(and, for a git worktree, the repository's shared `.git`) at the same absolute path as on the host, so `git -C` and
+worktree links work unchanged, and runs as the worker's uid:gid so files stay owned by the worker. Containers are
+named and killed on timeout. The image is `infrastructure/docker/sandbox.Dockerfile`.

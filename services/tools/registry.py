@@ -266,14 +266,32 @@ def prepare_pull_request(ctx: ToolContext, title: str, body: str) -> dict:
     if not ctx.workspace.exists():
         raise ToolFailed("no worktree to publish")
     add = _run(ctx, ["git", "add", "-A"])
-    commit = _run(ctx, ["git", "commit", "-q", "-m", title[:120], "-m", body[:2000]])
-    if add.exit_code or commit.exit_code:
-        raise ToolFailed(f"commit failed: {commit.output}")
+    staged = _run(ctx, ["git", "diff", "--cached", "--name-only"]).stdout.strip()
+    already = _run(ctx, ["git", "log", "-1", "--format=%s"]).stdout.strip() == title[:120]
+    if staged or not already:  # a retried task finds its commit already made and goes straight to publishing
+        commit = _run(ctx, ["git", "commit", "-q", "-m", title[:120], "-m", body[:2000]])
+        if add.exit_code or commit.exit_code:
+            raise ToolFailed(f"commit failed: {commit.output}")
     sha = _run(ctx, ["git", "rev-parse", "HEAD"]).stdout.strip()
     patch = _run(ctx, ["git", "log", "-1", "-p", "--no-color", "--format=From %H%nSubject: %s%n%n%b"]).stdout
-    # Local sample repo: the "pull request" is the committed mission branch + patch artifact.
-    # GitHub repositories go through services/integrations/github.py, which requires a GitHub App installation.
-    return {"branch": f"mission/{ctx.mission_id[:8]}", "commit": sha, "patch": redact(patch)[:100_000], "remote": None}
+    out = {"branch": f"mission/{ctx.mission_id[:8]}", "commit": sha, "patch": redact(patch)[:100_000], "remote": None}
+    # With AICIV_GITHUB_REPO set, the same commit also becomes a real draft pull request (services/integrations/github.py).
+    # Without it, the "pull request" is the committed mission branch + patch artifact.
+    from services.integrations.github import GitHubPublisher, PublishError, PublishTarget
+
+    try:
+        target = PublishTarget.from_env()
+        if target is None:
+            return out
+        diff = _run(ctx, ["git", "diff", "--no-color", "HEAD~1", "HEAD"])
+        if diff.exit_code:
+            raise ToolFailed(f"could not read the mission diff: {diff.output}")
+        pr = GitHubPublisher(target, get_settings().data_dir / "github").publish(
+            ctx.mission_id, diff.stdout, title, body + f"\n\n---\nOpened by AI Civilization mission `{ctx.mission_id}` after the owner approved publication.")
+    except PublishError as exc:
+        raise ToolFailed(f"GitHub publish failed: {exc}") from exc
+    return {**out, "remote": "github", "repo": pr["repo"], "pr_number": pr["pr_number"], "pr_url": pr["pr_url"],
+            "pr_branch": pr["branch"], "pr_base": pr["base"], "pr_commit": pr["commit"], "pr_created": pr["created"]}
 
 
 APPROVED_SOURCES = {"architecture": REPO_ROOT / "docs" / "architecture" / "overview.md"}
@@ -380,6 +398,8 @@ def _summarize(name: str, result: dict) -> str:
     if name == "inspect_repository":
         return f"{result.get('file_count')} files"
     if name == "prepare_pull_request":
+        if result.get("pr_url"):
+            return f"draft pull request #{result.get('pr_number')} {result.get('pr_url')}"
         return f"commit {str(result.get('commit', ''))[:10]} on {result.get('branch')}"
     return "ok"
 

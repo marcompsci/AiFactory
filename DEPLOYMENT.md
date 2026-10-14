@@ -28,11 +28,40 @@ cp .env.example .env    # fill in
 docker compose up --build
 ```
 
-`docker compose --profile postgres up` adds Postgres (pgvector) and Redis containers for experimenting with the
-production database; the Supabase-specific RLS helpers (`auth.uid()`) need a real Supabase project.
+`docker compose --profile postgres up` adds Postgres (pgvector) and Redis containers. The API applies
+`infrastructure/migrations/*.sql` itself on start (tracked in `schema_migrations`); on plain Postgres a stub
+`auth.uid()` is created and `memory_entries.embedding` falls back to `jsonb` when pgvector is missing.
+
+### Container sandbox
+
+```bash
+docker build -f infrastructure/docker/sandbox.Dockerfile -t aiciv-sandbox:latest .
+AICIV_SANDBOX=docker            # optional: AICIV_SANDBOX_IMAGE=your-registry/aiciv-sandbox:tag
+```
+The worker needs the Docker CLI and daemon; workspaces are bind-mounted at the same absolute path, so the
+worker's data directory must be a real host path (not a path that exists only inside another container).
+
+### Real pull requests
+
+```bash
+AICIV_GITHUB_REPO=owner/repo          # where pull requests go
+AICIV_GITHUB_BASE=main                # the branch they target
+AICIV_GITHUB_SUBDIR=path/in/repo      # where the mission's project lives in that repo ("" = root)
+GITHUB_TOKEN=github_pat_…             # fine-grained: Contents + Pull requests (read/write) on that one repo
+# or a GitHub App: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY_PATH, GITHUB_APP_INSTALLATION_ID
+```
+Pull requests open as drafts, only after you approve the mission's publish step.
+
+### Live models
+
+Add an `ANTHROPIC_API_KEY` repository secret (GitHub → Settings → Secrets and variables → Actions), then run the
+**Live models** workflow from the Actions tab. It calls each model the roster uses and, optionally, runs one live
+mission to the approval gate. Locally: `ANTHROPIC_API_KEY=… python scripts/live_smoke.py --mission`.
 
 ## Status
 
-The local SQLite stack is fully verified (see TESTING.md). The Postgres, Supabase Broadcast, Docker sandbox and
-GitHub App paths are implemented but were **not exercised** in the build environment; treat the first deploy
-as a test.
+Verified: SQLite and **PostgreSQL 16** (full test suite on both), the **Docker sandbox** (real containers, a whole
+mission), **real draft pull requests** (see `docs/acceptance/github-pr-log.md`), and the native iOS app's build and
+unit tests on GitHub's macOS runners. Not yet verified: Supabase-hosted Postgres specifically (RLS with real
+`auth.uid()`), Supabase Broadcast, the GitHub App token exchange (the PR run used ambient git credentials), and any
+real model call (needs your key).

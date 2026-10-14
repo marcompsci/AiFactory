@@ -1,0 +1,32 @@
+name: Live models
+# Manual: real Claude API calls with the ANTHROPIC_API_KEY repository secret
+# (Settings → Secrets and variables → Actions → New repository secret). Costs a few cents per run.
+on:
+  workflow_dispatch:
+    inputs:
+      mission:
+        description: "Also run one live mission (fix the sample repo's failing test) up to the approval gate"
+        type: boolean
+        default: true
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - name: Check the secret exists
+        env: { ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}" }
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::Add an ANTHROPIC_API_KEY repository secret first (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+      - name: Smoke test
+        env:
+          ANTHROPIC_API_KEY: "${{ secrets.ANTHROPIC_API_KEY }}"
+        run: python scripts/live_smoke.py ${{ inputs.mission && '--mission' || '' }}

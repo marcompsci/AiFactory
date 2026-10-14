@@ -76,20 +76,20 @@ class OutboxPublisher(threading.Thread):
         super().__init__(daemon=True, name="outbox-publisher")
         self.broadcaster = broadcaster
         self.interval = interval
-        self._stop = threading.Event()
+        self._halt = threading.Event()
         s = get_settings()
         self.supabase = SupabaseBroadcastAdapter(s.supabase_url, s.supabase_service_role_key) if s.supabase_url and s.supabase_service_role_key else None
 
     def stop(self) -> None:
-        self._stop.set()
+        self._halt.set()
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._halt.is_set():
             try:
                 self.drain()
             except Exception:  # keep publishing; errors are recorded per row
                 log.exception("outbox drain failed")
-            self._stop.wait(self.interval)
+            self._halt.wait(self.interval)
 
     def drain(self) -> int:
         engine = db.get_engine()

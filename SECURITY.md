@@ -13,7 +13,8 @@ web page says can widen what a tool call is allowed to do.
 | Tool permissions | `execute_tool` checks emergency stop, agent capability, task `permitted_tools`, project `allowed_tools`, task ownership, mission state | `test_unauthorized_tool_request_is_denied_and_audited` |
 | Approval at execution time | protected tools require a GRANTED approval row for the exact task, re-read inside the transaction that records the start; expired approvals never count | `test_protected_tool_denied_without_approval`, `test_recovery_after_worker_interruption` |
 | Audit | every call (including denials, stored in their own transaction) → `tool_executions` + `tool.*` event; agent audit trail in the inspector | same tests |
-| Sandboxed execution | argv allowlist (`python -m pytest|compileall`, limited `git` subcommands), no shell, workspace jail incl. symlinks and `git -C`, scrubbed env (no keys), CPU/memory/file/FD rlimits, process-group kill on timeout, empty network namespace (`unshare --net`) when available; DockerSandbox: `--network none --read-only --cap-drop ALL --no-new-privileges --pids-limit --user 65534` | `test_sandbox_*`, `test_confine_blocks_escapes`, `test_docker_sandbox_command_is_locked_down` |
+| Sandboxed execution | argv allowlist (`python -m pytest|compileall`, limited `git` subcommands), no shell, workspace jail incl. symlinks and `git -C`, scrubbed env (no keys), CPU/memory/file/FD rlimits, process-group kill on timeout, empty network namespace (`unshare --net`) when available; DockerSandbox: `--network none --read-only --cap-drop ALL --no-new-privileges --pids-limit --memory --cpus`, the worker's uid, named and killed on timeout | `test_sandbox_*`, `test_confine_blocks_escapes`, `test_docker_sandbox_command_is_locked_down`, and in real containers (CI `sandbox` job) `test_container_has_no_network_and_a_read_only_root`, `test_timeout_kills_the_container`, `test_whole_mission_runs_its_tools_in_containers` |
+| Pull requests only after approval, only as drafts | `prepare_pull_request` is protected; the worker (not the sandbox) pushes `aiciv/mission-<id>`, never the base branch; patches touching `.github/`, `.git/`, absolute or `..` paths are refused; token passed to git via `GIT_CONFIG_*` env, redacted from errors | `tests/unit/test_github_publisher.py`; real run in `docs/acceptance/github-pr-log.md` |
 | No host Docker socket for agents | agents only reach tools; only the worker process may talk to a container runtime | design + `test_docker_sandbox_command_is_locked_down` |
 | Prompt-injection defense | repo/web text fenced in `<untrusted>` with a system rule never to follow it; model output only becomes an `edit_file` call after schema checks; edits to `tests/` refused; sample repo ships an injection canary | `test_live_mode_uses_model_patch_and_records_cost`, `test_model_cannot_make_tests_pass_by_editing_tests` |
 | Secret management | env vars only; `.env` git-ignored; outputs and arguments redacted (Anthropic/OpenAI/GitHub/JWT patterns); service-role key never sent to the browser | `test_secret_redaction` |
@@ -43,11 +44,16 @@ web page says can widen what a tool call is allowed to do.
 ## Known gaps (tracked in PROGRESS.md)
 
 - The process sandbox is a good local default, not a security boundary against a hostile kernel exploit.
-  Use `AICIV_SANDBOX=docker` (or gVisor/Firecracker) in production.
+  Use `AICIV_SANDBOX=docker` (or gVisor/Firecracker) in production. Run the worker as a non-root user (the
+  container inherits its uid; as root it would be root with every capability dropped) or enable Docker
+  `userns-remap`.
 - Rate limiting and the mission queue are in-process; multi-instance deployments need Redis.
 - Supabase JWT mode maps every user to the seed organization; multi-org membership lookup is not wired yet.
 - Python dependency scanning (`pip-audit`) is not in CI yet.
-- Opus/Haiku calls were exercised with a fake provider in tests; no real model was called in the build environment.
+- No real Opus/Sonnet/Haiku call has been made yet: the build environment has no API key. The manual "Live models"
+  workflow (`scripts/live_smoke.py`) makes those calls once an `ANTHROPIC_API_KEY` repository secret exists.
+- The API connects to Postgres as the table owner (service role), so RLS read policies protect direct client
+  access, not the API itself; organization scoping in the API is by query.
 - Live Etsy, Depop, Apple and App Store Connect access was not exercised (no credentials or network); fixtures cover those paths.
 
 ## Reporting

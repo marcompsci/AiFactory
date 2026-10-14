@@ -4,7 +4,20 @@
 -- this file is the production source of truth.
 
 create extension if not exists pgcrypto;
-create extension if not exists vector;
+-- pgvector ships with Supabase. On a plain Postgres without it, memory_entries.embedding is created as jsonb instead.
+do $$ begin
+  if exists (select 1 from pg_available_extensions where name = 'vector') then
+    create extension if not exists vector;
+  end if;
+end $$;
+-- Supabase provides auth.uid(). On plain Postgres (CI, self-hosting) a stub returns null, so RLS read policies deny
+-- every non-owner role; the API connects as the table owner (service role) and is unaffected.
+do $$ begin
+  if not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'auth' and p.proname = 'uid') then
+    create schema if not exists auth;
+    create function auth.uid() returns uuid language sql stable as 'select null::uuid';
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------- tenancy
 create table organizations (
@@ -259,10 +272,17 @@ create table memory_entries (
   trust text not null check (trust in ('verified','hypothesis')),
   content text not null,
   source text not null,                       -- attribution: tool execution id, artifact id, or URL
-  embedding vector(1536),
   expires_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+do $$ begin
+  if exists (select 1 from pg_extension where extname = 'vector') then
+    execute 'alter table memory_entries add column embedding vector(1536)';
+  else
+    execute 'alter table memory_entries add column embedding jsonb';
+  end if;
+end $$;
 
 create table world_entities (
   id uuid primary key default gen_random_uuid(),

@@ -14,7 +14,8 @@ complete work, and an animation finishing never means a task finished.
  │ World (R3F)               │ ◀── SSE envelopes ─│ OutboxPublisher ◀── poll ─────│◀─────────── │ events       │
  │  interpreter(state, evt)  │ ◀─ GET /snapshot ──│                              │             │ event_outbox │
  │  gap → GET /events?after  │                    │ MissionWorker (thread pool)  │             └──────────────┘
- └───────────────────────────┘                    │  └ MissionRunner (durable)   │
+ └───────────────────────────┘                    │  └ LangGraph thread/mission  │──▶ checkpoints (SQLite / Postgres)
+                                                  │    └ MissionRunner steps     │
                                                   │      └ handlers per agent    │──▶ ModelGateway (Anthropic / OpenAI)
                                                   │          └ execute_tool ─────│──▶ Sandbox (rlimits, no network,
                                                   └──────────────────────────────┘     argv allowlist, workspace jail)
@@ -31,9 +32,12 @@ complete work, and an animation finishing never means a task finished.
    ASSIGNED, walks (`agent.movement_requested` → `agent.arrived`), becomes EXECUTING, and its handler calls
    tools through `execute_tool`, which re-checks permissions at execution time and writes `tool_executions`.
 4. `publish` raises `NeedsApproval`; the task, agent and mission enter WAITING_FOR_APPROVAL and an
-   `approvals` row + `approval.requested` event are written. The runner exits.
-5. `POST /api/approvals/{id}/grant` records the decision and re-enqueues; the protected tool runs only if the
-   database shows a GRANTED approval for that exact task at that moment.
+   `approvals` row + `approval.requested` event are written. The mission's LangGraph thread stops at
+   `interrupt()` in its `await_approval` node, checkpointed.
+5. `POST /api/approvals/{id}/grant` records the decision and re-enqueues; the worker resumes the thread with
+   `Command(resume=...)`. The protected tool runs only if the database shows a GRANTED approval for that exact task
+   at that moment. With `AICIV_GITHUB_REPO` set, publishing pushes `aiciv/mission-<id>` and opens a draft pull
+   request (DECISIONS.md D8).
 6. On completion every agent returns home and to IDLE; the mission records an `outcome`
    (`published`, `not_published`, `no_change`).
 
@@ -74,12 +78,15 @@ complete work, and an animation finishing never means a task finished.
 | Module | Responsibility |
 |---|---|
 | `services/core/db.py` | portable table definitions (SQLite locally); Postgres schema in `infrastructure/migrations` |
+| `services/core/pg.py` | Postgres: migration runner (`schema_migrations`), uuid/timestamptz/numeric adapters |
+| `services/integrations/github.py` | approved patch → branch push → draft pull request (token, GitHub App, or ambient credentials) |
 | `services/core/events.py` | `transaction()`, `emit()` (event + outbox atomically), replay |
 | `services/core/realtime.py` | broadcaster, outbox publisher, Supabase adapter |
 | `services/core/state.py` | mission / task / agent transition tables |
 | `services/core/auth.py` | dev / token / Supabase JWT modes, roles, rate limiting |
 | `services/orchestrator/plan.py` | prompt + graph validation, the mission template |
-| `services/orchestrator/runner.py` | durable scheduling, retries, approvals, cancellation, budget suspension |
+| `services/orchestrator/graph.py` | LangGraph `StateGraph` per mission: prepare → execute waves → approval interrupt; checkpointer |
+| `services/orchestrator/runner.py` | the steps the graph calls: validation, planning, one wave of tasks, retries, cancellation, budget suspension |
 | `services/orchestrator/handlers.py` | what each agent does; simulation vs live sourcing |
 | `services/workers/worker.py` | bounded pool, re-enqueue, crash recovery |
 | `services/tools/registry.py` | tool implementations + `execute_tool` enforcement + audit |

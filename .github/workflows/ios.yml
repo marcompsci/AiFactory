@@ -36,3 +36,9 @@ jobs:
         if: failure()
         working-directory: apps/ios
         run: grep -E "error:|failed \(|XCTAssert" xcodebuild.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::$l"; done
+      - name: Report test totals
+        if: always()
+        working-directory: apps/ios
+        run: |
+          grep -E "Executed [0-9]+ tests?, with [0-9]+ failures?" xcodebuild.log | tail -1 | sed 's/^/::notice title=XCTest::/' || true
+          grep -E "Test Case .*(passed|failed)" xcodebuild.log | sed -E 's/.*-\[AICivTests\.([A-Za-z]+) ([A-Za-z]+)\]\x27? (passed|failed).*/\1.\2 \3/' | sort -u | tr '\n' ';' | sed 's/^/::notice title=XCTest cases::/'; echo
