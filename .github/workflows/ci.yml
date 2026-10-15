@@ -66,3 +66,6 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: npm ci && npx playwright install --with-deps chromium
       - run: npx playwright test -c tests/e2e/playwright.config.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-results, path: tests/e2e/test-results, retention-days: 7 }

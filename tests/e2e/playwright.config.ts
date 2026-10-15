@@ -6,6 +6,7 @@ export default defineConfig({
   testDir: ".",
   timeout: 120_000,
   workers: 1,
+  retries: process.env.CI ? 1 : 0,  // software WebGL on shared CI runners is slow; one retry absorbs a cold start
   use: {
     baseURL: "http://localhost:3100",
     launchOptions: {

@@ -9,7 +9,7 @@
 import { useFrame } from "@react-three/fiber";
 import { DISTRICTS, PLAZA_RADIUS, type District as D } from "@aiciv/world-engine";
 import { Html } from "@react-three/drei";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useStore } from "@/lib/store";
 
@@ -174,6 +174,7 @@ function Islets() {
 }
 
 export function PixelWorld() {
+  const quality = useStore((s) => s.settings.quality);
   const falls = useMemo(
     () =>
       DISTRICTS.filter((_, i) => i % 2 === 0).map((d, i) => {
@@ -198,7 +199,7 @@ export function PixelWorld() {
       {falls.map((f, i) => <Waterfall key={i} {...f} />)}
       {DISTRICTS.map((d) => <Deck key={d.id} d={d} />)}
       <LogisticsHub />
-      <Skyline />
+      {quality !== "low" ? <Skyline /> : null}
       <SkyDome />
       <Islets />
       <FlyingCars />
@@ -377,22 +378,27 @@ function Skyline() {
     }
     return out;
   }, []);
+  // one instanced draw call for the whole skyline (a box per tower, scaled), so it costs almost nothing to render
+  const body = useRef<THREE.InstancedMesh>(null);
+  const spires = useMemo(() => towers.filter((t) => t.spire), [towers]);
+  const tip = useRef<THREE.InstancedMesh>(null);
+  useEffect(() => {
+    const m = new THREE.Matrix4();
+    towers.forEach((t, i) => body.current?.setMatrixAt(i, m.compose(new THREE.Vector3(t.x, t.h / 2, t.z), new THREE.Quaternion(), new THREE.Vector3(t.w, t.h, t.w))));
+    spires.forEach((t, i) => tip.current?.setMatrixAt(i, m.compose(new THREE.Vector3(t.x, t.h + 10, t.z), new THREE.Quaternion(), new THREE.Vector3(t.w * 0.35, 20, t.w * 0.35))));
+    if (body.current) body.current.instanceMatrix.needsUpdate = true;
+    if (tip.current) tip.current.instanceMatrix.needsUpdate = true;
+  }, [towers, spires]);
   return (
     <group position={[0, -60, 0]}>
-      {towers.map((t, i) => (
-        <group key={i} position={[t.x, 0, t.z]}>
-          <mesh position={[0, t.h / 2, 0]}>
-            <boxGeometry args={[t.w, t.h, t.w]} />
-            <meshBasicMaterial map={windows} fog={false} color="#c9ccff" />
-          </mesh>
-          {t.spire ? (
-            <mesh position={[0, t.h + 10, 0]}>
-              <coneGeometry args={[t.w * 0.35, 20, 4]} />
-              <meshBasicMaterial color="#c86bff" fog={false} toneMapped={false} />
-            </mesh>
-          ) : null}
-        </group>
-      ))}
+      <instancedMesh ref={body} args={[undefined, undefined, towers.length]} frustumCulled={false}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial map={windows} fog={false} color="#c9ccff" />
+      </instancedMesh>
+      <instancedMesh ref={tip} args={[undefined, undefined, spires.length]} frustumCulled={false}>
+        <coneGeometry args={[1, 1, 4]} />
+        <meshBasicMaterial color="#c86bff" fog={false} toneMapped={false} />
+      </instancedMesh>
     </group>
   );
 }
