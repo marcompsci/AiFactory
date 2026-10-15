@@ -6,6 +6,7 @@ import { routeLength, sampleRoute, type WorldAgent } from "@aiciv/world-engine";
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import * as THREE from "three";
 import { useStore } from "@/lib/store";
+import { ChibiFigure } from "./Chibi";
 
 const WALK_SPEED = 9; // world units per second — configurable movement speed
 const STATE_COLOR: Record<string, string> = {
@@ -167,6 +168,9 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
   const clock = useStore((s) => s.clock);
   const total = useMemo(() => routeLength(agent.route), [agent.route]);
   const color = STATE_COLOR[agent.execState] ?? "#8FA8FF";
+  const motion = useRef({ walking: false });
+  const scale = 1.05 + (agent.height - 1.4) * 0.35; // taller roles stand a little taller
+  const figH = agent.look ? 2.1 * scale : agent.height;
 
   useFrame(({ clock: c }) => {
     if (!group.current) return;
@@ -177,6 +181,7 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
     if (!s.done) group.current.rotation.y = s.heading;
     if (body.current) {
       const walking = !s.done && !reduced;
+      motion.current.walking = walking;
       body.current.position.y = walking ? Math.abs(Math.sin(c.elapsedTime * 10)) * 0.18 : reduced ? 0 : Math.sin(c.elapsedTime * 2 + agent.id.charCodeAt(0)) * 0.05;
     }
     const v = positions.get(agent.id) ?? new THREE.Vector3();
@@ -203,11 +208,19 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
       }}
     >
       <group ref={body}>
-        <Body shape={agent.shape} color={agent.color} height={agent.height} />
-        <ChibiFace height={agent.height} color={agent.color} />
+        {agent.look ? (
+          <group scale={scale}>
+            <ChibiFigure look={agent.look} motion={motion} />
+          </group>
+        ) : (
+          <>
+            <Body shape={agent.shape} color={agent.color} height={agent.height} />
+            <ChibiFace height={agent.height} color={agent.color} />
+          </>
+        )}
         {agent.carrying ? (
           // the holographic package an agent carries to its dispatch terminal
-          <mesh position={[0, agent.height + 0.6, 0]} rotation={[0.4, 0.6, 0]}>
+          <mesh position={[0, figH + 0.6, 0]} rotation={[0.4, 0.6, 0]}>
             <boxGeometry args={[0.6, 0.6, 0.6]} />
             <meshStandardMaterial color="#5BF2A5" emissive="#5BF2A5" emissiveIntensity={1.1} transparent opacity={0.7} />
           </mesh>
@@ -219,12 +232,12 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
         <meshBasicMaterial color={color} toneMapped={false} transparent opacity={0.9} />
       </mesh>
       {/* generous invisible hit target for fingers */}
-      <mesh position={[0, agent.height / 2, 0]} visible={false}>
-        <cylinderGeometry args={[1.1, 1.1, agent.height + 0.6, 8]} />
+      <mesh position={[0, figH / 2, 0]} visible={false}>
+        <cylinderGeometry args={[1.1, 1.1, figH + 0.6, 8]} />
         <meshBasicMaterial />
       </mesh>
       {labels || selected ? (
-        <Html position={[0, agent.height + 1.4, 0]} center zIndexRange={[20, 0]}>
+        <Html position={[0, figH + (agent.look ? 0.6 : 1.4), 0]} center zIndexRange={[20, 0]}>
           <div className="world-label flex flex-col items-center gap-1" style={{ transform: "none" }}>
             {showBubble && b && ind!.kind === "message" ? (
               // pixel speech bubble: what the agent just said to another agent

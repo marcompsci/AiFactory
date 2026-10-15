@@ -11,7 +11,30 @@
       "avatar": {
         "shape": "crown",
         "color": "#A66BFF",
-        "height": 1.9
+        "height": 1.9,
+        "look": {
+          "skin": "#C68642",
+          "hair": {
+            "style": "ponytail",
+            "color": "#8E5BE8"
+          },
+          "eyes": "anime",
+          "eyeColor": "#6A3FC4",
+          "mouth": "grin",
+          "top": {
+            "style": "jacket",
+            "color": "#5B2E9E",
+            "accent": "#C9A7FF"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#E9E4F5"
+          },
+          "shoes": "#3B2366",
+          "accessory": "headset",
+          "prop": "clipboard",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -41,7 +64,30 @@
       "avatar": {
         "shape": "pillar",
         "color": "#32D8FF",
-        "height": 2.1
+        "height": 2.1,
+        "look": {
+          "skin": "#8D5524",
+          "hair": {
+            "style": "buzz",
+            "color": "#1B1410"
+          },
+          "eyes": "dot",
+          "eyeColor": "#1B1410",
+          "mouth": "smile",
+          "top": {
+            "style": "vest",
+            "color": "#1F8FA8",
+            "accent": "#F2F6FA"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#33415C"
+          },
+          "shoes": "#6B4B2E",
+          "accessory": "glasses",
+          "prop": "blueprint",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -75,7 +121,30 @@
       "avatar": {
         "shape": "cube",
         "color": "#5BF2A5",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#F1C27D",
+          "hair": {
+            "style": "spiky",
+            "color": "#3CCB7F"
+          },
+          "eyes": "anime",
+          "eyeColor": "#2E8B57",
+          "mouth": "grin",
+          "top": {
+            "style": "hoodie",
+            "color": "#5B6270",
+            "accent": "#5BF2A5"
+          },
+          "bottom": {
+            "style": "shorts",
+            "color": "#2D3346"
+          },
+          "shoes": "#F2F2F2",
+          "accessory": "headphones",
+          "prop": "laptop",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -118,7 +187,31 @@
       "avatar": {
         "shape": "shield",
         "color": "#FFBD69",
-        "height": 1.8
+        "height": 1.8,
+        "look": {
+          "skin": "#6B4226",
+          "hair": {
+            "style": "curly",
+            "color": "#151012"
+          },
+          "eyes": "dot",
+          "eyeColor": "#151012",
+          "mouth": "flat",
+          "top": {
+            "style": "jacket",
+            "color": "#F29A2E",
+            "accent": "#FFE3B0"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#3A3F4F"
+          },
+          "shoes": "#F29A2E",
+          "accessory": "cap",
+          "hatColor": "#E0662B",
+          "prop": "magnifier",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -153,7 +246,30 @@
       "avatar": {
         "shape": "orb",
         "color": "#32D8FF",
-        "height": 1.6
+        "height": 1.6,
+        "look": {
+          "skin": "#FFDBB4",
+          "hair": {
+            "style": "long",
+            "color": "#3F8CFF"
+          },
+          "eyes": "anime",
+          "eyeColor": "#2F6FE0",
+          "mouth": "o",
+          "top": {
+            "style": "labcoat",
+            "color": "#F4F7FB",
+            "accent": "#3F8CFF"
+          },
+          "bottom": {
+            "style": "skirt",
+            "color": "#3E4A6B"
+          },
+          "shoes": "#5B3A29",
+          "accessory": "none",
+          "prop": "book",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -186,7 +302,31 @@
       "avatar": {
         "shape": "prism",
         "color": "#FF6178",
-        "height": 1.75
+        "height": 1.75,
+        "look": {
+          "skin": "#E0AC69",
+          "hair": {
+            "style": "buns",
+            "color": "#FF6FAE"
+          },
+          "eyes": "happy",
+          "eyeColor": "#2B2F3A",
+          "mouth": "grin",
+          "top": {
+            "style": "tee",
+            "color": "#FFFFFF",
+            "accent": "#FF6178"
+          },
+          "bottom": {
+            "style": "skirt",
+            "color": "#7A4FD6"
+          },
+          "shoes": "#FFD36B",
+          "accessory": "beret",
+          "hatColor": "#E94B6A",
+          "prop": "brush",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -214,7 +354,30 @@
       "avatar": {
         "shape": "monolith",
         "color": "#EAF2FF",
-        "height": 2.3
+        "height": 2.3,
+        "look": {
+          "skin": "#E8B98F",
+          "hair": {
+            "style": "swoop",
+            "color": "#C9CED8"
+          },
+          "eyes": "dot",
+          "eyeColor": "#2B2F3A",
+          "mouth": "smile",
+          "top": {
+            "style": "blazer",
+            "color": "#24345C",
+            "accent": "#F4D58D"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#5A6275"
+          },
+          "shoes": "#1E1E26",
+          "accessory": "glasses",
+          "prop": "tablet",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -243,7 +406,31 @@
       "avatar": {
         "shape": "drone",
         "color": "#5BF2A5",
-        "height": 1.4
+        "height": 1.4,
+        "look": {
+          "skin": "#F5C99B",
+          "hair": {
+            "style": "afro",
+            "color": "#E8862E"
+          },
+          "eyes": "anime",
+          "eyeColor": "#3A7A2E",
+          "mouth": "grin",
+          "top": {
+            "style": "tee",
+            "color": "#7FD3FF",
+            "accent": "#FFFFFF"
+          },
+          "bottom": {
+            "style": "shorts",
+            "color": "#3D5A80"
+          },
+          "shoes": "#FF6178",
+          "accessory": "visor",
+          "hatColor": "#5BF2A5",
+          "prop": "phone",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -276,7 +463,31 @@
       "avatar": {
         "shape": "drone",
         "color": "#FFBD69",
-        "height": 1.4
+        "height": 1.4,
+        "look": {
+          "skin": "#D9A066",
+          "hair": {
+            "style": "bob",
+            "color": "#A0472B"
+          },
+          "eyes": "dot",
+          "eyeColor": "#3B2416",
+          "mouth": "smile",
+          "top": {
+            "style": "cardigan",
+            "color": "#E5B53A",
+            "accent": "#7A4A2E"
+          },
+          "bottom": {
+            "style": "skirt",
+            "color": "#5C7A4A"
+          },
+          "shoes": "#7A4A2E",
+          "accessory": "scarf",
+          "hatColor": "#C24A3A",
+          "prop": "tote",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -306,7 +517,31 @@
       "avatar": {
         "shape": "crown",
         "color": "#F4D58D",
-        "height": 2.0
+        "height": 2.0,
+        "look": {
+          "skin": "#A8683E",
+          "hair": {
+            "style": "bald",
+            "color": "#2B2B2B"
+          },
+          "eyes": "dot",
+          "eyeColor": "#1E1E1E",
+          "mouth": "smile",
+          "top": {
+            "style": "blazer",
+            "color": "#1E6B4A",
+            "accent": "#F4D58D"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#1E3B2E"
+          },
+          "shoes": "#2B1A12",
+          "accessory": "bowtie",
+          "mustache": true,
+          "prop": "coin",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -337,7 +572,30 @@
       "avatar": {
         "shape": "orb",
         "color": "#5BF2A5",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#F3D2B3",
+          "hair": {
+            "style": "ponytail",
+            "color": "#121212"
+          },
+          "eyes": "anime",
+          "eyeColor": "#2C2C2C",
+          "mouth": "smile",
+          "top": {
+            "style": "blouse",
+            "color": "#9BE8C6",
+            "accent": "#FFFFFF"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#2E3A4F"
+          },
+          "shoes": "#1E1E26",
+          "accessory": "none",
+          "prop": "calculator",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -364,7 +622,30 @@
       "avatar": {
         "shape": "shield",
         "color": "#FFBD69",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#FFE0C2",
+          "hair": {
+            "style": "bob",
+            "color": "#C8322B"
+          },
+          "eyes": "dot",
+          "eyeColor": "#2B2F3A",
+          "mouth": "flat",
+          "top": {
+            "style": "blazer",
+            "color": "#7A1F35",
+            "accent": "#F2E6E8"
+          },
+          "bottom": {
+            "style": "skirt",
+            "color": "#2B2B33"
+          },
+          "shoes": "#1E1E26",
+          "accessory": "glasses",
+          "prop": "clipboard",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -392,7 +673,31 @@
       "avatar": {
         "shape": "cube",
         "color": "#32D8FF",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#7B4A2A",
+          "hair": {
+            "style": "buzz",
+            "color": "#2F5BD8"
+          },
+          "eyes": "happy",
+          "eyeColor": "#1E1E1E",
+          "mouth": "grin",
+          "top": {
+            "style": "jacket",
+            "color": "#2F7FD8",
+            "accent": "#FFD36B"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#1F2A44"
+          },
+          "shoes": "#FFD36B",
+          "accessory": "cap",
+          "hatColor": "#FFD36B",
+          "prop": "envelope",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -421,7 +726,30 @@
       "avatar": {
         "shape": "pillar",
         "color": "#A66BFF",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#E8C39E",
+          "hair": {
+            "style": "swoop",
+            "color": "#5A3A22"
+          },
+          "eyes": "dot",
+          "eyeColor": "#3B2416",
+          "mouth": "smile",
+          "top": {
+            "style": "sweatervest",
+            "color": "#6B4AAE",
+            "accent": "#FFFFFF"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#4A4A5A"
+          },
+          "shoes": "#3B2416",
+          "accessory": "glasses",
+          "prop": "book",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -448,7 +776,30 @@
       "avatar": {
         "shape": "orb",
         "color": "#FF6178",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#C68642",
+          "hair": {
+            "style": "curly",
+            "color": "#FF8FB8"
+          },
+          "eyes": "anime",
+          "eyeColor": "#B03A6A",
+          "mouth": "grin",
+          "top": {
+            "style": "tee",
+            "color": "#FFC2D9",
+            "accent": "#FF6178"
+          },
+          "bottom": {
+            "style": "skirt",
+            "color": "#5BC0BE"
+          },
+          "shoes": "#FFFFFF",
+          "accessory": "none",
+          "prop": "jar",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -477,7 +828,30 @@
       "avatar": {
         "shape": "drone",
         "color": "#EAF2FF",
-        "height": 1.4
+        "height": 1.4,
+        "look": {
+          "skin": "#FFE4CC",
+          "hair": {
+            "style": "long",
+            "color": "#EEF2FF"
+          },
+          "eyes": "sleepy",
+          "eyeColor": "#6A5ACD",
+          "mouth": "smile",
+          "top": {
+            "style": "cape",
+            "color": "#26285E",
+            "accent": "#F4D58D"
+          },
+          "bottom": {
+            "style": "skirt",
+            "color": "#26285E"
+          },
+          "shoes": "#F4D58D",
+          "accessory": "none",
+          "prop": "crystal",
+          "blush": true
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -504,7 +878,30 @@
       "avatar": {
         "shape": "cube",
         "color": "#FF8A5C",
-        "height": 1.6
+        "height": 1.6,
+        "look": {
+          "skin": "#F1C27D",
+          "hair": {
+            "style": "spiky",
+            "color": "#FF8A5C"
+          },
+          "eyes": "anime",
+          "eyeColor": "#C2410C",
+          "mouth": "smile",
+          "top": {
+            "style": "hoodie",
+            "color": "#FF8A5C",
+            "accent": "#FFE3D3"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#3A2A2A"
+          },
+          "shoes": "#FFFFFF",
+          "accessory": "headphones",
+          "prop": "laptop",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -533,7 +930,31 @@
       "avatar": {
         "shape": "pillar",
         "color": "#B8C4D6",
-        "height": 1.7
+        "height": 1.7,
+        "look": {
+          "skin": "#8D5524",
+          "hair": {
+            "style": "buzz",
+            "color": "#1B1410"
+          },
+          "eyes": "dot",
+          "eyeColor": "#1B1410",
+          "mouth": "flat",
+          "top": {
+            "style": "overalls",
+            "color": "#3E5C8A",
+            "accent": "#B8C4D6"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#3E5C8A"
+          },
+          "shoes": "#6B4B2E",
+          "accessory": "beanie",
+          "hatColor": "#B8C4D6",
+          "prop": "wrench",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",
@@ -562,7 +983,31 @@
       "avatar": {
         "shape": "cube",
         "color": "#5EEAD4",
-        "height": 1.6
+        "height": 1.6,
+        "look": {
+          "skin": "#E0AC69",
+          "hair": {
+            "style": "long",
+            "color": "#1F2A33"
+          },
+          "eyes": "anime",
+          "eyeColor": "#14B8A6",
+          "mouth": "smile",
+          "top": {
+            "style": "jacket",
+            "color": "#1F2A33",
+            "accent": "#5EEAD4"
+          },
+          "bottom": {
+            "style": "pants",
+            "color": "#14303A"
+          },
+          "shoes": "#5EEAD4",
+          "accessory": "cap",
+          "hatColor": "#5EEAD4",
+          "prop": "tablet",
+          "blush": false
+        }
       },
       "model": {
         "provider": "anthropic",

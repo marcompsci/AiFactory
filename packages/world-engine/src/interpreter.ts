@@ -15,7 +15,25 @@ export type Indicator =
   | { kind: "error"; text: string; at: number }
   | { kind: "complete"; text: string; at: number };
 
+/** How an agent looks: a chunky chibi character (big head, simple face, stubby body). Drawn in 3D, as a web portrait and on iPhone. */
+export interface AgentLook {
+  skin: string;
+  hair: { style: string; color: string };
+  eyes: string;
+  eyeColor: string;
+  mouth: string;
+  top: { style: string; color: string; accent: string };
+  bottom: { style: string; color: string };
+  shoes: string;
+  accessory: string;
+  hatColor?: string;
+  prop?: string;
+  blush?: boolean;
+  mustache?: boolean;
+}
+
 export interface WorldAgent {
+  look?: AgentLook;
   id: string;
   key: string;
   name: string;
@@ -75,7 +93,7 @@ export interface AgentSeed {
   name: string;
   role: string;
   home_district: string;
-  avatar: { shape: string; color: string; height: number };
+  avatar: { shape: string; color: string; height: number; look?: AgentLook };
   district?: string;
   waypoint?: string | null;
   execution_state?: AgentExecutionState;
@@ -96,6 +114,7 @@ export function initialWorld(agents: AgentSeed[], lastSequence = 0, mode: Execut
       color: a.avatar.color,
       shape: a.avatar.shape,
       height: a.avatar.height,
+      look: a.avatar.look,
       homeDistrict: a.home_district,
       district,
       waypoint: a.waypoint ?? null,

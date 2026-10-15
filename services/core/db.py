@@ -1338,7 +1338,8 @@ def seed(engine: Engine) -> None:
                 max_usd_per_mission=a["limits"]["max_usd_per_mission"], max_concurrent_tasks=a["limits"]["max_concurrent_tasks"],
                 department_id=None, tier=a.get("tier", "specialist")))
             if not created:
-                conn.execute(update(agents).where(agents.c.id == a["id"]).values(tier=a.get("tier", "specialist"), model_name=model_of(a)))
+                conn.execute(update(agents).where(agents.c.id == a["id"]).values(tier=a.get("tier", "specialist"), model_name=model_of(a),
+                                                                                 avatar=a["avatar"]))
             for t in a["tools"]:
                 _ensure(conn, agent_capabilities, {"agent_id": a["id"], "tool_name": t}, {})
             _ensure(conn, agent_positions, {"agent_id": a["id"]}, {"organization_id": org_id, "district": a["home_district"]})

@@ -135,7 +135,7 @@ struct OrgRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Circle().fill(Color(hexString: agent.avatar.color)).frame(width: 8, height: 8)
+                AgentPortrait(agent: agent, size: 28)
                 Text(agent.name)
                 Text(agent.role).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()

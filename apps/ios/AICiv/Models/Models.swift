@@ -21,7 +21,26 @@ struct EventEnvelope: Codable, Identifiable, Equatable {
 struct EventsPage: Codable { let events: [EventEnvelope] }
 
 struct Agent: Codable, Identifiable, Hashable {
-    struct Avatar: Codable, Hashable { let shape: String; let color: String; let height: Double }
+    struct Avatar: Codable, Hashable { let shape: String; let color: String; let height: Double; var look: Look? = nil }
+    /// The agent's chibi character (same data the 3D city and the web roster draw from).
+    struct Look: Codable, Hashable {
+        struct Hair: Codable, Hashable { let style: String; let color: String }
+        struct Top: Codable, Hashable { let style: String; let color: String; let accent: String }
+        struct Bottom: Codable, Hashable { let style: String; let color: String }
+        let skin: String
+        let hair: Hair
+        let eyes: String
+        let eyeColor: String
+        let mouth: String
+        let top: Top
+        let bottom: Bottom
+        let shoes: String
+        let accessory: String
+        var hatColor: String? = nil
+        var prop: String? = nil
+        var blush: Bool? = nil
+        var mustache: Bool? = nil
+    }
     let id: String
     let key: String
     let name: String

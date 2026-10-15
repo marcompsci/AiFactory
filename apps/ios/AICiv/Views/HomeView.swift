@@ -76,7 +76,11 @@ struct HomeView: View {
                 let line = FeedText.line(e, agents: app.agents)
                 HStack(alignment: .top, spacing: 6) {
                     Text(Self.time(e.occurredAt)).font(Pixel.mono(9)).foregroundStyle(.secondary).frame(width: 44, alignment: .leading)
-                    Rectangle().fill(e.agentId.flatMap { app.agents[$0] }.map { Color(hexString: $0.avatar.color) } ?? Theme.cyan).frame(width: 9, height: 9).padding(.top, 3)
+                    if let a = e.agentId.flatMap({ app.agents[$0] }) {
+                        AgentPortrait(agent: a, size: 20)
+                    } else {
+                        Rectangle().fill(Theme.cyan).frame(width: 9, height: 9).padding(.top, 3)
+                    }
                     (Text(line.who).bold() + Text(" ") + Text(line.text).foregroundStyle(.secondary)).font(.caption).lineLimit(2)
                 }
             }
@@ -261,7 +265,7 @@ struct DistrictSheet: View {
             PixelHeader(text: "Here now", color: c, trailing: "\(here.count)")
             ForEach(here) { a in
                 HStack {
-                    Rectangle().fill(Color(hexString: a.avatar.color)).frame(width: 10, height: 10)
+                    AgentPortrait(agent: a, size: 32)
                     Text(a.name).bold()
                     Text(a.role).foregroundStyle(.secondary).lineLimit(1)
                     Spacer()

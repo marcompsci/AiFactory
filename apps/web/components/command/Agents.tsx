@@ -1,6 +1,7 @@
 "use client";
 
 import { DISTRICT_BY_ID } from "@aiciv/world-engine";
+import { Portrait } from "./Portrait";
 import { useQuery } from "@tanstack/react-query";
 import { api, type Json } from "@/lib/api";
 import { ago, human, STATUS_COLOR, usd } from "@/lib/format";
@@ -18,9 +19,7 @@ export function AgentRoster() {
       {Object.values(agents).map((a) => (
         <li key={a.id}>
           <button type="button" onClick={() => select(a.id)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-white/5">
-            <span className="grid size-8 shrink-0 place-items-center rounded-lg text-sm font-semibold text-ground" style={{ background: a.color }}>
-              {a.name[0]}
-            </span>
+            <Portrait look={a.look} size={40} fallback={a.color} name={a.name} />
             <span className="min-w-0 flex-1">
               <span className="block text-sm">
                 {a.name} <span className="text-ink-3">{a.role}</span>
@@ -52,9 +51,7 @@ function AgentInspector({ id }: { id: string }) {
           ← All agents
         </button>
         <div className="flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl font-display text-lg text-ground" style={{ background: a.color }}>
-            {a.name[0]}
-          </span>
+          <Portrait look={a.look} size={64} fallback={a.color} name={a.name} />
           <div>
             <h2 className="font-display text-base">{a.name}</h2>
             <p className="text-sm text-ink-2">
