@@ -19,3 +19,5 @@ pytest.log
 knowledge/skills/
 knowledge/phoronomics/
 knowledge/phoronomic-studios/
+apps/ios/AICiv.xcodeproj/
+apps/ios/AICiv/Info.plist

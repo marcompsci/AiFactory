@@ -23,6 +23,11 @@ the server, which is not set up yet.
 
 ## Run it
 
+No xcodegen on your Mac? CI publishes the generated project to the `ios-xcodeproj` branch:
+`git fetch origin ios-xcodeproj && git checkout FETCH_HEAD -- apps/ios/AICiv.xcodeproj apps/ios/AICiv/Info.plist`
+(both are gitignored on main).
+
+
 Requires a Mac with Xcode 16+.
 
 ```bash
