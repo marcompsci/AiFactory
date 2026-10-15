@@ -20,15 +20,23 @@ echo "==> Python: $($PY --version)  Node: $(node --version)"
 .venv/bin/pip install -q --upgrade pip
 .venv/bin/pip install -q -r requirements.txt
 
+mkdir -p .data
 echo "==> Installing and building the web app (first run takes a few minutes)"
 npm install --no-audit --no-fund --loglevel=error
-(cd apps/web && npx next build >/dev/null)
+(cd apps/web && npx next build > ../../.data/web-build.log 2>&1) || { echo "Web build failed:" >&2; tail -30 .data/web-build.log >&2; exit 1; }
 
 set -a; [ -f .env ] && . ./.env; set +a
 
 LAN_IP=""
 if [ "${AICIV_HOST:-127.0.0.1}" = "0.0.0.0" ]; then
-  LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
+  # the interface that carries the default route (Wi-Fi or Ethernet), then the usual suspects
+  IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}' || true)
+  for i in $IFACE en0 en1 en2 en3 en4 en5; do
+    LAN_IP=$(ipconfig getifaddr "$i" 2>/dev/null || true)
+    [ -n "$LAN_IP" ] && break
+  done
+  [ -z "$LAN_IP" ] && LAN_IP=$( (hostname -I 2>/dev/null || true) | awk '{print $1}')
+  [ -z "$LAN_IP" ] && echo "!! Couldn't find this Mac's network address. Is Wi-Fi on? The phone needs it." >&2
   if [ -n "$LAN_IP" ]; then
     # the city opened on your phone (http://<this Mac>:3000) calls the API from that origin
     export AICIV_ALLOWED_ORIGINS="${AICIV_ALLOWED_ORIGINS:-http://localhost:3000},http://$LAN_IP:3000"
