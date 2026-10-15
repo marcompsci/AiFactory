@@ -26,6 +26,7 @@ npm install --no-audit --no-fund --loglevel=error
 (cd apps/web && npx next build > ../../.data/web-build.log 2>&1) || { echo "Web build failed:" >&2; tail -30 .data/web-build.log >&2; exit 1; }
 
 set -a; [ -f .env ] && . ./.env; set +a
+export AICIV_LOCAL_MODE=1   # running on your own computer: a stale browser tab here never triggers the sign-in lockout
 
 LAN_IP=""
 if [ "${AICIV_HOST:-127.0.0.1}" = "0.0.0.0" ]; then

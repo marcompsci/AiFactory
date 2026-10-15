@@ -178,3 +178,17 @@ def test_lan_origins_only_when_serving_the_phone():
     for bad in ("http://evil.com:3000", "https://192.168.1.20:3000", "http://192.168.1.20:8000", "http://8.8.8.8:3000",
                 "http://192.168.1.20.evil.com:3000", "http://172.32.0.1:3000"):
         assert not rx.match(bad), bad
+
+
+def test_expired_sessions_and_your_own_computer_never_trigger_the_lockout(jwt_mode, monkeypatch):
+    stale = token(exp=int(time.time()) - 3600)  # correctly signed, an hour old: a stale tab, not an attack
+    with client() as c:
+        for _ in range(15):
+            r = c.get("/api/snapshot", headers={"authorization": f"Bearer {stale}"})
+            assert r.status_code == 401 and r.json()["detail"] == "token expired"
+        assert c.get("/api/snapshot", headers={"authorization": f"Bearer {token()}"}).status_code == 200
+    monkeypatch.setenv("AICIV_LOCAL_MODE", "1")  # run-local.sh: the test client counts as this computer
+    from services.core import auth
+    assert auth._counts("127.0.0.1") is False and auth._counts("192.0.0.1") is True
+    monkeypatch.delenv("AICIV_LOCAL_MODE")
+    assert auth._counts("127.0.0.1") is True

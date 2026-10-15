@@ -70,6 +70,11 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       /* body was not JSON */
     }
+    if (res.status === 401 && (detail === "token expired" || detail === "invalid token")) {
+      // a stale or broken saved session: stop sending it (the sign-in library refreshes a live session on its own)
+      const c = loadConnection();
+      if (c.token && !c.native) saveConnection({ ...c, token: "" });
+    }
     throw new ApiError(res.status, typeof detail === "string" ? detail : JSON.stringify(detail));
   }
   return res.json() as Promise<T>;

@@ -11,7 +11,7 @@ settings:
     MARKETING_VERSION: "0.5.0"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: ""   # set your Apple team ID to run on a device
+    DEVELOPMENT_TEAM: "X6LZQ3FS36"   # the owner's Apple team (public: it appears in every app it signs)
 targets:
   AICiv:
     type: application

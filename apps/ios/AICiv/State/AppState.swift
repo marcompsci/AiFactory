@@ -26,6 +26,7 @@ final class AppState {
     var authError: String?
 
     private var streamTask: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
 
     var api: APIClient? {
         guard let url = URL(string: serverURL) else { return nil }
@@ -101,7 +102,7 @@ final class AppState {
 
     /// Refreshes the Supabase access token a minute before it expires.
     func ensureFreshToken() async {
-        guard let s = session, s.expiresAt.timeIntervalSinceNow < 60, let auth else { return }
+        guard let s = session, s.expiresAt.timeIntervalSinceNow < 300, let auth else { return }
         if let fresh = try? await auth.refresh(s) {
             session = fresh
             SupabaseAuth.save(fresh)
@@ -111,6 +112,15 @@ final class AppState {
     func connect() {
         streamTask?.cancel()
         streamTask = Task { await self.run() }
+        if refreshTask == nil {
+            // keep the sign-in fresh while the app is open (sessions last an hour; the stream can outlive that)
+            refreshTask = Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 120 * 1_000_000_000)
+                    await self.ensureFreshToken()
+                }
+            }
+        }
     }
 
     func refresh() async {

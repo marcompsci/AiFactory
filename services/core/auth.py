@@ -72,6 +72,9 @@ def verify_supabase_token(token: str, secret: str, jwks_url: str, issuer: str | 
         client = _jwks.setdefault(jwks_url, jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=600))
         key = client.get_signing_key_from_jwt(token).key
         return jwt.decode(token, key, algorithms=[alg], **kw)
+    except jwt.ExpiredSignatureError as exc:
+        # correctly signed but old: a stale session, not an attack (never counts toward the lockout)
+        raise HTTPException(status_code=401, detail="token expired") from exc
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="invalid token") from exc
 
@@ -104,8 +107,8 @@ def authenticate(request: Request) -> Principal:
     if s.supabase_jwt_secret or s.supabase_jwks_url:
         try:
             claims = verify_supabase_token(token, s.supabase_jwt_secret, s.supabase_jwks_url, issuer=_issuer(s.supabase_url))
-        except HTTPException:
-            if auth_failures.fail(client):
+        except HTTPException as exc:
+            if exc.detail != "token expired" and _counts(client) and auth_failures.fail(client):
                 log.warning("auth lockout for client %s after repeated invalid tokens", client)
             raise
         auth_failures.succeed(client)
@@ -114,8 +117,17 @@ def authenticate(request: Request) -> Principal:
 
         return Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase",
                          mfa_fresh=aal2_fresh(claims))
-    auth_failures.fail(client)
+    if _counts(client):
+        auth_failures.fail(client)
     raise HTTPException(status_code=401, detail="invalid token")
+
+
+def _counts(client: str) -> bool:
+    """Bad tokens count toward the lockout, except from this computer itself when running locally
+    (AICIV_LOCAL_MODE=1, set by scripts/run-local.sh): a stale tab on your own Mac must not lock you out."""
+    import os
+
+    return not (os.environ.get("AICIV_LOCAL_MODE") == "1" and client in ("127.0.0.1", "::1"))
 
 
 def _issuer(supabase_url: str) -> str | None:
