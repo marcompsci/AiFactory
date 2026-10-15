@@ -39,7 +39,7 @@ function adopt(session: Session | null): void {
   const c = loadConnection();
   if (session?.provider_token && session.user?.app_metadata?.provider === "github") githubToken = session.provider_token;
   if (session?.access_token && c.token !== session.access_token) saveConnection({ ...c, token: session.access_token });
-  if (!session && c.token && c.token.split(".").length === 3) saveConnection({ ...c, token: "" }); // signed out: drop the JWT
+  if (!session && !c.native && c.token && c.token.split(".").length === 3) saveConnection({ ...c, token: "" }); // signed out: drop the JWT
   listeners.forEach((fn) => fn(session));
 }
 

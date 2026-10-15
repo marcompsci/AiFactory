@@ -26,14 +26,28 @@ npm install --no-audit --no-fund --loglevel=error
 
 set -a; [ -f .env ] && . ./.env; set +a
 
+LAN_IP=""
+if [ "${AICIV_HOST:-127.0.0.1}" = "0.0.0.0" ]; then
+  LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')
+  if [ -n "$LAN_IP" ]; then
+    # the city opened on your phone (http://<this Mac>:3000) calls the API from that origin
+    export AICIV_ALLOWED_ORIGINS="${AICIV_ALLOWED_ORIGINS:-http://localhost:3000},http://$LAN_IP:3000"
+  fi
+fi
+
 echo "==> Starting the API on http://localhost:8000 and the app on http://localhost:3000"
 # AICIV_HOST=0.0.0.0 lets the iPhone app reach this Mac on your Wi-Fi (sign-in must be configured; plain HTTP on a
 # trusted network only — use Tailscale or a tunnel with HTTPS anywhere else).
 .venv/bin/python -m uvicorn services.api.main:app --host "${AICIV_HOST:-127.0.0.1}" --port 8000 --proxy-headers &
 API=$!
-(cd apps/web && npx next start -p 3000) &
+(cd apps/web && npx next start -H "${AICIV_HOST:-127.0.0.1}" -p 3000) &
 WEB=$!
 trap 'kill $API $WEB 2>/dev/null' EXIT INT TERM
 sleep 4
 open http://localhost:3000 2>/dev/null || true
+if [ -n "$LAN_IP" ]; then
+  echo
+  echo "==> iPhone app: More > Settings > API address:  http://$LAN_IP:8000   (or just $LAN_IP)"
+  echo "    City address fills in as http://$LAN_IP:3000. Phone and Mac must be on the same Wi-Fi."
+fi
 wait

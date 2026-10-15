@@ -195,3 +195,26 @@ final class V51Tests: XCTestCase {
         XCTAssertTrue(d.contains { $0.id == "owners-tower" })
     }
 }
+
+
+@MainActor
+final class ConnectionTests: XCTestCase {
+    func testABareMacAddressBecomesAPIAndCityURLs() {
+        XCTAssertEqual(AppState.normalize("192.168.1.20", port: 8000), "http://192.168.1.20:8000")
+        XCTAssertEqual(AppState.normalize("http://my-mac.local:9000", port: 8000), "http://my-mac.local:9000")
+        XCTAssertEqual(AppState.normalize("my-mac.local:8001", port: 8000), "http://my-mac.local:8001")
+        XCTAssertTrue(AppState.isLocalhost("http://localhost:3000"))
+        XCTAssertFalse(AppState.isLocalhost("http://192.168.1.20:3000"))
+    }
+
+    func testCityGetsTheAppsConnectionAsAJSONString() throws {
+        let js = CityWebView.connectionScript(apiURL: "http://192.168.1.20:8000", token: "a'b\"c")
+        XCTAssertTrue(js.hasPrefix("try { localStorage.setItem('aiciv.connection', [\""))
+        let start = try XCTUnwrap(js.range(of: ", ")?.upperBound), end = try XCTUnwrap(js.range(of: "[0])", options: .backwards)?.lowerBound)
+        let arr = try JSONSerialization.jsonObject(with: Data(js[start..<end].utf8)) as? [String]
+        let obj = try JSONSerialization.jsonObject(with: Data(try XCTUnwrap(arr?.first).utf8)) as? [String: Any]
+        XCTAssertEqual(obj?["apiUrl"] as? String, "http://192.168.1.20:8000")
+        XCTAssertEqual(obj?["token"] as? String, "a'b\"c")
+        XCTAssertEqual(obj?["native"] as? Bool, true)
+    }
+}

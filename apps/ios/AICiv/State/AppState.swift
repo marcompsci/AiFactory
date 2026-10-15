@@ -34,9 +34,26 @@ final class AppState {
 
     var ownerWaiting: Int { ledger.ownerQueue.count }
 
+    /// "192.168.1.20" or "my-mac.local" → "http://192.168.1.20:8000"; a full URL is kept as typed.
+    static func normalize(_ raw: String, port: Int) -> String {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty || t.contains("://") { return t }
+        return t.contains(":") ? "http://\(t)" : "http://\(t):\(port)"
+    }
+
+    static func isLocalhost(_ s: String) -> Bool {
+        guard let h = URL(string: s)?.host else { return true }
+        return h == "localhost" || h == "127.0.0.1" || h == "::1"
+    }
+
     func saveSettings(server: String, web: String, token: String?) {
-        serverURL = server.trimmingCharacters(in: .whitespacesAndNewlines)
-        webURL = web.trimmingCharacters(in: .whitespacesAndNewlines)
+        serverURL = Self.normalize(server, port: 8000)
+        var w = Self.normalize(web, port: 3000)
+        // the city runs on the same computer as the API: follow the API's address unless set to somewhere else
+        if (w.isEmpty || Self.isLocalhost(w)), !Self.isLocalhost(serverURL), let host = URL(string: serverURL)?.host {
+            w = "http://\(host):3000"
+        }
+        webURL = w
         UserDefaults.standard.set(serverURL, forKey: "serverURL")
         UserDefaults.standard.set(webURL, forKey: "webURL")
         if let token { Keychain.save(token); tokenSet = !token.isEmpty }

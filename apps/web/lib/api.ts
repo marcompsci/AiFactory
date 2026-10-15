@@ -7,15 +7,35 @@ const KEY = "aiciv.connection";
 export interface Connection {
   apiUrl: string;
   token: string;
+  /** Set by the iPhone app, which signs in natively and hands its session to the city view. */
+  native?: boolean;
+}
+
+const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/;
+
+/** Opened from another device (a phone on your Wi-Fi), "localhost" would mean that device: use this page's host instead. */
+function reachable(apiUrl: string): string {
+  try {
+    const u = new URL(apiUrl);
+    const page = typeof window !== "undefined" ? window.location : null;
+    if (page && LOCAL.test(u.hostname) && !LOCAL.test(page.hostname)) {
+      u.hostname = page.hostname;
+      return u.toString().replace(/\/$/, "");
+    }
+  } catch {
+    /* not a URL; leave it */
+  }
+  return apiUrl;
 }
 
 export function loadConnection(): Connection {
   const fallback = { apiUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000", token: "" };
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+    const c = raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+    return { ...c, apiUrl: reachable(c.apiUrl) };
   } catch {
-    return fallback;
+    return { ...fallback, apiUrl: reachable(fallback.apiUrl) };
   }
 }
 

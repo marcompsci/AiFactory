@@ -7,8 +7,13 @@ struct CityView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            if let url = URL(string: app.webURL) {
-                CityWebView(url: url).ignoresSafeArea()
+            if AppState.isLocalhost(app.webURL) {
+                ContentUnavailableView("Point the app at your Mac", systemImage: "wifi",
+                                       description: Text("On your iPhone, \"localhost\" is the phone itself. In More → Settings, enter your Mac's Wi-Fi address (for example 192.168.1.20) and start the server with AICIV_HOST=0.0.0.0."))
+            } else if let url = URL(string: app.webURL) {
+                let token = Keychain.load() ?? ""
+                CityWebView(url: url, apiURL: app.serverURL, token: token).ignoresSafeArea()
+                    .id("\(app.serverURL)|\(app.webURL)|\(app.session?.accessToken.suffix(12) ?? "")")  // reload with a new session
             }
             ConnectionBadge().padding(.top, 4)
         }
@@ -17,9 +22,25 @@ struct CityView: View {
 
 struct CityWebView: UIViewRepresentable {
     let url: URL
+    var apiURL: String = ""
+    var token: String = ""
+
+    /// Hands the app's connection (API address and signed-in session) to the city page before it loads, so the city
+    /// connects as you without a second sign-in inside the web view.
+    static func connectionScript(apiURL: String, token: String) -> String {
+        let payload = (try? JSONSerialization.data(withJSONObject: ["apiUrl": apiURL, "token": token, "native": true])) ?? Data()
+        let json = String(decoding: payload, as: UTF8.self)
+        let literal = (try? JSONSerialization.data(withJSONObject: [json], options: [.fragmentsAllowed])).map { String(decoding: $0, as: UTF8.self) } ?? "[\"{}\"]"
+        return "try { localStorage.setItem('aiciv.connection', \(literal)[0]); } catch (e) {}"
+    }
 
     func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView()
+        let config = WKWebViewConfiguration()
+        if !apiURL.isEmpty {
+            config.userContentController.addUserScript(WKUserScript(source: Self.connectionScript(apiURL: apiURL, token: token),
+                                                                    injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        let view = WKWebView(frame: .zero, configuration: config)
         view.isOpaque = false
         view.backgroundColor = UIColor(Theme.ground)
         view.scrollView.isScrollEnabled = false
@@ -159,8 +180,8 @@ struct SettingsView: View {
             Form {
                 AccountSection()
                 Section {
-                    TextField("API address", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    TextField("City (web app) address", text: $web).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("Your Mac's address, e.g. 192.168.1.20", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    TextField("City address (fills in from the Mac's address)", text: $web).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                     SecureField(app.tokenSet ? "Access token (saved)" : "Access token", text: $token)
                     Button("Connect") { app.saveSettings(server: server, web: web, token: token.isEmpty ? nil : token) }
                 } header: {
