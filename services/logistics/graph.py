@@ -35,7 +35,7 @@ class Segment:
 def gate(district: dict) -> tuple[float, float]:
     x, _, z = district["position"]
     if x == 0 and z == 0:
-        return (9.0, 0.0)  # east side: the north/south axes belong to Memory Vault and the Owner's Tower
+        return (0.0, 9.0)  # south, toward the Logistics Network hub; north belongs to the Owner's Tower
     return (x * 0.72, z * 0.72)
 
 

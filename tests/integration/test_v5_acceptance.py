@@ -135,7 +135,7 @@ def test_acceptance_paid_tool_request_to_owner_decision(v5env):
         assert r.status_code == 200
         d = at_tower(c, pid)
         assert d["packet"]["research_rounds"] == 2
-        log.append("6. Owner asked for more research → `fee_research_request` Owner's Tower→Data Observatory → second round "
+        log.append("6. Owner asked for more research → `fee_research_request` Owner's Tower→Research Observatory → second round "
                    f"(by {'Wren' if d['packet']['research_rounds'] % 2 == 0 else 'Pip'}) → back through the bank and the GM to the tower.")
         opts = {a["details"]["option"]: a for a in d["approvals"] if a["status"] == "REQUESTED"}
 

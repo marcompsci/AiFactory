@@ -6,7 +6,7 @@ App Lab improves your own apps, with your permission at every step that touches 
    play. Every pattern has a source. Today these come from a bundled **fixture** library
    (`services/applab/fixtures/design_patterns.json`, labeled everywhere). When live chart research exists, its findings
    are attached as evidence.
-2. **Analysis.** A `design_insights` package travels Data Observatory → Code Forge. Kade (Sonnet) reads your
+2. **Analysis.** A `design_insights` package travels Research Observatory → Code Forge. Kade (Sonnet) reads your
    repository **read-only** (a shallow clone in the worker's data directory) and drafts proposals:
    - the pinned **Claude Code GitHub Action** workflow, if your repository doesn't have it yet. This is a real patch,
      checked with `git apply --check` in a throwaway copy;

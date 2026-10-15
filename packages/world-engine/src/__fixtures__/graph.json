@@ -4,157 +4,22 @@
       "id": "nexus-spire:dispatch",
       "kind": "dispatch",
       "position": [
-        9.0,
+        -3.0,
         1.2,
-        3.0
+        9.0
       ]
     },
     {
       "id": "nexus-spire:receiving",
       "kind": "receiving",
       "position": [
-        9.0,
+        3.0,
         1.2,
-        -3.0
+        9.0
       ]
     },
     {
       "id": "junction:nexus-spire",
-      "kind": "junction",
-      "position": [
-        16.0,
-        1.2,
-        0.0
-      ]
-    },
-    {
-      "id": "code-forge:dispatch",
-      "kind": "dispatch",
-      "position": [
-        -20.05651273371742,
-        1.2,
-        -15.532478777137632
-      ]
-    },
-    {
-      "id": "code-forge:receiving",
-      "kind": "receiving",
-      "position": [
-        -23.143487266282577,
-        1.2,
-        -10.387521222862366
-      ]
-    },
-    {
-      "id": "junction:code-forge",
-      "kind": "junction",
-      "position": [
-        -13.719886811400706,
-        1.2,
-        -8.231932086840423
-      ]
-    },
-    {
-      "id": "sentinel-citadel:dispatch",
-      "kind": "dispatch",
-      "position": [
-        23.143487266282577,
-        1.2,
-        -10.387521222862366
-      ]
-    },
-    {
-      "id": "sentinel-citadel:receiving",
-      "kind": "receiving",
-      "position": [
-        20.05651273371742,
-        1.2,
-        -15.532478777137632
-      ]
-    },
-    {
-      "id": "junction:sentinel-citadel",
-      "kind": "junction",
-      "position": [
-        13.719886811400706,
-        1.2,
-        -8.231932086840423
-      ]
-    },
-    {
-      "id": "vision-quarter:dispatch",
-      "kind": "dispatch",
-      "position": [
-        -23.264100588675685,
-        1.2,
-        11.903849116986468
-      ]
-    },
-    {
-      "id": "vision-quarter:receiving",
-      "kind": "receiving",
-      "position": [
-        -19.93589941132431,
-        1.2,
-        16.89615088301353
-      ]
-    },
-    {
-      "id": "junction:vision-quarter",
-      "kind": "junction",
-      "position": [
-        -13.312804709405498,
-        1.2,
-        8.875203139603666
-      ]
-    },
-    {
-      "id": "data-observatory:dispatch",
-      "kind": "dispatch",
-      "position": [
-        19.93589941132431,
-        1.2,
-        16.89615088301353
-      ]
-    },
-    {
-      "id": "data-observatory:receiving",
-      "kind": "receiving",
-      "position": [
-        23.264100588675685,
-        1.2,
-        11.903849116986468
-      ]
-    },
-    {
-      "id": "junction:data-observatory",
-      "kind": "junction",
-      "position": [
-        13.312804709405498,
-        1.2,
-        8.875203139603666
-      ]
-    },
-    {
-      "id": "memory-vault:dispatch",
-      "kind": "dispatch",
-      "position": [
-        -3.0,
-        1.2,
-        25.919999999999998
-      ]
-    },
-    {
-      "id": "memory-vault:receiving",
-      "kind": "receiving",
-      "position": [
-        3.0,
-        1.2,
-        25.919999999999998
-      ]
-    },
-    {
-      "id": "junction:memory-vault",
       "kind": "junction",
       "position": [
         0.0,
@@ -163,12 +28,147 @@
       ]
     },
     {
+      "id": "code-forge:dispatch",
+      "kind": "dispatch",
+      "position": [
+        -23.592865605150557,
+        1.2,
+        1.3713834391970345
+      ]
+    },
+    {
+      "id": "code-forge:receiving",
+      "kind": "receiving",
+      "position": [
+        -22.48713439484944,
+        1.2,
+        7.2686165608029665
+      ]
+    },
+    {
+      "id": "junction:code-forge",
+      "kind": "junction",
+      "position": [
+        -15.72595499094915,
+        1.2,
+        2.948616560802966
+      ]
+    },
+    {
+      "id": "sentinel-citadel:dispatch",
+      "kind": "dispatch",
+      "position": [
+        22.48713439484944,
+        1.2,
+        7.2686165608029665
+      ]
+    },
+    {
+      "id": "sentinel-citadel:receiving",
+      "kind": "receiving",
+      "position": [
+        23.592865605150557,
+        1.2,
+        1.3713834391970345
+      ]
+    },
+    {
+      "id": "junction:sentinel-citadel",
+      "kind": "junction",
+      "position": [
+        15.72595499094915,
+        1.2,
+        2.948616560802966
+      ]
+    },
+    {
+      "id": "vision-quarter:dispatch",
+      "kind": "dispatch",
+      "position": [
+        -45.117697316473865,
+        1.2,
+        4.238276637862057
+      ]
+    },
+    {
+      "id": "vision-quarter:receiving",
+      "kind": "receiving",
+      "position": [
+        -44.162302683526136,
+        1.2,
+        10.161723362137941
+      ]
+    },
+    {
+      "id": "junction:vision-quarter",
+      "kind": "junction",
+      "position": [
+        -15.795857931402354,
+        1.2,
+        2.547719021193928
+      ]
+    },
+    {
+      "id": "data-observatory:dispatch",
+      "kind": "dispatch",
+      "position": [
+        -26.925914857336725,
+        1.2,
+        -25.38260642832909
+      ]
+    },
+    {
+      "id": "data-observatory:receiving",
+      "kind": "receiving",
+      "position": [
+        -30.67408514266327,
+        1.2,
+        -20.697393571670908
+      ]
+    },
+    {
+      "id": "junction:data-observatory",
+      "kind": "junction",
+      "position": [
+        -12.493900951088484,
+        1.2,
+        -9.995120760870789
+      ]
+    },
+    {
+      "id": "memory-vault:dispatch",
+      "kind": "dispatch",
+      "position": [
+        44.162302683526136,
+        1.2,
+        10.161723362137941
+      ]
+    },
+    {
+      "id": "memory-vault:receiving",
+      "kind": "receiving",
+      "position": [
+        45.117697316473865,
+        1.2,
+        4.238276637862057
+      ]
+    },
+    {
+      "id": "junction:memory-vault",
+      "kind": "junction",
+      "position": [
+        15.795857931402354,
+        1.2,
+        2.547719021193928
+      ]
+    },
+    {
       "id": "owners-tower:dispatch",
       "kind": "dispatch",
       "position": [
         3.0,
         1.2,
-        -28.799999999999997
+        -31.68
       ]
     },
     {
@@ -177,7 +177,7 @@
       "position": [
         -3.0,
         1.2,
-        -28.799999999999997
+        -31.68
       ]
     },
     {
@@ -193,158 +193,222 @@
       "id": "central-bank:dispatch",
       "kind": "dispatch",
       "position": [
-        -37.44,
+        32.05812964578857,
         1.2,
-        -3.0
+        -20.653704839902502
       ]
     },
     {
       "id": "central-bank:receiving",
       "kind": "receiving",
       "position": [
-        -37.44,
+        28.42187035421143,
         1.2,
-        3.0
+        -25.426295160097496
       ]
     },
     {
       "id": "junction:central-bank",
       "kind": "junction",
       "position": [
-        -16.0,
+        12.72690752051998,
         1.2,
-        0.0
+        -9.6966914442057
       ]
     }
   ],
   "routes": [
     {
       "id": "nexus-spire:dispatch->junction:nexus-spire",
+      "from_node": "nexus-spire:dispatch",
+      "to_node": "junction:nexus-spire",
       "length": 7.616
     },
     {
       "id": "junction:nexus-spire->nexus-spire:receiving",
+      "from_node": "junction:nexus-spire",
+      "to_node": "nexus-spire:receiving",
       "length": 7.616
     },
     {
       "id": "code-forge:dispatch->junction:code-forge",
-      "length": 9.667
+      "from_node": "code-forge:dispatch",
+      "to_node": "junction:code-forge",
+      "length": 8.023
     },
     {
       "id": "junction:code-forge->code-forge:receiving",
-      "length": 9.667
+      "from_node": "junction:code-forge",
+      "to_node": "code-forge:receiving",
+      "length": 8.023
     },
     {
       "id": "sentinel-citadel:dispatch->junction:sentinel-citadel",
-      "length": 9.667
+      "from_node": "sentinel-citadel:dispatch",
+      "to_node": "junction:sentinel-citadel",
+      "length": 8.023
     },
     {
       "id": "junction:sentinel-citadel->sentinel-citadel:receiving",
-      "length": 9.667
+      "from_node": "junction:sentinel-citadel",
+      "to_node": "sentinel-citadel:receiving",
+      "length": 8.023
     },
     {
       "id": "vision-quarter:dispatch->junction:vision-quarter",
-      "length": 10.402
+      "from_node": "vision-quarter:dispatch",
+      "to_node": "junction:vision-quarter",
+      "length": 29.371
     },
     {
       "id": "junction:vision-quarter->vision-quarter:receiving",
-      "length": 10.402
+      "from_node": "junction:vision-quarter",
+      "to_node": "vision-quarter:receiving",
+      "length": 29.371
     },
     {
       "id": "data-observatory:dispatch->junction:data-observatory",
-      "length": 10.402
+      "from_node": "data-observatory:dispatch",
+      "to_node": "junction:data-observatory",
+      "length": 21.096
     },
     {
       "id": "junction:data-observatory->data-observatory:receiving",
-      "length": 10.402
+      "from_node": "junction:data-observatory",
+      "to_node": "data-observatory:receiving",
+      "length": 21.096
     },
     {
       "id": "memory-vault:dispatch->junction:memory-vault",
-      "length": 10.364
+      "from_node": "memory-vault:dispatch",
+      "to_node": "junction:memory-vault",
+      "length": 29.371
     },
     {
       "id": "junction:memory-vault->memory-vault:receiving",
-      "length": 10.364
+      "from_node": "junction:memory-vault",
+      "to_node": "memory-vault:receiving",
+      "length": 29.371
     },
     {
       "id": "owners-tower:dispatch->junction:owners-tower",
-      "length": 13.147
+      "from_node": "owners-tower:dispatch",
+      "to_node": "junction:owners-tower",
+      "length": 15.964
     },
     {
       "id": "junction:owners-tower->owners-tower:receiving",
-      "length": 13.147
+      "from_node": "junction:owners-tower",
+      "to_node": "owners-tower:receiving",
+      "length": 15.964
     },
     {
       "id": "central-bank:dispatch->junction:central-bank",
-      "length": 21.649
+      "from_node": "central-bank:dispatch",
+      "to_node": "junction:central-bank",
+      "length": 22.221
     },
     {
       "id": "junction:central-bank->central-bank:receiving",
-      "length": 21.649
+      "from_node": "junction:central-bank",
+      "to_node": "central-bank:receiving",
+      "length": 22.221
     },
     {
-      "id": "junction:code-forge->junction:owners-tower",
-      "length": 15.766
+      "id": "junction:data-observatory->junction:owners-tower",
+      "from_node": "junction:data-observatory",
+      "to_node": "junction:owners-tower",
+      "length": 13.862
     },
     {
-      "id": "junction:owners-tower->junction:code-forge",
-      "length": 15.766
+      "id": "junction:owners-tower->junction:data-observatory",
+      "from_node": "junction:owners-tower",
+      "to_node": "junction:data-observatory",
+      "length": 13.862
     },
     {
-      "id": "junction:owners-tower->junction:sentinel-citadel",
-      "length": 15.766
+      "id": "junction:owners-tower->junction:central-bank",
+      "from_node": "junction:owners-tower",
+      "to_node": "junction:central-bank",
+      "length": 14.202
     },
     {
-      "id": "junction:sentinel-citadel->junction:owners-tower",
-      "length": 15.766
+      "id": "junction:central-bank->junction:owners-tower",
+      "from_node": "junction:central-bank",
+      "to_node": "junction:owners-tower",
+      "length": 14.202
+    },
+    {
+      "id": "junction:central-bank->junction:memory-vault",
+      "from_node": "junction:central-bank",
+      "to_node": "junction:memory-vault",
+      "length": 12.623
+    },
+    {
+      "id": "junction:memory-vault->junction:central-bank",
+      "from_node": "junction:memory-vault",
+      "to_node": "junction:central-bank",
+      "length": 12.623
+    },
+    {
+      "id": "junction:memory-vault->junction:sentinel-citadel",
+      "from_node": "junction:memory-vault",
+      "to_node": "junction:sentinel-citadel",
+      "length": 0.407
+    },
+    {
+      "id": "junction:sentinel-citadel->junction:memory-vault",
+      "from_node": "junction:sentinel-citadel",
+      "to_node": "junction:memory-vault",
+      "length": 0.407
     },
     {
       "id": "junction:sentinel-citadel->junction:nexus-spire",
-      "length": 8.542
+      "from_node": "junction:sentinel-citadel",
+      "to_node": "junction:nexus-spire",
+      "length": 20.436
     },
     {
       "id": "junction:nexus-spire->junction:sentinel-citadel",
-      "length": 8.542
+      "from_node": "junction:nexus-spire",
+      "to_node": "junction:sentinel-citadel",
+      "length": 20.436
     },
     {
-      "id": "junction:nexus-spire->junction:data-observatory",
-      "length": 9.273
+      "id": "junction:nexus-spire->junction:code-forge",
+      "from_node": "junction:nexus-spire",
+      "to_node": "junction:code-forge",
+      "length": 20.436
     },
     {
-      "id": "junction:data-observatory->junction:nexus-spire",
-      "length": 9.273
+      "id": "junction:code-forge->junction:nexus-spire",
+      "from_node": "junction:code-forge",
+      "to_node": "junction:nexus-spire",
+      "length": 20.436
     },
     {
-      "id": "junction:data-observatory->junction:memory-vault",
-      "length": 15.099
+      "id": "junction:code-forge->junction:vision-quarter",
+      "from_node": "junction:code-forge",
+      "to_node": "junction:vision-quarter",
+      "length": 0.407
     },
     {
-      "id": "junction:memory-vault->junction:data-observatory",
-      "length": 15.099
+      "id": "junction:vision-quarter->junction:code-forge",
+      "from_node": "junction:vision-quarter",
+      "to_node": "junction:code-forge",
+      "length": 0.407
     },
     {
-      "id": "junction:memory-vault->junction:vision-quarter",
-      "length": 15.099
+      "id": "junction:vision-quarter->junction:data-observatory",
+      "from_node": "junction:vision-quarter",
+      "to_node": "junction:data-observatory",
+      "length": 12.97
     },
     {
-      "id": "junction:vision-quarter->junction:memory-vault",
-      "length": 15.099
-    },
-    {
-      "id": "junction:vision-quarter->junction:central-bank",
-      "length": 9.273
-    },
-    {
-      "id": "junction:central-bank->junction:vision-quarter",
-      "length": 9.273
-    },
-    {
-      "id": "junction:central-bank->junction:code-forge",
-      "length": 8.542
-    },
-    {
-      "id": "junction:code-forge->junction:central-bank",
-      "length": 8.542
+      "id": "junction:data-observatory->junction:vision-quarter",
+      "from_node": "junction:data-observatory",
+      "to_node": "junction:vision-quarter",
+      "length": 12.97
     }
   ]
 }

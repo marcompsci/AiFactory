@@ -121,7 +121,7 @@ export function ApprovalCall() {
     <button
       type="button"
       onClick={() => setTab("approvals")}
-      className="approval-pulse fixed left-1/2 top-[calc(max(12px,env(safe-area-inset-top))+108px)] z-30 -translate-x-1/2 whitespace-nowrap rounded-full lg:left-[calc(200px+(100vw-640px)/2)] lg:top-[calc(max(8px,env(safe-area-inset-top))+72px)] border border-warn/60 bg-ground/85 px-4 py-2 text-sm text-warn backdrop-blur"
+      className="approval-pulse fixed left-1/2 top-[calc(max(12px,env(safe-area-inset-top))+108px)] z-30 -translate-x-1/2 whitespace-nowrap rounded-full lg:left-[calc(200px+(100vw-640px)/2)] lg:top-auto lg:bottom-[212px] border border-warn/60 bg-ground/85 px-4 py-2 text-sm text-warn backdrop-blur"
     >
       {releases && !pending ? (releases === 1 ? "A decision is waiting at your tower" : `${releases} decisions are waiting at your tower`)
         : count === 1 ? "1 action needs your approval" : `${count} actions need your approval`}

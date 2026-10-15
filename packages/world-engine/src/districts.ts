@@ -67,7 +67,7 @@ export function homePosition(districtId: string, slot = 0): Vec3 {
   if (d.architecture === "bank" && d.workstations.length) {
     // the bank's staff wait at the floor desks in front of the tower rather than crowding its gate
     const w = d.workstations[slot % d.workstations.length];
-    return add(d.position, [w.offset[0] + 1.6, 0, w.offset[2]]);
+    return add(d.position, [w.offset[0] - 1.6, 0, w.offset[2]]);
   }
   const g = gatePosition(districtId);
   const side = slot % 2 === 0 ? 1 : -1;
@@ -83,6 +83,6 @@ export function homePosition(districtId: string, slot = 0): Vec3 {
 export function gatePosition(districtId: string): Vec3 {
   const d = DISTRICT_BY_ID[districtId];
   if (!d) return [0, 0, 0];
-  if (d.position[0] === 0 && d.position[2] === 0) return [9, 0, 0]; // east: north/south belong to Memory Vault and the Owner's Tower
+  if (d.position[0] === 0 && d.position[2] === 0) return [0, 0, 9]; // south, toward the Logistics Network hub; north belongs to the Owner's Tower
   return [d.position[0] * 0.72, 0, d.position[2] * 0.72];
 }

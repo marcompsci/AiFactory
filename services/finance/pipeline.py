@@ -1,7 +1,7 @@
 """The fee review workflow (spec §6, §12), advanced by the durable scheduler like the V4 pipeline.
 
 SUBMITTED ─purchase_request / expense_alert arrives at the bank─▶ AT_BANK (CFO receives and classifies it)
-AT_BANK ─fee_research_request to the Data Observatory─▶ RESEARCH_REQUESTED ─received─▶ RESEARCHING (a Haiku researcher's mission)
+AT_BANK ─fee_research_request to the Research Observatory─▶ RESEARCH_REQUESTED ─received─▶ RESEARCHING (a Haiku researcher's mission)
 RESEARCHING ─savings_recommendation back to the bank─▶ FINDINGS_RETURNED (Savings Strategist and CFO analysis mission)
 FINDINGS_RETURNED ─significant: to the General Manager─▶ GM_REVIEW ─owner_approval_request─▶ OWNER_DECISION
                   └─routine: straight to the Owner's Tower─────────────────────────────────────▶ OWNER_DECISION

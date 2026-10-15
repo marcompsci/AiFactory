@@ -7,7 +7,7 @@ import { Button, Dot, ErrorNote, Pill, Skeleton } from "./ui";
 
 export const INVESTIGATION_STAGES = ["REQUESTED", "RESEARCHING", "EVALUATING", "TESTING", "MANAGER_REVIEW", "AWAITING_OWNER"];
 const WHERE: Record<string, string> = {
-  REQUESTED: "on the belt to the Data Observatory",
+  REQUESTED: "on the belt to the Research Observatory",
   RESEARCHING: "Haiku researchers are gathering candidates",
   EVALUATING: "the Savings Strategist is scoring the shortlist",
   TESTING: "Code Forge is testing in a sandbox, then QA reviews",

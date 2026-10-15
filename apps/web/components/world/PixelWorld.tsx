@@ -8,17 +8,22 @@
  */
 import { useFrame } from "@react-three/fiber";
 import { DISTRICTS, PLAZA_RADIUS, type District as D } from "@aiciv/world-engine";
+import { Html } from "@react-three/drei";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useStore } from "@/lib/store";
 
-const ROCK = "#3a2f4a";
-const ROCK_DARK = "#241c33";
-const GRASS = "#2f7d5b";
+const ROCK = "#54456e";
+const ROCK_DARK = "#3a2f52";
+const GRASS = "#3f9e64";
 const WATER = "#5fd8ff";
 
 function islandRadius(d: D): number {
-  return d.architecture === "bank" ? 17 : 14;
+  return d.architecture === "bank" ? 19 : d.architecture === "spire" ? 15 : 17;
+}
+
+function deckSize(d: D): number {
+  return d.architecture === "bank" ? 26 : d.architecture === "spire" ? 0 : 23;
 }
 
 /** A faceted rock island: a grassy disc on top of an inverted, jagged cone. */
@@ -86,47 +91,6 @@ function Waterfall({ x, z, angle, height, width }: { x: number; z: number; angle
         <circleGeometry args={[width * 0.9, 8]} />
         <meshBasicMaterial color={WATER} transparent opacity={0.25} toneMapped={false} />
       </mesh>
-    </group>
-  );
-}
-
-/** A neon sign on a post at the edge of a district, facing the plaza. */
-function NeonSign({ d }: { d: D }) {
-  const [x, , z] = d.position;
-  const toward = new THREE.Vector3(-x, 0, -z);
-  if (toward.lengthSq() === 0) toward.set(0, 0, 1);
-  toward.normalize();
-  const p = new THREE.Vector3(x, 0, z).add(toward.clone().multiplyScalar(islandRadius(d) - 3)).add(new THREE.Vector3(toward.z, 0, -toward.x).multiplyScalar(6));
-  const yaw = Math.atan2(toward.x, toward.z);
-  const glow = useRef<THREE.MeshBasicMaterial>(null);
-  const reduced = useStore((s) => s.settings.reducedMotion);
-  const seed = d.id.length;
-  useFrame(({ clock }) => {
-    if (!glow.current || reduced) return;
-    // a cheap neon flicker every few seconds
-    const t = clock.elapsedTime + seed;
-    glow.current.opacity = Math.sin(t * 0.7) > 0.97 && Math.sin(t * 40) > 0 ? 0.35 : 1;
-  });
-  return (
-    <group position={[p.x, 0, p.z]} rotation={[0, yaw, 0]}>
-      <mesh position={[0, 3, 0]}>
-        <boxGeometry args={[0.25, 6, 0.25]} />
-        <meshStandardMaterial color="#1b2340" />
-      </mesh>
-      <mesh position={[0, 6.6, 0]}>
-        <boxGeometry args={[5.6, 1.6, 0.2]} />
-        <meshStandardMaterial color="#0b1226" />
-      </mesh>
-      <mesh position={[0, 6.6, 0.12]}>
-        <planeGeometry args={[5.2, 1.2]} />
-        <meshBasicMaterial ref={glow} color={d.color} transparent toneMapped={false} />
-      </mesh>
-      {Array.from({ length: 5 }, (_, i) => (
-        <mesh key={i} position={[-2 + i, 6.6, 0.14]}>
-          <planeGeometry args={[0.55, 0.55]} />
-          <meshBasicMaterial color="#070B18" />
-        </mesh>
-      ))}
     </group>
   );
 }
@@ -232,9 +196,247 @@ export function PixelWorld() {
         <Island key={d.id} x={d.position[0]} z={d.position[2]} r={islandRadius(d)} depth={16 + (i % 3) * 6} seed={i * 1.7} />
       ))}
       {falls.map((f, i) => <Waterfall key={i} {...f} />)}
-      {DISTRICTS.filter((d) => d.id !== "nexus-spire").map((d) => <NeonSign key={d.id} d={d} />)}
+      {DISTRICTS.map((d) => <Deck key={d.id} d={d} />)}
+      <LogisticsHub />
+      <Skyline />
+      <SkyDome />
       <Islets />
       <FlyingCars />
+    </group>
+  );
+}
+
+/** Checkered floor tiles, drawn once and sampled without smoothing so they stay crisp pixels. */
+function useTileTexture(color: string) {
+  return useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 16;
+    const g = c.getContext("2d")!;
+    const base = new THREE.Color(color).lerp(new THREE.Color("#2a2140"), 0.62);
+    const alt = new THREE.Color(color).lerp(new THREE.Color("#3a2f58"), 0.5);
+    for (let y = 0; y < 2; y++)
+      for (let x = 0; x < 2; x++) {
+        g.fillStyle = `#${((x + y) % 2 ? alt : base).getHexString()}`;
+        g.fillRect(x * 8, y * 8, 8, 8);
+      }
+    g.fillStyle = "rgba(255,255,255,0.08)";
+    g.fillRect(0, 0, 16, 1);
+    g.fillRect(0, 0, 1, 16);
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(6, 6);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, [color]);
+}
+
+/** Lo-fi tree: a trunk and a faceted crown. */
+function Tree({ x, z, s = 1, color }: { x: number; z: number; s?: number; color: string }) {
+  return (
+    <group position={[x, 0, z]} scale={s}>
+      <mesh position={[0, 0.9, 0]}>
+        <cylinderGeometry args={[0.18, 0.25, 1.8, 5]} />
+        <meshStandardMaterial color="#5a3b2a" flatShading />
+      </mesh>
+      <mesh position={[0, 2.4, 0]}>
+        <icosahedronGeometry args={[1.25, 0]} />
+        <meshStandardMaterial color={color} flatShading roughness={0.9} emissive={color} emissiveIntensity={0.08} />
+      </mesh>
+    </group>
+  );
+}
+
+const CROWNS = ["#2f8f5b", "#3aa66a", "#c25bd6", "#ff7ab8", "#2a7d6b"];
+
+/**
+ * Each district stands on a raised stone deck (reference art): tiled floor, a glowing rim in the district colour,
+ * a back wall of screens, open-plan desks with monitors, and trees on the corners. Decoration: the agents, desks
+ * that light up from real tool events, and packages are drawn by their own components.
+ */
+function Deck({ d }: { d: D }) {
+  const W = deckSize(d);
+  const tex = useTileTexture(d.color);
+  const desks = useMemo(() => {
+    const out: [number, number][] = [];
+    if (!W) return out;
+    for (const z of [2.5, 5.5])
+      for (const x of [-8.5, -5.5, 5.5, 8.5]) out.push([x, z]);
+    return out;
+  }, [W]);
+  if (!W) return null;
+  const [x, , z] = d.position;
+  const h = W / 2;
+  return (
+    <group position={[x, 0, z]}>
+      {/* stone slab with a lit rim */}
+      <mesh position={[0, -1.7, 0]}>
+        <boxGeometry args={[W, 3.4, W]} />
+        <meshStandardMaterial color="#4a3c6e" flatShading roughness={1} />
+      </mesh>
+      <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[W - 0.6, W - 0.6]} />
+        <meshStandardMaterial map={tex} roughness={0.9} />
+      </mesh>
+      {[[0, h], [0, -h], [h, 0], [-h, 0]].map(([dx, dz], i) => (
+        <mesh key={i} position={[dx, 0.1, dz]} rotation={[0, i < 2 ? 0 : Math.PI / 2, 0]}>
+          <boxGeometry args={[W, 0.2, 0.25]} />
+          <meshBasicMaterial color={d.color} toneMapped={false} />
+        </mesh>
+      ))}
+      {/* back wall of screens */}
+      <mesh position={[0, 1.6, -h + 0.4]}>
+        <boxGeometry args={[W - 1, 3.2, 0.5]} />
+        <meshStandardMaterial color="#141b33" />
+      </mesh>
+      {[-7.5, -2.5, 2.5, 7.5].map((sx) => (
+        <mesh key={sx} position={[sx, 1.9, -h + 0.7]}>
+          <planeGeometry args={[3.6, 1.8]} />
+          <meshBasicMaterial color={d.color} transparent opacity={0.55} toneMapped={false} />
+        </mesh>
+      ))}
+      {/* open-plan desks with monitors */}
+      {desks.map(([dx, dz], i) => (
+        <group key={i} position={[dx, 0, dz]}>
+          <mesh position={[0, 0.45, 0]}>
+            <boxGeometry args={[2.2, 0.9, 1.1]} />
+            <meshStandardMaterial color="#3a2f52" flatShading />
+          </mesh>
+          <mesh position={[0, 1.35, -0.35]}>
+            <boxGeometry args={[1.3, 0.85, 0.08]} />
+            <meshStandardMaterial color="#0b1020" />
+          </mesh>
+          <mesh position={[0, 1.35, -0.3]}>
+            <planeGeometry args={[1.15, 0.7]} />
+            <meshBasicMaterial color={i % 3 ? d.color : "#9fe8ff"} toneMapped={false} />
+          </mesh>
+        </group>
+      ))}
+      {/* trees on the corners */}
+      {[[-h + 1.6, -h + 1.6], [h - 1.6, -h + 1.6], [-h + 1.6, h - 1.6], [h - 1.6, h - 1.6]].map(([tx, tz], i) => (
+        <Tree key={i} x={tx} z={tz} s={1 + (i % 2) * 0.3} color={CROWNS[(i + d.id.length) % CROWNS.length]} />
+      ))}
+    </group>
+  );
+}
+
+/** The conveyor hub in front of the Nexus Spire, labeled like the reference: the belts themselves are real. */
+function LogisticsHub() {
+  return (
+    <group position={[0, 0, 21]}>
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[4, 4.4, 0.4, 8]} />
+        <meshStandardMaterial color="#2b2342" flatShading />
+      </mesh>
+      <mesh position={[0, 0.42, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[3.2, 3.6, 8]} />
+        <meshBasicMaterial color="#F4D58D" toneMapped={false} />
+      </mesh>
+      <Html position={[0, 4, 0]} center zIndexRange={[6, 0]}>
+        <div className="neon-sign" style={{ "--c": "#F4D58D", cursor: "default" } as React.CSSProperties}>
+          <span className="neon-icon" aria-hidden>▣</span>
+          <span>Logistics Network</span>
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+/** Distant skyline with lit windows. Not part of the city's state; ignores fog so it reads as a backdrop. */
+function Skyline() {
+  const windows = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 16;
+    c.height = 64;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#0d1030";
+    g.fillRect(0, 0, 16, 64);
+    for (let y = 2; y < 64; y += 4)
+      for (let x = 2; x < 16; x += 4) {
+        const r = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+        const v = r - Math.floor(r);
+        g.fillStyle = v > 0.72 ? "#ffd27a" : v > 0.55 ? "#7fd8ff" : v > 0.45 ? "#ff7ad9" : "#141a40";
+        g.fillRect(x, y, 2, 2);
+      }
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestFilter;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }, []);
+  const towers = useMemo(() => {
+    const out: { x: number; z: number; w: number; h: number; spire: boolean }[] = [];
+    for (let i = 0; i < 110; i++) {
+      const a = (i / 110) * Math.PI * 2 + Math.sin(i * 7.1) * 0.02;
+      // keep the view toward the camera (south) open
+      if (Math.sin(a) > 0.55) continue;
+      const r = 300 + ((i * 37) % 60);
+      out.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, w: 6 + (i % 5) * 2, h: 25 + ((i * 53) % 45), spire: i % 9 === 0 });
+    }
+    return out;
+  }, []);
+  return (
+    <group position={[0, -60, 0]}>
+      {towers.map((t, i) => (
+        <group key={i} position={[t.x, 0, t.z]}>
+          <mesh position={[0, t.h / 2, 0]}>
+            <boxGeometry args={[t.w, t.h, t.w]} />
+            <meshBasicMaterial map={windows} fog={false} color="#c9ccff" />
+          </mesh>
+          {t.spire ? (
+            <mesh position={[0, t.h + 10, 0]}>
+              <coneGeometry args={[t.w * 0.35, 20, 4]} />
+              <meshBasicMaterial color="#c86bff" fog={false} toneMapped={false} />
+            </mesh>
+          ) : null}
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** Dusk sky: navy overhead, violet in the middle, a warm band at the horizon, and a few stars. */
+function SkyDome() {
+  const stars = useMemo(() => {
+    const p = new Float32Array(600 * 3);
+    for (let i = 0; i < 600; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const e = 0.25 + Math.random() * 1.2;
+      p.set([Math.cos(a) * Math.cos(e) * 380, Math.sin(e) * 380, Math.sin(a) * Math.cos(e) * 380], i * 3);
+    }
+    return p;
+  }, []);
+  return (
+    <group>
+      <mesh>
+        <sphereGeometry args={[420, 32, 16]} />
+        <shaderMaterial
+          side={THREE.BackSide}
+          depthWrite={false}
+          fog={false}
+          vertexShader="varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }"
+          fragmentShader={`varying vec3 vP;
+            void main(){
+              float h = vP.y;
+              vec3 top = vec3(0.04, 0.05, 0.17);
+              vec3 mid = vec3(0.23, 0.11, 0.38);
+              vec3 low = vec3(0.98, 0.45, 0.42);
+              vec3 deep = vec3(0.05, 0.05, 0.16);
+              vec3 c = h > 0.18 ? mix(mid, top, smoothstep(0.18, 0.7, h))
+                     : h > 0.0 ? mix(low, mid, smoothstep(0.0, 0.18, h))
+                     : mix(low * 0.55, deep, smoothstep(0.0, -0.22, h));
+              gl_FragColor = vec4(c, 1.0);
+            }`}
+        />
+      </mesh>
+      <points>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[stars, 3]} />
+        </bufferGeometry>
+        <pointsMaterial color="#ffffff" size={1.6} sizeAttenuation={false} fog={false} />
+      </points>
     </group>
   );
 }

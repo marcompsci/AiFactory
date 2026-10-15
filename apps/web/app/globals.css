@@ -141,3 +141,44 @@ body {
   max-width: 160px;
   white-space: normal;
 }
+
+/* District neon signs (reference art): a dark board with a glowing rim, pixel caps and an icon tile. */
+.neon-sign {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 4px;
+  white-space: nowrap;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #f4f7ff;
+  background: linear-gradient(180deg, rgb(14 20 44 / 0.95), rgb(8 12 28 / 0.95));
+  border: 2px solid var(--c);
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #050814, 0 0 14px color-mix(in srgb, var(--c) 70%, transparent), inset 0 0 10px color-mix(in srgb, var(--c) 35%, transparent);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--c) 80%, transparent);
+  transform: translate3d(0, 0, 0);
+  cursor: pointer;
+}
+.neon-icon {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 14px;
+  color: #050814;
+  background: var(--c);
+  text-shadow: none;
+}
+.neon-sub {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--c) 60%, white);
+  letter-spacing: 0.06em;
+}

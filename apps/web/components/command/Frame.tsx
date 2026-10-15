@@ -43,13 +43,33 @@ function Clock() {
     const t = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(t);
   }, []);
+  const weather = useQuery({ queryKey: ["weather"], queryFn: fetchWeather, refetchInterval: 30 * 60_000, staleTime: 15 * 60_000, retry: 0 });
   if (!now) return null;
   return (
-    <span className="text-right leading-tight">
-      <span className="block font-mono text-[13px]">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-      <span className="block text-[10px] text-ink-3">{now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
+    <span className="flex items-center gap-3">
+      <span className="text-right leading-tight">
+        <span className="block text-[10px] uppercase text-ink-3">{now.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })}</span>
+        <span className="block font-mono text-[13px]">{now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+      </span>
+      {weather.data ? (
+        <span className="text-right leading-tight" title={`Open-Meteo, ${WEATHER_PLACE.name}`}>
+          <span className="block font-mono text-[13px]">{weather.data.icon} {Math.round(weather.data.tempF)}°F</span>
+          <span className="block text-[10px] text-ink-3">{WEATHER_PLACE.name}</span>
+        </span>
+      ) : null}
     </span>
   );
+}
+
+/** Real current weather from Open-Meteo (free, no key). Shown only when it loads; nothing is made up. */
+const WEATHER_PLACE = { name: "San Francisco", lat: 37.7749, lon: -122.4194 };
+async function fetchWeather(): Promise<{ tempF: number; icon: string }> {
+  const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_PLACE.lat}&longitude=${WEATHER_PLACE.lon}&current=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit`);
+  if (!r.ok) throw new Error("weather unavailable");
+  const c = (await r.json()).current;
+  const code: number = c.weather_code;
+  const icon = code === 0 ? (c.is_day ? "☀" : "☾") : code <= 3 ? "⛅" : code <= 48 ? "🌫" : code <= 67 || (code >= 80 && code <= 82) ? "☂" : code <= 77 ? "❄" : "⛈";
+  return { tempF: c.temperature_2m, icon };
 }
 
 function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
@@ -106,7 +126,13 @@ export function SideNav() {
   ];
   return (
     <nav aria-label="Sections" className="pixel-panel fixed bottom-3 left-2 top-2 z-40 hidden w-[184px] flex-col p-2 lg:flex">
-      <p className="pixel-title px-2 pb-2 pt-1 text-[15px] text-cyan">AI Civilization</p>
+      <div className="flex items-center gap-2 px-1 pb-3 pt-1">
+        <span className="grid size-9 shrink-0 place-items-center rounded bg-gradient-to-br from-violet via-cyan to-[#FF4FB0] font-display text-sm font-bold text-ground" aria-hidden>▲</span>
+        <span className="min-w-0">
+          <span className="pixel-title block whitespace-nowrap text-[13px] leading-tight text-ink">AI Civilization</span>
+          <span className="block whitespace-nowrap text-[7px] tracking-[0.08em] text-ink-3">BUILD · RESEARCH · CREATE · GROW</span>
+        </span>
+      </div>
       <ul className="space-y-0.5">
         {NAV.map((n) => (
           <li key={n.id}>
@@ -171,14 +197,17 @@ export function LiveActivityPanel({ limit = 6 }: { limit?: number }) {
     <ul className="space-y-1 text-[12px]">
       {items.length === 0 ? <li className="text-ink-3">Waiting for the agents…</li> : null}
       {items.map(({ e, d }) => (
-        <li key={e.event_id} className="flex gap-1.5">
-          <span className="pixel-avatar mt-1 size-2.5 shrink-0" style={{ background: e.agent_id ? agents[e.agent_id]?.color ?? d.tone : d.tone }} />
+        <li key={e.event_id} className="flex items-start gap-1.5">
+          <span className="w-12 shrink-0 font-mono text-[10px] leading-5 text-ink-3">{new Date(e.occurred_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+          <span className="pixel-avatar mt-1 size-3 shrink-0 rounded-sm" style={{ background: e.agent_id ? agents[e.agent_id]?.color ?? d.tone : d.tone }} />
           <span className="min-w-0"><b className="font-medium">{d.who}</b> <span className="text-ink-2">{d.text}</span></span>
         </li>
       ))}
     </ul>
   );
 }
+
+const STAGE_COLOR: Record<string, string> = { research: "#F4D58D", manager: "#A66BFF", production: "#4C8DFF", qa: "#3FB8FF", bank: "#3DE08A", owner: "#FF9A3D" };
 
 export function ConveyorFlowPanel({ data }: { data?: Json }) {
   const stages: Json[] = data?.conveyor ?? [];
@@ -188,7 +217,9 @@ export function ConveyorFlowPanel({ data }: { data?: Json }) {
       {stages.map((s) => (
         <div key={s.id} className="relative flex min-w-0 flex-1 items-center">
           <div className="min-w-0 flex-1 text-center">
-            <div className={`mx-auto grid size-8 place-items-center rounded border-2 bg-ground font-mono text-sm ${s.in_transit ? "border-cyan text-cyan shadow-[0_0_10px_rgba(50,216,255,.5)]" : "border-white/15 text-ink-3"}`}>
+            <div className="mx-auto grid size-8 place-items-center rounded border-2 bg-ground font-mono text-sm"
+              style={{ borderColor: STAGE_COLOR[s.id], color: s.in_transit ? "#fff" : STAGE_COLOR[s.id], background: s.in_transit ? STAGE_COLOR[s.id] + "55" : undefined,
+                boxShadow: s.in_transit ? `0 0 10px ${STAGE_COLOR[s.id]}` : undefined }}>
               {s.in_transit}
             </div>
             <p className="mt-1 text-[9px] leading-tight text-ink-2">{s.label}</p>

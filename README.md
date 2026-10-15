@@ -49,7 +49,7 @@ is in [docs/acceptance/v4-acceptance-log.md](docs/acceptance/v4-acceptance-log.m
 
 ## What works today
 
-- **The city.** Six districts (Nexus Spire, Code Forge, Sentinel Citadel, Vision Quarter, Data Observatory,
+- **The city.** Six districts (Nexus Spire, Code Forge, Sentinel Citadel, Creative Studio, Research Observatory,
   Memory Vault) built from `packages/world-engine/src/districts.json`, elevated walkways, a central plaza,
   workstations that light up while a tool runs, ambient drones (decoration only, labeled as such),
   bloom, fog, adaptive quality, reduced-motion mode. City / Orbit / Follow / Fly cameras. Tap a district

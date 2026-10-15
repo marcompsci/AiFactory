@@ -4,8 +4,8 @@ The owner's RESEARCH_FREE_ALTERNATIVE decision authorizes research and sandboxed
 cost review stays waiting for the owner (its approval requests are untouched), and the investigation runs as a
 physical packet:
 
-  REQUESTED     AI Central Bank ──savings_investigation──▶ Data Observatory   (Haiku researcher finds ≤ 5 candidates)
-  RESEARCHING   Data Observatory ─────────────────────▶ AI Central Bank       (Savings Strategist scores, shortlists)
+  REQUESTED     AI Central Bank ──savings_investigation──▶ Research Observatory   (Haiku researcher finds ≤ 5 candidates)
+  RESEARCHING   Research Observatory ─────────────────────▶ AI Central Bank       (Savings Strategist scores, shortlists)
   EVALUATING    AI Central Bank ──────────────────────▶ Code Forge            (Developer tests the strongest in a sandbox)
   TESTING       Code Forge ───────────────────────────▶ Sentinel Citadel      (QA reviews the evidence)
                 Sentinel Citadel ─────────────────────▶ Nexus Spire           (General Manager: recommendation only)
@@ -191,7 +191,7 @@ class InvestigationPipeline:
         if not _arrived(conn, inv.id, "central-bank", "data-observatory", lead):
             return 0
         mid = _mission_for(conn, inv, "alt_research", "Find free alternatives for a cost review", lead, agent_key="research_apps")
-        set_status(conn, inv.id, "RESEARCHING", "research started at the Data Observatory", agent_id=lead.id, research_mission_id=mid)
+        set_status(conn, inv.id, "RESEARCHING", "research started at the Research Observatory", agent_id=lead.id, research_mission_id=mid)
         q.append(mid)
         return 1
 

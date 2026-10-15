@@ -118,7 +118,7 @@ Each stage starts only when the right package has **arrived** at the right build
 
 | Package | From → To | Consumed by | Next |
 |---|---|---|---|
-| research_brief | Data Observatory → Nexus Spire | Atlas | packet review (rules, then optional Opus veto) |
+| research_brief | Research Observatory → Nexus Spire | Atlas | packet review (rules, then optional Opus veto) |
 | product_proposal | Nexus Spire → Code Forge | Orin (capacity check) | `build_prototype` mission |
 | code_artifact | Code Forge → Sentinel Citadel | Sentry | `qa_prototype` mission on the exact bundle |
 | test_report | Sentinel Citadel → Nexus Spire | Atlas | 12-category release review |
@@ -238,7 +238,7 @@ narrative text, from a redacted view.
 
 **Free-alternative investigations** (`services/finance/investigations.py`, `alt_research.py`, `investigation_tools.py`).
 The owner's `RESEARCH_FREE_ALTERNATIVE` decision creates a durable `savings_investigations` row. The original request
-stays pending. A `savings_investigation` package then travels Central Bank → Data Observatory → Central Bank → Code
+stays pending. A `savings_investigation` package then travels Central Bank → Research Observatory → Central Bank → Code
 Forge → Sentinel Citadel → Nexus Spire → Owner's Tower, with one mission per stage:
 
 - `alt_research` (Haiku): up to 5 candidates with evidence;

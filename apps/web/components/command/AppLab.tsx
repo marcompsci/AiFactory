@@ -146,7 +146,7 @@ function CycleRow({ c, proposals }: { c: Json; proposals: Json[] }) {
           <li key={s} title={human(s)} className="h-1.5 flex-1 rounded-full" style={{ background: idx >= i || c.status === "DONE" ? COLOR[s] : "#22304f" }} />
         ))}
       </ol>
-      <p className="text-[11px] text-ink-3">Data Observatory → Code Forge → Nexus Spire → Owner's Tower</p>
+      <p className="text-[11px] text-ink-3">Research Observatory → Code Forge → Nexus Spire → Owner's Tower</p>
       {c.reason ? <p className="text-xs text-ink-2">{c.reason}</p> : null}
       {proposals.filter((p) => p.status !== "AWAITING_OWNER").map((p) => (
         <div key={p.id} className="flex items-center gap-2 text-xs">

@@ -1,6 +1,6 @@
 "use client";
 
-import { AdaptiveDpr, Grid, OrbitControls, PerformanceMonitor } from "@react-three/drei";
+import { AdaptiveDpr, OrbitControls, PerformanceMonitor } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { DISTRICT_BY_ID, DISTRICTS, PLAZA_RADIUS, workstationPosition } from "@aiciv/world-engine";
@@ -13,7 +13,7 @@ import { Conveyors } from "./Conveyors";
 import { District } from "./District";
 import { PixelWorld } from "./PixelWorld";
 
-const OVERVIEW = { pos: new THREE.Vector3(70, 82, 142), target: new THREE.Vector3(-12, -8, 0) }; // V5: framed to include the AI Central Bank in the west
+const OVERVIEW = { pos: new THREE.Vector3(50, 108, 166), target: new THREE.Vector3(0, -12, -30) }; // isometric-ish, from the front, like the reference art // V5: framed to include the AI Central Bank in the west
 
 function Plaza() {
   const ring = useRef<THREE.Mesh>(null);
@@ -54,8 +54,8 @@ function ViewFit() {
     const panelY = desktop ? 200 - 60 : peek * 0.5;
     const k = size.width < size.height ? Math.min(2.1, 1.05 / (size.width / size.height)) : 1;
     if (scene.fog instanceof THREE.Fog) {
-      scene.fog.near = 90 * k;
-      scene.fog.far = 260 * k;
+      scene.fog.near = 230 * k;
+      scene.fog.far = 520 * k;
     }
     if (panelX || panelY) cam.setViewOffset(size.width + panelX, size.height + panelY, panelX, panelY, size.width, size.height);
     else cam.clearViewOffset();
@@ -92,7 +92,7 @@ function CameraRig({ positions }: { positions: Map<string, THREE.Vector3> }) {
     if (interior && d.architecture === "bank") {
       // the bank's interior is its stack of floors: stand back toward the plaza and look up the see-through shaft
       const toward = c.clone().setY(0).normalize().multiplyScalar(-1);
-      goal.current = { pos: c.clone().add(toward.multiplyScalar(54)).add(new THREE.Vector3(0, 24, 20)), target: c.clone().add(new THREE.Vector3(-2, 19, 0)) };
+      goal.current = { pos: c.clone().add(toward.multiplyScalar(54)).add(new THREE.Vector3(0, 24, 20)), target: c.clone().add(new THREE.Vector3(2, 19, 0)) };
     } else if (interior) {
       const ws = new THREE.Vector3(...workstationPosition(d.id, d.workstations[0]?.id));
       const out = ws.clone().sub(c).setY(0).normalize();
@@ -163,7 +163,7 @@ function CameraRig({ positions }: { positions: Map<string, THREE.Vector3> }) {
       enableDamping
       maxPolarAngle={Math.PI / 2.08}
       minDistance={4}
-      maxDistance={180}
+      maxDistance={340}
       screenSpacePanning={mode === "fly"}
       onStart={() => {
         goal.current = null;
@@ -185,7 +185,7 @@ export function CityScene() {
   return (
     <Canvas
       className={`!fixed inset-0 ${pixel ? "pixel-canvas" : ""}`}
-      camera={{ position: OVERVIEW.pos.toArray(), fov: 45, near: 0.5, far: 600 }}
+      camera={{ position: OVERVIEW.pos.toArray(), fov: 45, near: 0.5, far: 900 }}
       dpr={pixel ? 0.5 : low ? [1, 1.25] : [1, 2]}
       gl={{ antialias: !low && !pixel, powerPreference: "high-performance" }}
       onPointerMissed={() => {
@@ -196,27 +196,15 @@ export function CityScene() {
       aria-label="3D city of AI agents"
     >
       <color attach="background" args={["#121a44"]} />
-      <fog attach="fog" args={["#121a44", 90, 260]} />
-      <ambientLight intensity={0.55} color="#9fb4ff" />
-      <hemisphereLight args={["#5fd8ff", "#2a1f4a", 0.7]} />
-      <directionalLight position={[40, 80, 20]} intensity={0.9} color="#ffd9a8" />
+      <fog attach="fog" args={["#121a44", 230, 520]} />
+      <ambientLight intensity={0.95} color="#b7c3ff" />
+      <hemisphereLight args={["#8fe3ff", "#3a2a5e", 1.0]} />
+      <directionalLight position={[40, 80, 60]} intensity={1.4} color="#ffd9a8" />
       <directionalLight position={[-60, 40, -40]} intensity={0.4} color="#A66BFF" />
       <PerformanceMonitor onDecline={() => setDegraded(true)} onIncline={() => setDegraded(false)} />
       {pixel ? null : <AdaptiveDpr pixelated />}
       <Suspense fallback={null}>
-        <Grid
-          position={[0, -42, 0]}
-          args={[400, 400]}
-          cellSize={4}
-          cellThickness={0.5}
-          cellColor="#1a2a4d"
-          sectionSize={20}
-          sectionThickness={1}
-          sectionColor="#24407a"
-          fadeDistance={190}
-          fadeStrength={1.5}
-          infiniteGrid
-        />
+
         <PixelWorld />
         <Plaza />
         {DISTRICTS.map((d) => (

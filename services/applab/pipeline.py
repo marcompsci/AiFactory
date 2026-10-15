@@ -1,7 +1,7 @@
 """App Lab cycles: research → analysis → the General Manager's briefing → the owner → (only if approved) GitHub.
 
-  RESEARCHING     Data Observatory: the researcher collects design patterns that people engage with, buy and play
-                  Data Observatory ──design_insights──▶ Code Forge
+  RESEARCHING     Research Observatory: the researcher collects design patterns that people engage with, buy and play
+                  Research Observatory ──design_insights──▶ Code Forge
   ANALYZING       Code Forge: the developer reads the repository (read-only) and drafts proposals
                   Code Forge ──lab_proposal──▶ Nexus Spire
   MANAGER_REVIEW  the General Manager checks every proposal against the rules and briefs the owner
