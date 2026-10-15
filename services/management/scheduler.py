@@ -44,6 +44,7 @@ class Scheduler(threading.Thread):
             "finance": self.finance.tick,
             "applab": self.applab.tick,
             "game": self._game,
+            "factories": self._factories,
         }
 
     def poke(self) -> None:
@@ -56,6 +57,10 @@ class Scheduler(threading.Thread):
     def _logistics(self) -> dict:
         with transaction() as conn:
             return logistics.tick(conn)
+
+    def _factories(self) -> dict:
+        from services.factories.pipeline import tick
+        return tick(self.applab.enqueue)
 
     def _game(self) -> dict:
         from services.game.scoring import tick

@@ -10,7 +10,7 @@ export interface Workstation {
   floor?: number;
 }
 
-export type Architecture = "spire" | "blocks" | "fortress" | "twisted" | "dome" | "vault" | "tower" | "bank";
+export type Architecture = "spire" | "blocks" | "fortress" | "twisted" | "dome" | "vault" | "tower" | "bank" | "factory";
 
 export interface District {
   id: string;

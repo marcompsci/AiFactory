@@ -215,6 +215,60 @@
         1.2,
         -9.6966914442057
       ]
+    },
+    {
+      "id": "claude-code-factory:dispatch",
+      "kind": "dispatch",
+      "position": [
+        -28.197769807095888,
+        1.2,
+        28.287625879632092
+      ]
+    },
+    {
+      "id": "claude-code-factory:receiving",
+      "kind": "receiving",
+      "position": [
+        -23.64223019290411,
+        1.2,
+        32.1923741203679
+      ]
+    },
+    {
+      "id": "junction:claude-code-factory",
+      "kind": "junction",
+      "position": [
+        -10.412661975295498,
+        1.2,
+        12.148105637844747
+      ]
+    },
+    {
+      "id": "github-factory:dispatch",
+      "kind": "dispatch",
+      "position": [
+        23.64223019290411,
+        1.2,
+        32.1923741203679
+      ]
+    },
+    {
+      "id": "github-factory:receiving",
+      "kind": "receiving",
+      "position": [
+        28.197769807095888,
+        1.2,
+        28.287625879632092
+      ]
+    },
+    {
+      "id": "junction:github-factory",
+      "kind": "junction",
+      "position": [
+        10.412661975295498,
+        1.2,
+        12.148105637844747
+      ]
     }
   ],
   "routes": [
@@ -315,6 +369,30 @@
       "length": 22.221
     },
     {
+      "id": "claude-code-factory:dispatch->junction:claude-code-factory",
+      "from_node": "claude-code-factory:dispatch",
+      "to_node": "junction:claude-code-factory",
+      "length": 24.017
+    },
+    {
+      "id": "junction:claude-code-factory->claude-code-factory:receiving",
+      "from_node": "junction:claude-code-factory",
+      "to_node": "claude-code-factory:receiving",
+      "length": 24.017
+    },
+    {
+      "id": "github-factory:dispatch->junction:github-factory",
+      "from_node": "github-factory:dispatch",
+      "to_node": "junction:github-factory",
+      "length": 24.017
+    },
+    {
+      "id": "junction:github-factory->github-factory:receiving",
+      "from_node": "junction:github-factory",
+      "to_node": "github-factory:receiving",
+      "length": 24.017
+    },
+    {
       "id": "junction:data-observatory->junction:owners-tower",
       "from_node": "junction:data-observatory",
       "to_node": "junction:owners-tower",
@@ -363,28 +441,52 @@
       "length": 0.407
     },
     {
-      "id": "junction:sentinel-citadel->junction:nexus-spire",
+      "id": "junction:sentinel-citadel->junction:github-factory",
       "from_node": "junction:sentinel-citadel",
-      "to_node": "junction:nexus-spire",
-      "length": 20.436
+      "to_node": "junction:github-factory",
+      "length": 10.624
     },
     {
-      "id": "junction:nexus-spire->junction:sentinel-citadel",
-      "from_node": "junction:nexus-spire",
+      "id": "junction:github-factory->junction:sentinel-citadel",
+      "from_node": "junction:github-factory",
       "to_node": "junction:sentinel-citadel",
-      "length": 20.436
+      "length": 10.624
     },
     {
-      "id": "junction:nexus-spire->junction:code-forge",
-      "from_node": "junction:nexus-spire",
-      "to_node": "junction:code-forge",
-      "length": 20.436
-    },
-    {
-      "id": "junction:code-forge->junction:nexus-spire",
-      "from_node": "junction:code-forge",
+      "id": "junction:github-factory->junction:nexus-spire",
+      "from_node": "junction:github-factory",
       "to_node": "junction:nexus-spire",
-      "length": 20.436
+      "length": 11.102
+    },
+    {
+      "id": "junction:nexus-spire->junction:github-factory",
+      "from_node": "junction:nexus-spire",
+      "to_node": "junction:github-factory",
+      "length": 11.102
+    },
+    {
+      "id": "junction:nexus-spire->junction:claude-code-factory",
+      "from_node": "junction:nexus-spire",
+      "to_node": "junction:claude-code-factory",
+      "length": 11.102
+    },
+    {
+      "id": "junction:claude-code-factory->junction:nexus-spire",
+      "from_node": "junction:claude-code-factory",
+      "to_node": "junction:nexus-spire",
+      "length": 11.102
+    },
+    {
+      "id": "junction:claude-code-factory->junction:code-forge",
+      "from_node": "junction:claude-code-factory",
+      "to_node": "junction:code-forge",
+      "length": 10.624
+    },
+    {
+      "id": "junction:code-forge->junction:claude-code-factory",
+      "from_node": "junction:code-forge",
+      "to_node": "junction:claude-code-factory",
+      "length": 10.624
     },
     {
       "id": "junction:code-forge->junction:vision-quarter",

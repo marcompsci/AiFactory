@@ -123,7 +123,8 @@
         "lab.change_published",
         "lab.change_status",
         "game.score_recorded",
-        "game.season_changed"
+        "game.season_changed",
+        "factory.synced"
       ]
     },
     "sequence": {

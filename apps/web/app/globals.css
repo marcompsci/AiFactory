@@ -182,3 +182,24 @@ body {
   color: color-mix(in srgb, var(--c) 60%, white);
   letter-spacing: 0.06em;
 }
+
+/* Factory wall boards: small CRT screens above the Claude Code and GitHub factories. */
+.factory-board {
+  width: 230px;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--c) 35%, white);
+  background: rgb(4 8 20 / 0.92);
+  border: 2px solid var(--c);
+  border-radius: 3px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 45%, transparent), inset 0 0 18px rgb(0 0 0 / 0.6);
+}
+.factory-board-title {
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--c);
+  margin-bottom: 2px;
+}

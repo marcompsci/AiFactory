@@ -183,3 +183,10 @@ export const game = {
   link: (merchant: string, opportunity_id: string) => call<Json>("/api/game/revenue-links", post({ merchant, opportunity_id })),
   unlink: (id: string) => call<Json>(`/api/game/revenue-links/${id}/deactivate`, post()),
 };
+
+/** Claude Code and GitHub factories (owner/admin; read-only). */
+export const factories = {
+  get: () => call<Json>("/api/factories"),
+  link: (kind: "claude_code" | "github", enabled: boolean) => call<Json>(`/api/factories/${kind}/link`, post({ enabled })),
+  sync: () => call<Json>("/api/factories/sync", post()),
+};

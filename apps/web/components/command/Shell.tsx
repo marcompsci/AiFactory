@@ -12,6 +12,7 @@ import { MissionConsole } from "./Missions";
 import { SystemPanel } from "./System";
 import { Button, Dot } from "./ui";
 import { AppLabPanel } from "./AppLab";
+import { FactoriesPanel } from "./Factories";
 import { GamePanel } from "./Game";
 import { OverviewTab } from "./Frame";
 
@@ -121,6 +122,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "missions", label: "Tasks" },
   { id: "game", label: "Arena" },
   { id: "lab", label: "App Lab" },
+  { id: "factories", label: "Factories" },
   { id: "company", label: "Company" },
   { id: "bank", label: "Bank" },
   { id: "agents", label: "Agents" },
@@ -168,6 +170,7 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
         {tab === "overview" ? <OverviewTab /> : null}
         {tab === "game" ? <GamePanel /> : null}
         {tab === "lab" ? <AppLabPanel /> : null}
+        {tab === "factories" ? <FactoriesPanel /> : null}
         {tab === "missions" ? <MissionConsole /> : null}
         {tab === "agents" ? <AgentRoster /> : null}
         {tab === "activity" ? <LiveActivityFeed /> : null}

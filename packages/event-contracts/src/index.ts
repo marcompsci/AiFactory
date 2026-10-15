@@ -89,6 +89,7 @@ export const EVENT_TYPES = [
   "lab.change_status",
   "game.score_recorded",
   "game.season_changed",
+  "factory.synced",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

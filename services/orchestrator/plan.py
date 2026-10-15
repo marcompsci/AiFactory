@@ -171,14 +171,21 @@ INVESTIGATION_KINDS = ("alt_research", "alt_evaluation", "alt_sandbox", "alt_qa"
 LAB_RESEARCH_GRAPH = [TaskSpec("lab_research", "research_apps", "Research app designs people engage with, buy and play", "data-observatory",
                                "observatory-lens", ["research_design_insights"], expected_outputs={"count": "int"}, validation={"cites_sources": True})]
 LAB_ANALYZE_GRAPH = [TaskSpec("lab_analyze", "developer", "Read the repository and draft improvement proposals", "code-forge", "forge-anvil",
-                              ["scan_repository", "propose_improvements", "refine_proposal", "draft_patch"], expected_outputs={"proposals": "int"},
+                              ["scan_repository", "propose_improvements", "refine_proposal", "draft_patch", "read_claude_code_memory"], expected_outputs={"proposals": "int"},
                               timeout_seconds=900)]
 LAB_PUBLISH_GRAPH = [TaskSpec("lab_publish", "developer", "Publish the owner-approved change to GitHub", "code-forge", "forge-anvil",
                               ["publish_lab_change"], expected_outputs={"url": "str"}, timeout_seconds=600, max_attempts=1)]
 LAB_KINDS = ("lab_research", "lab_analyze", "lab_publish")
 
+FACTORY_SYNC_GRAPH = [
+    TaskSpec("claude_sync", "claude_liaison", "Check in on Claude Code: sessions, finished tasks, memory", "claude-code-factory", "cc-console",
+             ["sync_claude_code"], expected_outputs={"count": "int"}),
+    TaskSpec("github_sync", "github_foreman", "Check the repositories: commits, pull requests, Actions runs", "github-factory", "gh-dock",
+             ["sync_github_activity"], expected_outputs={"count": "int"}),
+]
+
 KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release",
-         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS, *LAB_KINDS)
+         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS, *LAB_KINDS, "factory_sync")
 
 
 def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list[TaskSpec]:
@@ -213,6 +220,8 @@ def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list
         graph = LAB_ANALYZE_GRAPH
     elif kind == "lab_publish":
         graph = LAB_PUBLISH_GRAPH
+    elif kind == "factory_sync":
+        graph = [t for t in FACTORY_SYNC_GRAPH if t.key in (params.get("tasks") or ["claude_sync", "github_sync"])]
     else:
         graph = RELEASE_GRAPH
     validate_graph(graph)

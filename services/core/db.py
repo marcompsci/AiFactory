@@ -1087,6 +1087,28 @@ lab_proposals = Table(
     Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
 )
 
+# ---------------------------------------------------------------- factories: Claude Code and GitHub, read-only
+factory_links = Table(             # the owner's explicit opt-in per source
+    "factory_links", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),                 # claude_code | github
+    Column("enabled", Integer, nullable=False, default=0),
+    Column("created_by", String(36)),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+    UniqueConstraint("organization_id", "kind"),
+)
+
+factory_snapshots = Table(         # what the factories last saw; owner/admin only
+    "factory_snapshots", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),                 # claude_code | github
+    Column("data", JSON, nullable=False, default=dict),
+    Column("mission_id", String(36)),
+    Column("synced_at", String, nullable=False, default=utcnow),
+)
+
 # ---------------------------------------------------------------- the money game: agents compete on *verified* money only
 game_seasons = Table(
     "game_seasons", metadata,
@@ -1313,7 +1335,7 @@ def seed(engine: Engine) -> None:
             if not _ensure(conn, logistics_routes, {"id": sg.id}, {"organization_id": org_id, "from_node": sg.from_node,
                                                                   "to_node": sg.to_node, "length": sg.length, "status": "UP"}):
                 conn.execute(update(logistics_routes).where(logistics_routes.c.id == sg.id).values(length=sg.length))
-        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2), ("applab", 2), ("game", 5)):
+        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2), ("applab", 2), ("game", 5), ("factories", 15)):
             _ensure(conn, scheduled_jobs, {"key": key}, {"interval_seconds": interval, "next_run_at": utcnow()})
         from services.finance.categories import seed as seed_categories
 

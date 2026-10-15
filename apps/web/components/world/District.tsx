@@ -5,6 +5,8 @@ import { useFrame } from "@react-three/fiber";
 import { gatePosition, PLAZA_RADIUS, type District as D } from "@aiciv/world-engine";
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { SEED } from "@aiciv/shared-types";
+import { useQuery } from "@tanstack/react-query";
+import { factories, type Json } from "@/lib/api";
 import * as THREE from "three";
 import { useStore } from "@/lib/store";
 
@@ -69,6 +71,12 @@ function towersFor(d: D): Tower[] {
       out.push({ pos: [2, 2, 0], size: [12, 4, 14], rot: 0, kind: "box" });
       out.push({ pos: [2, H / 2, 0], size: [8, H, 8], rot: 0, kind: "box" });
       out.push({ pos: [2, H + 2.5, 0], size: [5, 5, 5], rot: Math.PI / 4, kind: "cone" });
+      break;
+    case "factory":
+      // a long sawtooth-roofed shed with smokestacks
+      out.push({ pos: [0, 3, -3], size: [18, 6, 9], rot: 0, kind: "box" });
+      for (let i = 0; i < 4; i++) out.push({ pos: [-6.75 + i * 4.5, 7, -3], size: [4.5, 2, 9], rot: 0, kind: "cone" });
+      for (let i = 0; i < d.towers; i++) out.push({ pos: [-6 + i * 6, H / 2 + 3, -6.5], size: [1.6, H, 1.6], rot: 0, kind: "cyl" });
       break;
     case "vault":
       out.push({ pos: [0, 3, -3], size: [16, 6, 8], rot: 0, kind: "box" });
@@ -271,6 +279,7 @@ export function District({ d }: { d: D }) {
         {ownerWaiting ? <OwnerBeacon height={d.height} color={d.color} /> : null}
         {d.architecture === "bank" ? <BankFloors d={d} color={d.color} interior={interior} /> : null}
         {labels ? <NeonSign d={d} onClick={() => focus(d.id)} /> : null}
+        {d.architecture === "factory" ? <FactoryBoard d={d} /> : null}
         <ActivityBubble d={d} />
       </group>
     </group>
@@ -279,7 +288,7 @@ export function District({ d }: { d: D }) {
 
 const SIGN_ICON: Record<string, string> = {
   "nexus-spire": "◉", "code-forge": "</>", "sentinel-citadel": "⛉", "vision-quarter": "✎", "data-observatory": "◍",
-  "memory-vault": "≣", "owners-tower": "♛", "central-bank": "$",
+  "memory-vault": "≣", "owners-tower": "♛", "central-bank": "$", "claude-code-factory": "›_", "github-factory": "⑂",
 };
 
 const GM_MODEL = (() => {
@@ -313,7 +322,8 @@ const TOOL_TALK: Record<string, string> = {
   investigate_alternatives: "Researching free alternatives", score_alternatives: "Scoring alternatives", sandbox_evaluate_candidate: "Testing in a sandbox",
   review_sandbox_evidence: "Reviewing test evidence", classify_cost: "Analyzing a cost", read_ledger_summary: "Reading the ledger",
   research_design_insights: "Researching app designs", scan_repository: "Reading your repository", propose_improvements: "Drafting improvements",
-  publish_lab_change: "Publishing to GitHub",
+  publish_lab_change: "Publishing to GitHub", sync_claude_code: "Checking Claude Code's finished tasks", read_claude_code_memory: "Reading Claude Code's memory",
+  sync_github_activity: "Checking pull requests and Actions runs",
 };
 
 /** A speech bubble over the district with what is really happening there: a tool in use, or what an agent just said. */
@@ -340,6 +350,42 @@ function ActivityBubble({ d }: { d: D }) {
       <div className="speech relative" data-testid={`bubble-${d.id}`}>
         {text.length > 70 ? `${text.slice(0, 68)}…` : text}
         <span className="absolute -bottom-[7px] left-4 size-0 border-x-[6px] border-t-[7px] border-x-transparent border-t-[#0b1226]" />
+      </div>
+    </Html>
+  );
+}
+
+/**
+ * The factory's wall board: what Claude Code finished recently, or what is moving on GitHub. Owners and admins only
+ * (the API refuses everyone else, and then nothing is drawn).
+ */
+function FactoryBoard({ d }: { d: D }) {
+  const q = useQuery({ queryKey: ["factories"], queryFn: factories.get, refetchInterval: 10_000, retry: 0 });
+  const data = q.data;
+  if (!data) return null;
+  let lines: string[] = [];
+  let title = "";
+  if (d.id === "claude-code-factory") {
+    const cc = data.claude_code;
+    if (!cc?.linked) return null;
+    title = cc.data ? `${cc.data.active ? `${cc.data.active} active · ` : ""}finished recently` : "waiting for first check-in";
+    lines = (cc.data?.sessions ?? []).flatMap((s: Json) => (s.completed_tasks as string[]).slice(-2).map((t) => `✓ ${t}`)).slice(0, 4);
+    if (!lines.length && cc.data) lines = (cc.data.sessions ?? []).slice(0, 3).map((s: Json) => `• ${s.title}`);
+  } else {
+    const gh = data.github;
+    if (!gh?.linked) return null;
+    title = gh.data ? "latest on GitHub" : "waiting for first check-in";
+    for (const r of gh.data?.repos ?? []) {
+      lines.push(...(r.pulls ?? []).slice(0, 2).map((p: Json) => `${p.state === "merged" ? "⇣ merged" : p.draft ? "◌ draft" : "◉ open"} #${p.number} ${p.title}`));
+      lines.push(...(r.runs ?? []).slice(0, 1).map((x: Json) => `${x.conclusion === "success" ? "✓" : x.conclusion ? "✗" : "…"} ${x.name}`));
+    }
+    lines = lines.slice(0, 4);
+  }
+  return (
+    <Html position={[d.position[0] < 0 ? 7 : -7, 21, -3]} center zIndexRange={[5, 0]}>
+      <div className="factory-board" style={{ "--c": d.color } as React.CSSProperties} data-testid={`board-${d.id}`}>
+        <p className="factory-board-title">{title}</p>
+        {lines.length ? lines.map((l, i) => <p key={i} className="truncate">{l}</p>) : <p className="opacity-60">nothing yet</p>}
       </div>
     </Html>
   );

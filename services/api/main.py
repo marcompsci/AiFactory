@@ -85,6 +85,9 @@ app.include_router(game_router)
 from services.api.overview import router as overview_router  # noqa: E402
 
 app.include_router(overview_router)
+from services.api.factories import router as factories_router  # noqa: E402
+
+app.include_router(factories_router)
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().allowed_origins, allow_credentials=False,
                    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
                    allow_headers=["authorization", "content-type", "last-event-id", "x-step-up"])

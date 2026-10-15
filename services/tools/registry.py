@@ -81,16 +81,17 @@ class ToolSpec:
     investigation: bool = False  # V5.1: read-only investigation tool; only usable by investigation missions
     lab: bool = False            # App Lab tool; only usable by App Lab missions on their own cycle / proposal
     lab_gate: bool = False       # App Lab: needs the owner's step-up approval of exactly this change
+    factory: bool = False        # Claude Code / GitHub factory sync: only in factory_sync missions
 
 
 REGISTRY: dict[str, ToolSpec] = {}
 
 
 def tool(name: str, protected: bool = False, description: str = "", release_gate: bool = False, finance: bool = False,
-         finance_gate: bool = False, investigation: bool = False, lab: bool = False, lab_gate: bool = False):
+         finance_gate: bool = False, investigation: bool = False, lab: bool = False, lab_gate: bool = False, factory: bool = False):
     def deco(fn: Callable[..., dict]) -> Callable[..., dict]:
         REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate, finance or finance_gate, finance_gate, investigation,
-                                  lab or lab_gate, lab_gate)
+                                  lab or lab_gate, lab_gate, factory)
         return fn
     return deco
 
@@ -339,6 +340,8 @@ def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec, args: dict | None
             raise ToolDenied(f"{spec.name} is protected and has no granted approval")
     _check_investigation(conn, ctx, spec, mission, args or {})
     _check_lab(conn, ctx, spec, mission, args or {})
+    if (mission.kind == "factory_sync") != spec.factory and (spec.factory or spec.name not in FACTORY_SHARED):
+        raise ToolDenied(f"{spec.name} is not allowed here: factory sync missions use factory tools only, and factory tools run only there")
     if spec.finance or spec.name == "request_purchase":
         _check_finance(conn, ctx, spec, mission, args or {})
     if spec.release_gate:
@@ -372,7 +375,9 @@ def _check_investigation(conn, ctx: ToolContext, spec: ToolSpec, mission, args: 
             raise ToolDenied(f"investigation is {inv.status.lower() if inv else 'missing'}")
 
 
-LAB_TOOLS = {"research_design_insights", "scan_repository", "propose_improvements", "refine_proposal", "draft_patch", "publish_lab_change"}
+LAB_TOOLS = {"research_design_insights", "scan_repository", "propose_improvements", "refine_proposal", "draft_patch", "publish_lab_change",
+             "read_claude_code_memory"}
+FACTORY_SHARED = {"read_claude_code_memory"}
 LAB_STAGE = {"research_design_insights": ("lab_research", "RESEARCHING"), "scan_repository": ("lab_analyze", "ANALYZING"),
              "propose_improvements": ("lab_analyze", "ANALYZING"), "refine_proposal": ("lab_analyze", "ANALYZING"),
              "draft_patch": ("lab_analyze", "ANALYZING"), "publish_lab_change": ("lab_publish", None)}
@@ -482,7 +487,9 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
         result, status, error = {}, "FAILED", f"{type(exc).__name__}: {exc}"
     duration = int((time.monotonic() - started) * 1000)
     excerpt = redact(json.dumps(result, default=str))[:4000] if status == "COMPLETED" else error
-    if spec.lab and status == "COMPLETED":
+    if (spec.factory or name in FACTORY_SHARED) and status == "COMPLETED":  # transcript-derived data stays out of the tool log
+        excerpt = json.dumps({k: v for k, v in result.items() if k in ("status", "count", "memory_files", "completed_tasks")})
+    elif spec.lab and status == "COMPLETED":
         excerpt = json.dumps({k: v for k, v in result.items() if k in ("cycle_id", "proposal_id", "status", "count", "base_sha", "stack",
                                                                          "file_count", "kind", "number", "url", "data_mode", "detail")})
     elif (spec.finance or spec.investigation) and status == "COMPLETED":
@@ -520,3 +527,4 @@ from . import studio_tools  # noqa: E402,F401  (registers the V4 tools)
 from services.finance import tools as _finance_tools  # noqa: E402,F401  (registers the V5 financial tools)
 from services.finance import investigation_tools as _investigation_tools  # noqa: E402,F401  (V5.1)
 from services.applab import tools as _applab_tools  # noqa: E402,F401  (App Lab)
+from services.factories import tools as _factory_tools  # noqa: E402,F401  (Claude Code and GitHub factories)

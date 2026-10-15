@@ -51,7 +51,8 @@
         "read_file",
         "search_code",
         "inspect_diff",
-        "create_artifact"
+        "create_artifact",
+        "read_claude_code_memory"
       ],
       "limits": {
         "max_usd_per_mission": 0.5,
@@ -90,7 +91,8 @@
         "propose_improvements",
         "refine_proposal",
         "draft_patch",
-        "publish_lab_change"
+        "publish_lab_change",
+        "read_claude_code_memory"
       ],
       "limits": {
         "max_usd_per_mission": 1.0,
@@ -121,7 +123,8 @@
         "inspect_diff",
         "create_artifact",
         "stage_bundle",
-        "review_sandbox_evidence"
+        "review_sandbox_evidence",
+        "read_claude_code_memory"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -150,7 +153,8 @@
         "read_file",
         "search_code",
         "create_artifact",
-        "query_market_source"
+        "query_market_source",
+        "read_claude_code_memory"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -201,7 +205,8 @@
         "model": "claude-opus-5-5"
       },
       "tools": [
-        "create_artifact"
+        "create_artifact",
+        "read_claude_code_memory"
       ],
       "limits": {
         "max_usd_per_mission": 1.5,
@@ -230,7 +235,8 @@
         "create_artifact",
         "research_cost_alternatives",
         "investigate_alternatives",
-        "research_design_insights"
+        "research_design_insights",
+        "read_claude_code_memory"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
@@ -450,6 +456,58 @@
       },
       "department": "finance",
       "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000017",
+      "key": "claude_liaison",
+      "name": "Coda",
+      "role": "Claude Code Liaison",
+      "home_district": "claude-code-factory",
+      "avatar": {
+        "shape": "cube",
+        "color": "#FF8A5C",
+        "height": 1.6
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "sync_claude_code",
+        "read_claude_code_memory"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "tier": "specialist",
+      "department": "factories"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000018",
+      "key": "github_foreman",
+      "name": "Rook",
+      "role": "GitHub Foreman",
+      "home_district": "github-factory",
+      "avatar": {
+        "shape": "pillar",
+        "color": "#B8C4D6",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "sync_github_activity",
+        "read_claude_code_memory"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "tier": "specialist",
+      "department": "factories"
     }
   ],
   "departments": [
@@ -501,6 +559,13 @@
       "district": "central-bank",
       "supervisor": "cfo",
       "daily_budget_usd": 1.0
+    },
+    {
+      "key": "factories",
+      "name": "Factories",
+      "district": "claude-code-factory",
+      "supervisor": "claude_liaison",
+      "daily_budget_usd": 0.5
     }
   ],
   "reporting": {
@@ -519,6 +584,8 @@
     "bill_manager": "cfo",
     "tax_agent": "cfo",
     "savings_strategist": "cfo",
-    "forecaster": "cfo"
+    "forecaster": "cfo",
+    "claude_liaison": "architect",
+    "github_foreman": "architect"
   }
 }

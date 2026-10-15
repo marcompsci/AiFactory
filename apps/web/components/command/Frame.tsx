@@ -23,6 +23,7 @@ const NAV: { id: Tab; label: string; icon: string }[] = [
   { id: "bank", label: "Finances", icon: "$" },
   { id: "game", label: "Arena", icon: "♛" },
   { id: "lab", label: "App Lab", icon: "⚗" },
+  { id: "factories", label: "Factories", icon: "▥" },
   { id: "approvals", label: "Owner", icon: "♜" },
   { id: "activity", label: "Activity", icon: "≋" },
   { id: "system", label: "Settings", icon: "⚙" },

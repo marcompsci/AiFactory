@@ -38,12 +38,15 @@ def lab_analyze(env: TaskEnv) -> dict:
     cid = _param(env, "cycle_id")
     scan = env.tool("scan_repository", cycle_id=cid)
     r = env.tool("propose_improvements", cycle_id=cid)
+    # What Claude Code already learned about this codebase (CLAUDE.md, auto memory), when the owner linked it.
+    mem = env.tool("read_claude_code_memory", query=" ".join(["conventions", "tests", "style", *scan["stack"], *scan["readme"].split()[:12]]))
     refined = patched = 0
     if env.live and r.get("proposal_ids"):
         with db.get_engine().connect() as conn:
             rows = conn.execute(select(db.lab_proposals).where(db.lab_proposals.c.id.in_(r["proposal_ids"]),
                                                                db.lab_proposals.c.route == "claude_code")).fetchall()
-        context = {"stack": scan["stack"], "files": scan["files"][:200], "readme": scan["readme"][:2500]}
+        context = {"stack": scan["stack"], "files": scan["files"][:200], "readme": scan["readme"][:2500],
+                   "claude_code_memory": [h["text"][:500] for h in mem.get("hits", [])[:4]]}
         for p in rows:
             reply = env.ask_model(
                 "You are a senior app developer. Tailor this improvement to the repository below. Reply with JSON only: "
@@ -55,6 +58,8 @@ def lab_analyze(env: TaskEnv) -> dict:
                 env.tool("refine_proposal", cycle_id=cid, proposal_id=p.id, summary=str(data.get("summary", "")), plan=data["plan"],
                          model=env.agent.model_name)
                 refined += 1
+    if mem.get("count"):
+        env.say(f"Pulled {mem['count']} note(s) from Claude Code's memory about how this project is built.", kind="status")
     env.say(f"Read {scan['file_count']} files at {scan['base_sha'][:8]} (read-only) and drafted {r['count']} proposal(s)"
             + (f", {refined} tailored by {env.agent.model_name}" if refined else " from templates") + ". Sending them to the General Manager.",
             to_key="general_manager", kind="handoff")

@@ -203,6 +203,8 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: `GitHub #${s("number")} is ${p.merged ? "merged" : s("state")}`, tone: "#3DFFB8" };
     case "game.score_recorded":
       return { who, text: `scored in the money game (${human(s("kind")).toLowerCase()}${p.verified ? ", verified" : ", simulated"})`, tone: "#FFD36B" };
+    case "factory.synced":
+      return { who, text: s("kind") === "claude_code" ? `checked Claude Code: ${p.sessions ?? 0} session(s), ${p.completed_tasks ?? 0} finished task(s)` : `checked GitHub: ${p.pulls ?? 0} pull request(s), ${p.runs ?? 0} Actions run(s)`, tone: "#FF8A5C" };
     case "game.season_changed":
       return { who, text: `New money-game season ${s("season")}`, tone: "#FFD36B" };
     case "finance.tax_estimate_updated":

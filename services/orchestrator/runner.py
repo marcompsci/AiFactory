@@ -36,6 +36,9 @@ HANDLERS.update(FINANCE_HANDLERS)
 from services.applab.handlers import LAB_HANDLERS  # noqa: E402
 
 HANDLERS.update(LAB_HANDLERS)
+from services.factories.handlers import FACTORY_HANDLERS  # noqa: E402
+
+HANDLERS.update(FACTORY_HANDLERS)
 from .plan import PlanError, plan_for, validate_prompt
 
 log = logging.getLogger("aiciv.runner")

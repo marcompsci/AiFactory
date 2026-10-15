@@ -288,6 +288,74 @@
           ]
         }
       ]
+    },
+    {
+      "id": "claude-code-factory",
+      "name": "Claude Code Factory",
+      "purpose": "Where your Claude Code sessions show up: recent tasks completed, and the project memory the other agents learn from",
+      "position": [
+        -36,
+        0,
+        42
+      ],
+      "color": "#FF8A5C",
+      "architecture": "factory",
+      "towers": 3,
+      "height": 14,
+      "workstations": [
+        {
+          "id": "cc-console",
+          "label": "Session console",
+          "offset": [
+            -3,
+            0,
+            7
+          ]
+        },
+        {
+          "id": "cc-memory",
+          "label": "Memory library",
+          "offset": [
+            3,
+            0,
+            7
+          ]
+        }
+      ]
+    },
+    {
+      "id": "github-factory",
+      "name": "GitHub Factory",
+      "purpose": "Commits, pull requests, Claude Code Action runs and issues from the repositories you authorized",
+      "position": [
+        36,
+        0,
+        42
+      ],
+      "color": "#B8C4D6",
+      "architecture": "factory",
+      "towers": 3,
+      "height": 14,
+      "workstations": [
+        {
+          "id": "gh-dock",
+          "label": "Pull request dock",
+          "offset": [
+            -3,
+            0,
+            7
+          ]
+        },
+        {
+          "id": "gh-actions",
+          "label": "Actions line",
+          "offset": [
+            3,
+            0,
+            7
+          ]
+        }
+      ]
     }
   ]
 }

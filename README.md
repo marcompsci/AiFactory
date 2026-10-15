@@ -23,6 +23,9 @@ verifiable mission path from prompt to reviewable commit, rendered as a navigabl
   *your* GitHub repository. The General Manager briefs you, and nothing reaches GitHub until you approve the exact
   change. Changes go out as a draft PR on a separate branch, or as an issue for the Claude Code GitHub Action. See
   [docs/APP_LAB.md](docs/APP_LAB.md).
+- **Claude Code Factory and GitHub Factory.** Two new buildings where Coda and Rook check in on your Claude Code
+  sessions (finished tasks, memory) and your repositories (pull requests, Actions runs). The rest of the team
+  learns from Claude Code's memory. Read-only and opt-in. See [docs/FACTORIES.md](docs/FACTORIES.md).
 - **Sign in with Google or GitHub** (Supabase Auth). Claude connects through an API key for the agents and the Claude
   Code GitHub Action for code; third-party apps can't offer claude.ai login. See [docs/AUTH.md](docs/AUTH.md).
 - **Free-alternative investigations.** "Research a free alternative" on any paid-tool request. Researchers find up to
