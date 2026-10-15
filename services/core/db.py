@@ -493,6 +493,8 @@ logistics_packages = Table(
     Column("eta", String),
     Column("current_node", String),
     Column("artifact_references", JSON, nullable=False, default=list),
+    Column("subject_type", String),        # V5: e.g. cost_review_packet, bill, tax_estimate — the authoritative record
+    Column("subject_id", String(36), index=True),
     Column("attempts", Integer, nullable=False, default=0),
     Column("next_attempt_at", String),
     Column("dispatched_at", String),
@@ -579,7 +581,320 @@ release_executions = Table(
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
-APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations")
+
+# ---------------------------------------------------------------- V5: AI Central Bank (financial district)
+# Money is stored in integer minor units (cents). Every row carries data_mode: simulated | upload | live.
+
+financial_connections = Table(
+    "financial_connections", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),          # bank_feed | card_feed | payment_processor | app_store | marketplace | accounting | billing | upload
+    Column("provider", String, nullable=False),      # simulated | csv_upload | stripe | plaid | app_store_connect | ...
+    Column("display_name", String, nullable=False),
+    Column("access_mode", String, nullable=False, default="read_only"),
+    Column("scopes", JSON, nullable=False, default=list),
+    Column("status", String, nullable=False, default="PENDING_AUTHORIZATION"),  # PENDING_AUTHORIZATION | ACTIVE | ERROR | REVOKED
+    Column("secret_ciphertext", Text),               # Fernet; never returned by any endpoint
+    Column("authorized_by", String(36)),
+    Column("authorized_at", String),
+    Column("data_mode", String, nullable=False, default="live"),
+    Column("last_sync_at", String),
+    Column("last_error", Text),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+financial_accounts = Table(
+    "financial_accounts", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("connection_id", String(36), nullable=False, index=True),
+    Column("external_ref_hmac", String, nullable=False),   # keyed HMAC of the provider's account id; never the number itself
+    Column("name", String, nullable=False),
+    Column("mask", String),                                # last 4 only
+    Column("account_type", String, nullable=False),        # checking | savings | credit_card | processor_balance | store_proceeds
+    Column("currency", String(3), nullable=False, default="USD"),
+    Column("current_balance_minor", Integer),
+    Column("available_balance_minor", Integer),
+    Column("balance_as_of", String),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "connection_id", "external_ref_hmac"),
+)
+
+financial_transactions = Table(
+    "financial_transactions", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("connection_id", String(36), nullable=False, index=True),
+    Column("account_id", String(36)),
+    Column("dedupe_key", String, nullable=False),
+    Column("external_id", String),
+    Column("posted_at", String, nullable=False),
+    Column("amount_minor", Integer, nullable=False),        # negative = money out
+    Column("currency", String(3), nullable=False, default="USD"),
+    Column("description", Text, nullable=False),            # redacted on import
+    Column("merchant", String),
+    Column("category_key", String),
+    Column("kind", String, nullable=False),                 # revenue | expense | fee | refund | transfer | tax | payout | other
+    Column("is_fee", Integer, nullable=False, default=0),
+    Column("recurring", Integer, nullable=False, default=0),
+    Column("reconciliation_status", String, nullable=False, default="UNRECONCILED"),  # UNRECONCILED | MATCHED | NEEDS_REVIEW
+    Column("matched_type", String),
+    Column("matched_id", String(36)),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "dedupe_key"),
+)
+
+revenue_sources = Table(
+    "revenue_sources", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("connection_id", String(36)),
+    Column("name", String, nullable=False),
+    Column("platform", String, nullable=False),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "platform", "name"),
+)
+
+invoices = Table(
+    "invoices", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("direction", String, nullable=False),            # receivable | payable
+    Column("counterparty", String, nullable=False),
+    Column("amount_minor", Integer, nullable=False),
+    Column("currency", String(3), nullable=False, default="USD"),
+    Column("issued_at", String),
+    Column("due_at", String),
+    Column("status", String, nullable=False, default="OPEN"),  # OPEN | PAID | VOID
+    Column("document_sha256", String),
+    Column("document_path", String),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+bills = Table(
+    "bills", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("payee", String, nullable=False),
+    Column("amount_minor", Integer, nullable=False),
+    Column("currency", String(3), nullable=False, default="USD"),
+    Column("due_at", String, nullable=False),
+    Column("recurrence", String),                           # monthly | yearly | null
+    Column("autopay", Integer, nullable=False, default=0),
+    Column("status", String, nullable=False, default="UPCOMING"),  # UPCOMING | DUE | PAID | OVERDUE
+    Column("paid_transaction_id", String(36)),
+    Column("reminded_at", String),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+subscriptions = Table(
+    "subscriptions", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("vendor", String, nullable=False),
+    Column("plan", String),
+    Column("amount_minor", Integer, nullable=False),
+    Column("currency", String(3), nullable=False, default="USD"),
+    Column("interval", String, nullable=False),             # month | year
+    Column("renews_at", String),
+    Column("status", String, nullable=False, default="ACTIVE"),
+    Column("contract_terms", Text),                         # e.g. "annual commitment until 2027-03-01"
+    Column("category_key", String),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "vendor", "plan"),
+)
+
+expense_categories = Table(
+    "expense_categories", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("key", String, nullable=False),
+    Column("name", String, nullable=False),
+    Column("tax_treatment", String, nullable=False),        # deductible | partially_deductible | not_deductible | not_expense
+    Column("tax_line", String),                             # e.g. "Schedule C line 18 (office expense)" — a mapping hint, not advice
+    UniqueConstraint("organization_id", "key"),
+)
+
+tax_documents = Table(
+    "tax_documents", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("tax_year", Integer, nullable=False),
+    Column("jurisdiction", String, nullable=False),         # US-FED | US-CA | ...
+    Column("doc_type", String, nullable=False),             # 1099-K | 1099-NEC | receipt | bank_statement | prior_return | ...
+    Column("status", String, nullable=False, default="MISSING"),  # MISSING | RECEIVED | VERIFIED
+    Column("sha256", String),
+    Column("storage_path", String),
+    Column("source", String),
+    Column("note", Text),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+tax_estimates = Table(
+    "tax_estimates", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("tax_year", Integer, nullable=False),
+    Column("jurisdiction", String, nullable=False),
+    Column("period", String, nullable=False),               # Q1..Q4 | year
+    Column("gross_revenue_minor", Integer, nullable=False),
+    Column("deductible_expenses_minor", Integer, nullable=False),
+    Column("net_profit_minor", Integer, nullable=False),
+    Column("estimated_tax_minor", Integer, nullable=False),
+    Column("reserve_minor", Integer, nullable=False),
+    Column("assumptions", JSON, nullable=False, default=dict),
+    Column("uncertainty", JSON, nullable=False, default=list),
+    Column("missing_evidence", JSON, nullable=False, default=list),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+cost_review_packets = Table(
+    "cost_review_packets", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("origin", String, nullable=False),               # purchase_request | fee_detected
+    Column("status", String, nullable=False),
+    Column("requested_by_agent_id", String(36)),
+    Column("request_mission_id", String(36)),
+    Column("research_mission_id", String(36)),
+    Column("analysis_mission_id", String(36)),
+    Column("execution_mission_id", String(36)),
+    Column("subject_type", String),                         # transaction | subscription | tool_request
+    Column("subject_id", String(36)),
+    Column("vendor", String, nullable=False),
+    Column("item", String, nullable=False),
+    Column("justification", Text),
+    Column("amount_minor", Integer, nullable=False),
+    Column("currency", String(3), nullable=False, default="USD"),
+    Column("interval", String, nullable=False),             # one_time | month | year
+    Column("classification", String),                       # recurring | one_time | optional | contractual | legally_required
+    Column("classification_reason", Text),
+    Column("annualized_minor", Integer),
+    Column("significant", Integer, nullable=False, default=0),
+    Column("risk", String),                                 # low | medium | high
+    Column("research_rounds", Integer, nullable=False, default=0),
+    Column("findings", JSON, nullable=False, default=list),
+    Column("recommendation", JSON, nullable=False, default=dict),
+    Column("gm_decision", JSON, nullable=False, default=dict),
+    Column("owner_note", Text),
+    Column("deferred_until", String),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+)
+
+savings_opportunities = Table(
+    "savings_opportunities", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("packet_id", String(36), nullable=False, index=True),
+    Column("title", String, nullable=False),
+    Column("current_annual_minor", Integer, nullable=False),
+    Column("proposed_annual_minor", Integer, nullable=False),
+    Column("migration_cost_minor", Integer, nullable=False, default=0),
+    Column("first_year_saving_minor", Integer, nullable=False),
+    Column("confidence", String, nullable=False),
+    Column("alternative", JSON, nullable=False, default=dict),
+    Column("status", String, nullable=False, default="PROPOSED"),  # PROPOSED | ACCEPTED | DECLINED
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+financial_approvals = Table(
+    "financial_approvals", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("packet_id", String(36), index=True),
+    Column("action_type", String, nullable=False),          # purchase | payment | transfer | official_submission | tax_filing | financial_publication | banking_change
+    Column("amount_minor", Integer, nullable=False),
+    Column("currency", String(3), nullable=False),
+    Column("recipient", String, nullable=False),
+    Column("account_ref", String, nullable=False),          # which funding account (mask / internal id), never a full number
+    Column("details", JSON, nullable=False, default=dict),
+    Column("payload_hash", String, nullable=False),
+    Column("status", String, nullable=False, default="REQUESTED"),  # REQUESTED | APPROVED | REJECTED | DEFERRED | MORE_RESEARCH | EXPIRED | INVALIDATED | EXECUTED
+    Column("requested_by_agent_id", String(36)),
+    Column("expires_at", String, nullable=False),
+    Column("decided_by", String(36)),
+    Column("decided_role", String),
+    Column("decided_at", String),
+    Column("step_up_method", String),
+    Column("executed_at", String),
+    Column("execution_ref", String),
+    Column("execution_mode", String),                       # simulated | manual
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+financial_audit_events = Table(
+    "financial_audit_events", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("seq", Integer, nullable=False),
+    Column("actor_type", String, nullable=False),           # owner | user | agent | system
+    Column("actor_id", String(36)),
+    Column("action", String, nullable=False),
+    Column("subject_type", String, nullable=False),
+    Column("subject_id", String(36)),
+    Column("detail", JSON, nullable=False, default=dict),
+    Column("prev_hash", String, nullable=False),
+    Column("hash", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "seq"),
+)
+
+financial_sync_runs = Table(
+    "financial_sync_runs", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("connection_id", String(36), nullable=False, index=True),
+    Column("status", String, nullable=False),               # RUNNING | COMPLETED | PARTIAL | FAILED
+    Column("started_at", String, nullable=False, default=utcnow),
+    Column("finished_at", String),
+    Column("fetched", Integer, nullable=False, default=0),
+    Column("inserted", Integer, nullable=False, default=0),
+    Column("duplicates", Integer, nullable=False, default=0),
+    Column("rejected", Integer, nullable=False, default=0),
+    Column("coverage", JSON, nullable=False, default=dict),
+    Column("errors", JSON, nullable=False, default=list),
+    Column("data_mode", String, nullable=False),
+)
+
+financial_reports = Table(            # authoritative record behind REVENUE_REPORT / FINANCIAL_FORECAST packages
+    "financial_reports", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),                 # revenue_report | financial_forecast
+    Column("period_start", String, nullable=False),
+    Column("period_end", String, nullable=False),
+    Column("data", JSON, nullable=False, default=dict),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+stepup_secrets = Table(
+    "stepup_secrets", metadata,
+    Column("user_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("secret_ciphertext", Text, nullable=False),
+    Column("last_used_step", Integer, nullable=False, default=0),   # TOTP replay protection
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+FINANCE_TABLES = ("financial_connections", "financial_accounts", "financial_transactions", "revenue_sources", "invoices", "bills",
+                  "subscriptions", "expense_categories", "tax_documents", "tax_estimates", "cost_review_packets",
+                  "savings_opportunities", "financial_approvals", "financial_audit_events", "financial_sync_runs", "financial_reports")
+
+APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations", "financial_audit_events")
 
 
 _engine: Engine | None = None
@@ -737,5 +1052,8 @@ def seed(engine: Engine) -> None:
             if not _ensure(conn, logistics_routes, {"id": sg.id}, {"organization_id": org_id, "from_node": sg.from_node,
                                                                   "to_node": sg.to_node, "length": sg.length, "status": "UP"}):
                 conn.execute(update(logistics_routes).where(logistics_routes.c.id == sg.id).values(length=sg.length))
-        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1)):
+        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2)):
             _ensure(conn, scheduled_jobs, {"key": key}, {"interval_seconds": interval, "next_run_at": utcnow()})
+        from services.finance.categories import seed as seed_categories
+
+        seed_categories(conn, org_id)

@@ -132,7 +132,33 @@ RELEASE_GRAPH: list[TaskSpec] = [
              max_attempts=1),
 ]
 
-KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release")
+# ---------------------------------------------------------------- V5 AI Central Bank mission templates
+REQUEST_TOOL_GRAPH: list[TaskSpec] = [
+    TaskSpec("request_tool", "developer", "Ask the AI Central Bank for a paid tool", "code-forge", "forge-blueprint",
+             ["request_purchase"], expected_outputs={"packet_id": "str"}, max_attempts=1),
+]
+
+
+def cost_research_graph(agent_key: str) -> list[TaskSpec]:
+    return [TaskSpec("research_costs", agent_key, "Research legitimate alternatives", "data-observatory", "observatory-lens",
+                     ["research_cost_alternatives"], expected_outputs={"count": "int"}, validation={"cites_sources": True})]
+
+
+COST_ANALYSIS_GRAPH: list[TaskSpec] = [
+    TaskSpec("analyze_costs", "savings_strategist", "Compare options and costs", "central-bank", "bank-savings",
+             ["read_ledger_summary", "record_cost_findings"], expected_outputs={"action": "str"}),
+    TaskSpec("recommend_cost", "cfo", "Recommend and prepare exact approval requests", "central-bank", "bank-executive",
+             ["classify_cost", "propose_financial_action"], depends_on=["analyze_costs"], expected_outputs={"count": "int"}),
+]
+
+FINANCE_EXECUTE_GRAPH: list[TaskSpec] = [
+    TaskSpec("execute_action", "bill_manager", "Carry out the owner-approved action", "central-bank", "bank-payables",
+             ["execute_financial_action"], expected_outputs={"status": "str"}, validation={"owner_approved_exact_terms": True},
+             max_attempts=1),
+]
+
+KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release",
+         "request_tool", "cost_research", "cost_analysis", "finance_execute")
 
 
 def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list[TaskSpec]:
@@ -145,6 +171,14 @@ def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list
         graph = BUILD_PROTOTYPE_GRAPH
     elif kind == "qa_prototype":
         graph = QA_PROTOTYPE_GRAPH
+    elif kind == "request_tool":
+        graph = REQUEST_TOOL_GRAPH
+    elif kind == "cost_research":
+        graph = cost_research_graph(params.get("agent_key", "research_apps"))
+    elif kind == "cost_analysis":
+        graph = COST_ANALYSIS_GRAPH
+    elif kind == "finance_execute":
+        graph = FINANCE_EXECUTE_GRAPH
     else:
         graph = RELEASE_GRAPH
     validate_graph(graph)

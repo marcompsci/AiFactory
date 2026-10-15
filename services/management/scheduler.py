@@ -28,6 +28,9 @@ class Scheduler(threading.Thread):
     def __init__(self, enqueue: Callable[[str], None], gateway=None) -> None:
         super().__init__(daemon=True, name="scheduler")
         self.pipeline = Pipeline(enqueue, gateway)
+        from services.finance.pipeline import FinancePipeline
+
+        self.finance = FinancePipeline(enqueue, gateway)
         self._poke = threading.Event()
         self._halt = threading.Event()
         self.scale = float(os.environ.get("AICIV_TICK_SCALE", "1"))
@@ -35,6 +38,7 @@ class Scheduler(threading.Thread):
             "logistics": self._logistics,
             "pipeline": self.pipeline.tick,
             "supervisor": self._supervisor,
+            "finance": self.finance.tick,
         }
 
     def poke(self) -> None:

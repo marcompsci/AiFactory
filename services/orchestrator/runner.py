@@ -30,6 +30,9 @@ from .handlers import HANDLERS, NeedsApproval, SkipTask, TaskEnv, TaskError, Ver
 from .studio_handlers import V4_HANDLERS
 
 HANDLERS.update(V4_HANDLERS)
+from services.finance.handlers import FINANCE_HANDLERS  # noqa: E402
+
+HANDLERS.update(FINANCE_HANDLERS)
 from .plan import PlanError, plan_for, validate_prompt
 
 log = logging.getLogger("aiciv.runner")

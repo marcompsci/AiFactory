@@ -20,7 +20,12 @@ from services.core.state import assert_v4_transition
 from .graph import shortest_path
 
 PACKAGE_TYPES = {"research_brief", "product_proposal", "design_spec", "code_artifact", "test_report",
-                 "revision_request", "approval_request", "release_package"}
+                 "revision_request", "approval_request", "release_package",
+                 # V5 AI Central Bank. Each references its authoritative record via subject_type/subject_id.
+                 "revenue_report", "expense_alert", "bill_reminder", "fee_research_request", "savings_recommendation",
+                 "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request"}
+FINANCE_PACKAGE_TYPES = {"revenue_report", "expense_alert", "bill_reminder", "fee_research_request", "savings_recommendation",
+                         "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request"}
 
 
 def belt_speed() -> float:
@@ -66,19 +71,23 @@ def _transition(conn: Connection, pkg, target: str, event: str | None, detail: d
         emit(conn, event, mission_id=pkg.mission_id, agent_id=detail.get("agent_id"),
              payload={"package_id": pkg.id, "package_type": pkg.package_type, "origin": pkg.origin_district,
                       "destination": pkg.destination_district, "opportunity_id": pkg.opportunity_id, "priority": pkg.priority,
-                      "artifact_references": pkg.artifact_references, **detail, **{k: v for k, v in values.items() if k in ("route", "route_started_at", "eta")}})
+                      "artifact_references": pkg.artifact_references, "subject_type": pkg.subject_type, "subject_id": pkg.subject_id, **detail, **{k: v for k, v in values.items() if k in ("route", "route_started_at", "eta")}})
 
 
 def create_package(conn: Connection, *, org_id: str, package_type: str, origin: str, destination: str,
                    opportunity_id: str | None = None, mission_id: str | None = None, task_id: str | None = None,
-                   artifact_references: list | None = None, priority: int = 5, carrier_agent_id: str | None = None) -> str:
+                   artifact_references: list | None = None, priority: int = 5, carrier_agent_id: str | None = None,
+                   subject_type: str | None = None, subject_id: str | None = None) -> str:
     if package_type not in PACKAGE_TYPES:
         raise ValueError(f"unknown package type {package_type}")
+    if package_type in FINANCE_PACKAGE_TYPES and not (subject_type and subject_id):
+        raise ValueError("financial packages must reference their authoritative record")
     pid = db.new_id()
     conn.execute(insert(db.logistics_packages).values(
         id=pid, organization_id=org_id, opportunity_id=opportunity_id, mission_id=mission_id, task_id=task_id,
         package_type=package_type, priority=priority, origin_district=origin, destination_district=destination,
-        status="QUEUED", route=[], current_node=f"{origin}:dispatch", artifact_references=artifact_references or []))
+        status="QUEUED", route=[], current_node=f"{origin}:dispatch", artifact_references=artifact_references or [],
+        subject_type=subject_type, subject_id=subject_id))
     conn.execute(insert(db.package_transitions).values(package_id=pid, from_status=None, to_status="QUEUED", detail={}))
     dispatch(conn, pid, carrier_agent_id=carrier_agent_id)
     return pid
@@ -110,7 +119,7 @@ def dispatch(conn: Connection, pid: str, carrier_agent_id: str | None = None) ->
     emit(conn, "package.in_transit", mission_id=p.mission_id,
          payload={"package_id": pid, "package_type": p.package_type, "origin": p.origin_district, "destination": p.destination_district,
                   "route": route, "route_started_at": _iso(now), "eta": _iso(eta), "belt_speed": belt_speed(),
-                  "opportunity_id": p.opportunity_id})
+                  "opportunity_id": p.opportunity_id, "subject_type": p.subject_type, "subject_id": p.subject_id})
     return True
 
 

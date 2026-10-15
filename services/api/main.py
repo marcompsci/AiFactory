@@ -73,8 +73,12 @@ app = FastAPI(title="AI Civilization API", version="0.4.0", lifespan=lifespan)
 from services.api.v4 import router as v4_router  # noqa: E402
 
 app.include_router(v4_router)
+from services.api.finance import router as finance_router  # noqa: E402
+
+app.include_router(finance_router)
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().allowed_origins, allow_credentials=False,
-                   allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["authorization", "content-type", "last-event-id"])
+                   allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+                   allow_headers=["authorization", "content-type", "last-event-id", "x-step-up"])
 
 
 @app.middleware("http")

@@ -1,0 +1,192 @@
+{
+  "_label": "FIXTURE vendor catalog for development and tests. Prices are illustrative placeholders, not current quotes. Live price research needs an authorized search connector.",
+  "as_of": "fixture",
+  "categories": {
+    "design_tools": [
+      {
+        "vendor": "Figma",
+        "item": "Professional (per editor)",
+        "price_minor": 1500,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "SOC 2 Type II",
+        "quality": "industry standard",
+        "migration_minor": 0,
+        "notes": "Reference option.",
+        "reference": true
+      },
+      {
+        "vendor": "Penpot",
+        "item": "Cloud (free tier)",
+        "price_minor": 0,
+        "interval": "month",
+        "compatibility": "partial",
+        "security": "open source; self-hosting option",
+        "quality": "good for UI design; fewer plugins",
+        "migration_minor": 20000,
+        "notes": "Imports .fig via plugin with fidelity loss."
+      },
+      {
+        "vendor": "Sketch",
+        "item": "Standard (per editor)",
+        "price_minor": 1200,
+        "interval": "month",
+        "compatibility": "partial",
+        "security": "local files by default",
+        "quality": "mature; macOS only",
+        "migration_minor": 15000,
+        "notes": "Mac-only team requirement."
+      }
+    ],
+    "ci_and_hosting": [
+      {
+        "vendor": "Vercel",
+        "item": "Pro (per member)",
+        "price_minor": 2000,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "SOC 2 Type II",
+        "quality": "first-class Next.js support",
+        "migration_minor": 0,
+        "notes": "Reference option.",
+        "reference": true
+      },
+      {
+        "vendor": "Netlify",
+        "item": "Pro (per member)",
+        "price_minor": 1900,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "SOC 2 Type II",
+        "quality": "comparable",
+        "migration_minor": 5000,
+        "notes": "Build config changes."
+      },
+      {
+        "vendor": "Cloudflare Pages",
+        "item": "Free plan",
+        "price_minor": 0,
+        "interval": "month",
+        "compatibility": "partial",
+        "security": "SOC 2 Type II",
+        "quality": "edge runtime differences for some Next.js features",
+        "migration_minor": 25000,
+        "notes": "Server features need adaptation."
+      }
+    ],
+    "error_monitoring": [
+      {
+        "vendor": "Sentry",
+        "item": "Team",
+        "price_minor": 2600,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "SOC 2 Type II",
+        "quality": "industry standard",
+        "migration_minor": 0,
+        "notes": "Reference option.",
+        "reference": true
+      },
+      {
+        "vendor": "GlitchTip",
+        "item": "Self-hosted (open source)",
+        "price_minor": 500,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "self-managed; you patch it",
+        "quality": "Sentry-SDK compatible; fewer features",
+        "migration_minor": 30000,
+        "notes": "Hosting cost estimated; ops time not included."
+      },
+      {
+        "vendor": "Honeybadger",
+        "item": "Basic",
+        "price_minor": 2600,
+        "interval": "month",
+        "compatibility": "partial",
+        "security": "SOC 2 Type II",
+        "quality": "good",
+        "migration_minor": 10000,
+        "notes": "Different SDK."
+      }
+    ],
+    "payment_processing": [
+      {
+        "vendor": "Stripe",
+        "item": "Standard card processing",
+        "price_minor": 0,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "PCI DSS Level 1",
+        "quality": "reference",
+        "migration_minor": 0,
+        "notes": "Per-transaction pricing; compare effective rate on your own volume.",
+        "usage_priced": true
+      },
+      {
+        "vendor": "Paddle",
+        "item": "Merchant of record",
+        "price_minor": 0,
+        "interval": "month",
+        "compatibility": "partial",
+        "security": "PCI DSS Level 1",
+        "quality": "handles sales tax as merchant of record",
+        "migration_minor": 50000,
+        "notes": "Higher per-transaction rate; changes tax handling (needs professional review).",
+        "usage_priced": true
+      }
+    ],
+    "banking_fees": [
+      {
+        "vendor": "Current bank",
+        "item": "Monthly maintenance fee",
+        "price_minor": 1500,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "FDIC-insured",
+        "quality": "reference",
+        "migration_minor": 0,
+        "notes": "Often waived above a minimum balance; ask the bank.",
+        "reference": true
+      },
+      {
+        "vendor": "No-fee business checking (online bank)",
+        "item": "Business checking",
+        "price_minor": 0,
+        "interval": "month",
+        "compatibility": "partial",
+        "security": "FDIC-insured (verify)",
+        "quality": "fewer branches; check cash deposit limits",
+        "migration_minor": 5000,
+        "notes": "Switching moves payouts and autopays: every payee must be updated (banking change needs owner approval)."
+      }
+    ],
+    "ai_models": [
+      {
+        "vendor": "Anthropic API",
+        "item": "Usage-based",
+        "price_minor": 0,
+        "interval": "month",
+        "compatibility": "full",
+        "security": "SOC 2 Type II",
+        "quality": "reference",
+        "migration_minor": 0,
+        "notes": "Cost follows usage; lower-cost models for routine work are the main lever.",
+        "usage_priced": true
+      }
+    ]
+  },
+  "vendor_category": {
+    "figma": "design_tools",
+    "sketch": "design_tools",
+    "penpot": "design_tools",
+    "vercel": "ci_and_hosting",
+    "netlify": "ci_and_hosting",
+    "sentry": "error_monitoring",
+    "honeybadger": "error_monitoring",
+    "stripe": "payment_processing",
+    "paddle": "payment_processing",
+    "bank": "banking_fees",
+    "anthropic": "ai_models"
+  }
+}

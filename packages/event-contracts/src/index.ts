@@ -57,6 +57,26 @@ export const EVENT_TYPES = [
   "opportunity.status_changed",
   "report.submitted",
   "logistics.route_status_changed",
+  // V5.0 — AI Central Bank (additive). Payloads carry ids, statuses and labels only: never amounts or accounts.
+  "finance.packet_created",
+  "finance.packet_status_changed",
+  "finance.fee_detected",
+  "finance.research_requested",
+  "finance.findings_returned",
+  "finance.recommendation_ready",
+  "finance.gm_reviewed",
+  "finance.approval_requested",
+  "finance.approval_decided",
+  "finance.approval_expired",
+  "finance.action_executed",
+  "finance.action_refused",
+  "finance.connection_status_changed",
+  "finance.sync_completed",
+  "finance.sync_failed",
+  "finance.bill_reminder",
+  "finance.tax_estimate_updated",
+  "finance.forecast_updated",
+  "finance.revenue_reported",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

@@ -6,9 +6,11 @@ export interface Workstation {
   id: string;
   label: string;
   offset: Vec3;
+  /** AI Central Bank: which floor of the tower this desk serves (0 = vault level). */
+  floor?: number;
 }
 
-export type Architecture = "spire" | "blocks" | "fortress" | "twisted" | "dome" | "vault" | "tower";
+export type Architecture = "spire" | "blocks" | "fortress" | "twisted" | "dome" | "vault" | "tower" | "bank";
 
 export interface District {
   id: string;

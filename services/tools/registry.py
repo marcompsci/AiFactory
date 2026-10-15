@@ -76,14 +76,17 @@ class ToolSpec:
     description: str
     fn: Callable[..., dict]
     release_gate: bool = False  # needs a valid owner release authorization for the exact artifact
+    finance: bool = False       # V5: arguments and results are financial; withheld from events and mission views
+    finance_gate: bool = False  # V5: needs an owner-approved, unexpired, unused financial approval for exactly these terms
 
 
 REGISTRY: dict[str, ToolSpec] = {}
 
 
-def tool(name: str, protected: bool = False, description: str = "", release_gate: bool = False):
+def tool(name: str, protected: bool = False, description: str = "", release_gate: bool = False, finance: bool = False,
+         finance_gate: bool = False):
     def deco(fn: Callable[..., dict]) -> Callable[..., dict]:
-        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate)
+        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate, finance or finance_gate, finance_gate)
         return fn
     return deco
 
@@ -330,12 +333,40 @@ def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec, args: dict | None
             db.approvals.c.task_id == ctx.task_id, db.approvals.c.status == "GRANTED")).first()
         if not granted:
             raise ToolDenied(f"{spec.name} is protected and has no granted approval")
+    if spec.finance or spec.name == "request_purchase":
+        _check_finance(conn, ctx, spec, mission, args or {})
     if spec.release_gate:
         from services.management.release import ReleaseDenied, check_authorization
         try:
             check_authorization(conn, ctx.org_id, (args or {}).get("authorization_id", ""), mission.opportunity_id)
         except ReleaseDenied as exc:
             raise ToolDenied(f"release refused: {exc}") from exc
+
+
+def _check_finance(conn, ctx: ToolContext, spec: ToolSpec, mission, args: dict) -> None:
+    """THREAT_MODEL F4, F7: department, packet scoping and (for execution) the owner's exact approval."""
+    from services.finance.permissions import RESEARCH_SHARED_TOOLS
+
+    if spec.finance:
+        dept = conn.execute(select(db.departments.c.key).join(db.agents, db.agents.c.department_id == db.departments.c.id)
+                            .where(db.agents.c.id == ctx.agent_id)).scalar()
+        allowed = {"finance", "research"} if spec.name in RESEARCH_SHARED_TOOLS else {"finance"}
+        if dept not in allowed:
+            raise ToolDenied(f"{spec.name} is restricted to the {' or '.join(sorted(allowed))} department")
+    params = mission.params or {}
+    if "packet_id" in args and params.get("packet_id") != args.get("packet_id"):
+        raise ToolDenied("this mission is not working on that cost review")
+    if spec.finance_gate:
+        from services.finance.approvals import ApprovalRefused, authorize_execution
+
+        if params.get("approval_id") != args.get("approval_id"):
+            raise ToolDenied("this mission was not created for that approval")
+        try:
+            authorize_execution(conn, org_id=ctx.org_id, approval_id=args.get("approval_id", ""), action_type=args.get("action_type", ""),
+                                amount_minor=int(args.get("amount_minor", -1)), currency=str(args.get("currency", "")),
+                                recipient=str(args.get("recipient", "")), account_ref=str(args.get("account_ref", "")))
+        except ApprovalRefused as exc:
+            raise ToolDenied(f"financial action refused: {exc}") from exc
 
 
 def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
@@ -345,6 +376,8 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
         raise ToolDenied(f"unknown tool {name}")
     exec_id = db.new_id()
     safe_args = json.loads(redact(json.dumps(args)))
+    if spec.finance or name == "request_purchase":  # THREAT_MODEL F9: money stays in the bank's own records
+        safe_args = {k: v for k, v in args.items() if k in ("packet_id", "approval_id")} | {"withheld": "financial arguments"}
     denied: ToolDenied | None = None
     with transaction() as conn:
         try:
@@ -377,6 +410,8 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
         result, status, error = {}, "FAILED", f"{type(exc).__name__}: {exc}"
     duration = int((time.monotonic() - started) * 1000)
     excerpt = redact(json.dumps(result, default=str))[:4000] if status == "COMPLETED" else error
+    if spec.finance and status == "COMPLETED":
+        excerpt = json.dumps({k: v for k, v in result.items() if k in ("packet_id", "approval_id", "status", "action", "count", "data_mode")})
     with transaction() as conn:
         conn.execute(update(db.tool_executions).where(db.tool_executions.c.id == exec_id).values(
             status=status, exit_code=result.get("exit_code") if isinstance(result, dict) else None,
@@ -404,3 +439,4 @@ def _summarize(name: str, result: dict) -> str:
     return "ok"
 
 from . import studio_tools  # noqa: E402,F401  (registers the V4 tools)
+from services.finance import tools as _finance_tools  # noqa: E402,F401  (registers the V5 financial tools)

@@ -83,7 +83,8 @@
         "edit_file",
         "inspect_diff",
         "scaffold_prototype",
-        "build_release_bundle"
+        "build_release_bundle",
+        "request_purchase"
       ],
       "limits": {
         "max_usd_per_mission": 1.0,
@@ -219,7 +220,8 @@
       },
       "tools": [
         "query_market_source",
-        "create_artifact"
+        "create_artifact",
+        "research_cost_alternatives"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
@@ -245,13 +247,197 @@
       },
       "tools": [
         "query_market_source",
-        "create_artifact"
+        "create_artifact",
+        "research_cost_alternatives"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
         "max_concurrent_tasks": 1
       },
       "department": "research",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000010",
+      "key": "cfo",
+      "name": "Sterling",
+      "role": "Chief Financial Agent",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "crown",
+        "color": "#F4D58D",
+        "height": 2.0
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "read_ledger_summary",
+        "classify_cost",
+        "propose_financial_action",
+        "record_cost_findings",
+        "create_artifact"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.5,
+        "max_concurrent_tasks": 3
+      },
+      "department": "finance",
+      "tier": "supervisor"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000011",
+      "key": "revenue_analyst",
+      "name": "Tally",
+      "role": "Revenue Analyst",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "orb",
+        "color": "#5BF2A5",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "read_ledger_summary"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "department": "finance",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000012",
+      "key": "expense_auditor",
+      "name": "Audra",
+      "role": "Expense Auditor",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "shield",
+        "color": "#FFBD69",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "read_ledger_summary",
+        "classify_cost"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "department": "finance",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000013",
+      "key": "bill_manager",
+      "name": "Billie",
+      "role": "Bill Manager",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "cube",
+        "color": "#32D8FF",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "read_ledger_summary",
+        "propose_financial_action",
+        "execute_financial_action"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "department": "finance",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000014",
+      "key": "tax_agent",
+      "name": "Ledger",
+      "role": "Tax Preparation Agent",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "pillar",
+        "color": "#A66BFF",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "read_ledger_summary"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.3,
+        "max_concurrent_tasks": 1
+      },
+      "department": "finance",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000015",
+      "key": "savings_strategist",
+      "name": "Penny",
+      "role": "Savings Strategist",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "orb",
+        "color": "#FF6178",
+        "height": 1.7
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5"
+      },
+      "tools": [
+        "read_ledger_summary",
+        "record_cost_findings"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.3,
+        "max_concurrent_tasks": 1
+      },
+      "department": "finance",
+      "tier": "specialist"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000016",
+      "key": "forecaster",
+      "name": "Vesta",
+      "role": "Financial Forecaster",
+      "home_district": "central-bank",
+      "avatar": {
+        "shape": "drone",
+        "color": "#EAF2FF",
+        "height": 1.4
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "read_ledger_summary"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "department": "finance",
       "tier": "specialist"
     }
   ],
@@ -297,6 +483,13 @@
       "district": "vision-quarter",
       "supervisor": "designer",
       "daily_budget_usd": 1.0
+    },
+    {
+      "key": "finance",
+      "name": "Finance (AI Central Bank)",
+      "district": "central-bank",
+      "supervisor": "cfo",
+      "daily_budget_usd": 1.0
     }
   ],
   "reporting": {
@@ -308,6 +501,13 @@
     "designer": "general_manager",
     "developer": "architect",
     "research_apps": "researcher",
-    "research_marketplaces": "researcher"
+    "research_marketplaces": "researcher",
+    "cfo": "general_manager",
+    "revenue_analyst": "cfo",
+    "expense_auditor": "cfo",
+    "bill_manager": "cfo",
+    "tax_agent": "cfo",
+    "savings_strategist": "cfo",
+    "forecaster": "cfo"
   }
 }

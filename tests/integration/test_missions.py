@@ -249,7 +249,7 @@ def test_reconnecting_client_can_hydrate_and_replay(client):
     mid = start(client)
     wait_for(lambda: mission_status(client, mid)["status"] == "WAITING_FOR_APPROVAL")
     snap = client.get("/api/snapshot").json()
-    assert snap["sequence"] > 0 and len(snap["agents"]) == 9 and len(snap["districts"]) == 7  # V4: GM + 2 researchers, Owner's Tower
+    assert snap["sequence"] > 0 and len(snap["agents"]) == 16 and len(snap["districts"]) == 8  # V5: + 7 finance agents, AI Central Bank
     # whatever happened after the snapshot is exactly what replay returns, in order (background ticks may add events)
     later = [e["sequence"] for e in client.get(f"/api/events?after={snap['sequence']}").json()["events"]]
     assert later == list(range(snap["sequence"] + 1, snap["sequence"] + 1 + len(later)))

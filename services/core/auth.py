@@ -28,6 +28,7 @@ class Principal:
     organization_id: str
     role: str
     mode: str
+    mfa_fresh: bool = False  # Supabase session at aal2 with a recent MFA verification (step-up for financial approvals)
 
     def require(self, role: str) -> None:
         if ROLE_RANK.get(self.role, -1) < ROLE_RANK[role]:
@@ -60,7 +61,10 @@ def authenticate(request: Request) -> Principal:
         except jwt.PyJWTError as exc:
             raise HTTPException(status_code=401, detail="invalid token") from exc
         role = (claims.get("app_metadata") or {}).get("role", "viewer")
-        return Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase")
+        from services.finance.stepup import aal2_fresh
+
+        return Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase",
+                         mfa_fresh=aal2_fresh(claims))
     raise HTTPException(status_code=401, detail="invalid token")
 
 

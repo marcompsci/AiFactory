@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://aiciv.local/contracts/event-envelope.v1.json",
   "title": "AI Civilization event envelope v1",
-  "description": "Every event the backend publishes, whether over the realtime stream or from the reconciliation endpoint, uses this envelope. PostgreSQL is the source of truth; this envelope is a projection of a row in the events table. V4.0 added management, research, logistics and release event types (additive; schema_version stays 1 because no existing field changed meaning).",
+  "description": "Every event the backend publishes, whether over the realtime stream or from the reconciliation endpoint, uses this envelope. PostgreSQL is the source of truth; this envelope is a projection of a row in the events table. V4.0 added management, research, logistics and release event types ; V5.0 added finance.* types for the AI Central Bank, whose payloads carry ids, statuses and labels only, never amounts or account data (additive; schema_version stays 1 because no existing field changed meaning).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -94,7 +94,26 @@
         "release.executed",
         "opportunity.status_changed",
         "report.submitted",
-        "logistics.route_status_changed"
+        "logistics.route_status_changed",
+        "finance.packet_created",
+        "finance.packet_status_changed",
+        "finance.fee_detected",
+        "finance.research_requested",
+        "finance.findings_returned",
+        "finance.recommendation_ready",
+        "finance.gm_reviewed",
+        "finance.approval_requested",
+        "finance.approval_decided",
+        "finance.approval_expired",
+        "finance.action_executed",
+        "finance.action_refused",
+        "finance.connection_status_changed",
+        "finance.sync_completed",
+        "finance.sync_failed",
+        "finance.bill_reminder",
+        "finance.tax_estimate_updated",
+        "finance.forecast_updated",
+        "finance.revenue_reported"
       ]
     },
     "sequence": {
