@@ -78,15 +78,16 @@ class ToolSpec:
     release_gate: bool = False  # needs a valid owner release authorization for the exact artifact
     finance: bool = False       # V5: arguments and results are financial; withheld from events and mission views
     finance_gate: bool = False  # V5: needs an owner-approved, unexpired, unused financial approval for exactly these terms
+    investigation: bool = False  # V5.1: read-only investigation tool; only usable by investigation missions
 
 
 REGISTRY: dict[str, ToolSpec] = {}
 
 
 def tool(name: str, protected: bool = False, description: str = "", release_gate: bool = False, finance: bool = False,
-         finance_gate: bool = False):
+         finance_gate: bool = False, investigation: bool = False):
     def deco(fn: Callable[..., dict]) -> Callable[..., dict]:
-        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate, finance or finance_gate, finance_gate)
+        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate, finance or finance_gate, finance_gate, investigation)
         return fn
     return deco
 
@@ -333,6 +334,7 @@ def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec, args: dict | None
             db.approvals.c.task_id == ctx.task_id, db.approvals.c.status == "GRANTED")).first()
         if not granted:
             raise ToolDenied(f"{spec.name} is protected and has no granted approval")
+    _check_investigation(conn, ctx, spec, mission, args or {})
     if spec.finance or spec.name == "request_purchase":
         _check_finance(conn, ctx, spec, mission, args or {})
     if spec.release_gate:
@@ -341,6 +343,29 @@ def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec, args: dict | None
             check_authorization(conn, ctx.org_id, (args or {}).get("authorization_id", ""), mission.opportunity_id)
         except ReleaseDenied as exc:
             raise ToolDenied(f"release refused: {exc}") from exc
+
+
+INVESTIGATION_TOOLS = {"investigate_alternatives", "score_alternatives", "sandbox_evaluate_candidate", "review_sandbox_evidence"}
+
+
+def _check_investigation(conn, ctx: ToolContext, spec: ToolSpec, mission, args: dict) -> None:
+    """V5.1: an investigation authorizes research and sandboxed evaluation only. Its missions can use nothing else
+    (no purchases, payments, cancellations, pull requests, releases or deployments), and its tools work only for
+    the investigation the mission was created for, while that investigation is still running."""
+    from services.orchestrator.plan import INVESTIGATION_KINDS
+
+    in_investigation = mission.kind in INVESTIGATION_KINDS
+    if in_investigation and spec.name not in INVESTIGATION_TOOLS:
+        raise ToolDenied(f"{spec.name} is not allowed in a read-only investigation")
+    if spec.investigation:
+        if not in_investigation:
+            raise ToolDenied(f"{spec.name} only runs inside an owner-requested investigation")
+        inv_id = (mission.params or {}).get("investigation_id")
+        if not inv_id or args.get("investigation_id") != inv_id:
+            raise ToolDenied("this mission is not working on that investigation")
+        inv = conn.execute(select(db.savings_investigations).where(db.savings_investigations.c.id == inv_id)).first()
+        if inv is None or inv.status not in ("RESEARCHING", "EVALUATING", "TESTING"):
+            raise ToolDenied(f"investigation is {inv.status.lower() if inv else 'missing'}")
 
 
 def _check_finance(conn, ctx: ToolContext, spec: ToolSpec, mission, args: dict) -> None:
@@ -410,8 +435,9 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
         result, status, error = {}, "FAILED", f"{type(exc).__name__}: {exc}"
     duration = int((time.monotonic() - started) * 1000)
     excerpt = redact(json.dumps(result, default=str))[:4000] if status == "COMPLETED" else error
-    if spec.finance and status == "COMPLETED":
-        excerpt = json.dumps({k: v for k, v in result.items() if k in ("packet_id", "approval_id", "status", "action", "count", "data_mode")})
+    if (spec.finance or spec.investigation) and status == "COMPLETED":
+        excerpt = json.dumps({k: v for k, v in result.items() if k in ("packet_id", "approval_id", "investigation_id", "status", "action",
+                                                                         "count", "data_mode", "verdict", "passed", "failed", "errors")})
     with transaction() as conn:
         conn.execute(update(db.tool_executions).where(db.tool_executions.c.id == exec_id).values(
             status=status, exit_code=result.get("exit_code") if isinstance(result, dict) else None,
@@ -440,3 +466,4 @@ def _summarize(name: str, result: dict) -> str:
 
 from . import studio_tools  # noqa: E402,F401  (registers the V4 tools)
 from services.finance import tools as _finance_tools  # noqa: E402,F401  (registers the V5 financial tools)
+from services.finance import investigation_tools as _investigation_tools  # noqa: E402,F401  (V5.1)

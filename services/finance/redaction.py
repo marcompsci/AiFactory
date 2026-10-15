@@ -44,7 +44,7 @@ def for_model(*, vendor: str, item: str, category: str | None, amount_minor: int
 EVENT_SAFE_KEYS = {"packet_id", "approval_id", "status", "from", "to", "origin", "package_id", "package_type", "classification",
                    "significant", "risk", "action_type", "decision", "connection_id", "sync_run_id", "kind", "provider", "data_mode",
                    "label", "reason_code", "tax_year", "jurisdiction", "bill_id", "estimate_id", "round", "agent_key", "inserted",
-                   "duplicates", "coverage_gaps", "subject_type", "subject_id"}
+                   "duplicates", "coverage_gaps", "subject_type", "subject_id", "investigation_id", "verdict", "count"}
 
 
 def event_safe(payload: dict) -> dict:

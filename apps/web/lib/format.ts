@@ -185,6 +185,10 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: `Sync failed (${s("reason_code")})`, tone: "#FF6178" };
     case "finance.bill_reminder":
       return { who, text: `${s("label") || "Bill due"}: reminder sent to your tower${sim(p)}`, tone: "#FFBD69" };
+    case "finance.investigation_status_changed":
+      return { who, text: `Free-alternative investigation: ${human(s("to")).toLowerCase()}${p.label ? ` (${s("label")})` : ""}${sim(p)}`, tone: "#3DFFB8" };
+    case "finance.investigation_ready":
+      return { who, text: `Investigation complete; the recommendation is at your tower${sim(p)}`, tone: "#3DFFB8" };
     case "finance.tax_estimate_updated":
       return { who, text: `Tax estimate updated for ${s("tax_year")} (an estimate)${sim(p)}`, tone: "#A66BFF" };
     default:
@@ -212,4 +216,5 @@ export const PACKAGE_COLORS: Record<string, string> = {
   tax_review_package: "#B794FF",
   financial_forecast: "#9AD1FF",
   owner_approval_request: "#FFD86B",
+  savings_investigation: "#3DFFB8",
 };

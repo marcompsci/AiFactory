@@ -23,9 +23,11 @@ PACKAGE_TYPES = {"research_brief", "product_proposal", "design_spec", "code_arti
                  "revision_request", "approval_request", "release_package",
                  # V5 AI Central Bank. Each references its authoritative record via subject_type/subject_id.
                  "revenue_report", "expense_alert", "bill_reminder", "fee_research_request", "savings_recommendation",
-                 "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request"}
+                 "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request",
+                 "savings_investigation"}
 FINANCE_PACKAGE_TYPES = {"revenue_report", "expense_alert", "bill_reminder", "fee_research_request", "savings_recommendation",
-                         "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request"}
+                         "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request",
+                         "savings_investigation"}
 
 
 def belt_speed() -> float:

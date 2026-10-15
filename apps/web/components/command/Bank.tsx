@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ApiError, bank, type Json } from "@/lib/api";
 import { ago, human, money, PACKAGE_COLORS } from "@/lib/format";
 import { useStore } from "@/lib/store";
+import { InvestigationCard } from "./Investigation";
 import { Button, Dot, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
 
 export const PACKET_STAGES = ["SUBMITTED", "AT_BANK", "RESEARCH_REQUESTED", "RESEARCHING", "FINDINGS_RETURNED", "GM_REVIEW", "OWNER_DECISION", "APPROVED", "EXECUTED"];
@@ -176,7 +177,7 @@ function Reviews() {
 export function PacketDetail({ id }: { id: string }) {
   const q = useQuery({ queryKey: ["bank", "packet", id], queryFn: () => bank.packet(id), refetchInterval: 5000 });
   if (!q.data) return <Skeleton lines={2} />;
-  const { packet: p, approvals, packages, audit } = q.data;
+  const { packet: p, approvals, packages, audit, investigation } = q.data;
   const rec = p.recommendation ?? {};
   return (
     <div className="space-y-2 border-t border-line pt-2 text-xs">
@@ -184,6 +185,7 @@ export function PacketDetail({ id }: { id: string }) {
       {p.justification ? <p><span className="text-ink-3">Why requested:</span> {p.justification}</p> : null}
       {rec.summary ? <p><span className="text-ink-3">Recommendation:</span> {rec.summary}</p> : null}
       {rec.narrative && !String(rec.narrative).startsWith("[simulation") ? <p className="text-ink-2">{rec.narrative}</p> : null}
+      {investigation ? <InvestigationCard id={investigation.id} /> : null}
       {p.gm_decision?.outcome ? <p><span className="text-ink-3">General Manager:</span> {human(p.gm_decision.outcome)} ({p.gm_decision.method}){p.gm_decision.note ? `: ${p.gm_decision.note}` : ""}</p> : null}
       {(p.findings ?? []).length ? (
         <table className="w-full text-left">

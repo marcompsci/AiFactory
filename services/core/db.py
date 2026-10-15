@@ -869,6 +869,140 @@ financial_sync_runs = Table(
     Column("data_mode", String, nullable=False),
 )
 
+
+# ---------------------------------------------------------------- V5.1: free-alternative investigations
+savings_investigations = Table(
+    "savings_investigations", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("packet_id", String(36), nullable=False, index=True),
+    Column("status", String, nullable=False),            # REQUESTED RESEARCHING EVALUATING TESTING MANAGER_REVIEW AWAITING_OWNER | BLOCKED FAILED CANCELLED
+    Column("requested_by", String(36), nullable=False),
+    Column("owner_note", Text),
+    Column("category", String),
+    Column("top_candidate_id", String(36)),
+    Column("research_mission_id", String(36)),
+    Column("evaluation_mission_id", String(36)),
+    Column("sandbox_mission_id", String(36)),
+    Column("qa_mission_id", String(36)),
+    Column("recommendation", JSON, nullable=False, default=dict),
+    Column("reason", Text),                               # why BLOCKED / FAILED / CANCELLED
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+)
+
+alternative_candidates = Table(
+    "alternative_candidates", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("investigation_id", String(36), nullable=False, index=True),
+    Column("slug", String, nullable=False),
+    Column("name", String, nullable=False),
+    Column("vendor", String),
+    Column("product_url", String),
+    Column("docs_url", String),
+    Column("source_url", String, nullable=False),       # where this candidate record came from
+    Column("license", String, nullable=False),
+    Column("license_url", String),
+    Column("open_source", Integer, nullable=False, default=0),
+    Column("pricing", JSON, nullable=False, default=dict),
+    Column("features", JSON, nullable=False, default=list),
+    Column("claims", JSON, nullable=False, default=dict),
+    Column("limitations", JSON, nullable=False, default=list),
+    Column("maintenance", JSON, nullable=False, default=dict),
+    Column("estimated_costs", JSON, nullable=False, default=dict),
+    Column("evidence_as_of", String, nullable=False),
+    Column("confidence", String, nullable=False),
+    Column("rank", Integer),
+    Column("shortlisted", Integer, nullable=False, default=0),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+alternative_evidence = Table(
+    "alternative_evidence", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("candidate_id", String(36), nullable=False, index=True),
+    Column("kind", String, nullable=False),               # pricing | license | features | maintenance | documentation | restriction
+    Column("claim", Text, nullable=False),
+    Column("source_url", String, nullable=False),
+    Column("as_of", String, nullable=False),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+compatibility_assessments = Table(
+    "compatibility_assessments", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("candidate_id", String(36), nullable=False, index=True),
+    Column("compatibility", Float, nullable=False),
+    Column("security", Float, nullable=False),
+    Column("functionality", Float, nullable=False),
+    Column("migration", Float, nullable=False),          # higher = easier to migrate
+    Column("total_cost", Float, nullable=False),         # higher = cheaper to own
+    Column("total_score", Float, nullable=False),
+    Column("rationale", JSON, nullable=False, default=dict),
+    Column("assessed_by", String(36)),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+sandbox_evaluations = Table(
+    "sandbox_evaluations", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("investigation_id", String(36), nullable=False, index=True),
+    Column("candidate_id", String(36), nullable=False),
+    Column("status", String, nullable=False),             # RUNNING PASSED FAILED ERROR
+    Column("sandbox", String, nullable=False),
+    Column("network_isolated", Integer, nullable=False, default=0),
+    Column("subject", String, nullable=False),            # what actually ran: e.g. "fixture compatibility kit"
+    Column("command", JSON, nullable=False, default=list),
+    Column("exit_code", Integer),
+    Column("passed", Integer, nullable=False, default=0),
+    Column("failed", Integer, nullable=False, default=0),
+    Column("errors", Integer, nullable=False, default=0),
+    Column("results", JSON, nullable=False, default=list),   # per-requirement outcome
+    Column("output_excerpt", Text),
+    Column("kit_sha256", String),
+    Column("duration_ms", Integer),
+    Column("artifact_id", String(36)),
+    Column("started_at", String, nullable=False, default=utcnow),
+    Column("finished_at", String),
+)
+
+cost_comparisons = Table(
+    "cost_comparisons", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("investigation_id", String(36), nullable=False, index=True),
+    Column("candidate_id", String(36)),                   # null = the original request
+    Column("label", String, nullable=False),
+    Column("first_year_minor", Integer, nullable=False),
+    Column("three_year_minor", Integer, nullable=False),
+    Column("migration_minor", Integer, nullable=False, default=0),
+    Column("notes", Text),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+investigation_reviews = Table(
+    "investigation_reviews", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("investigation_id", String(36), nullable=False, index=True),
+    Column("stage", String, nullable=False),              # qa | manager
+    Column("reviewer_agent_id", String(36)),
+    Column("verdict", String, nullable=False),
+    Column("summary", Text, nullable=False),
+    Column("findings", JSON, nullable=False, default=list),
+    Column("method", String, nullable=False, default="rules"),
+    Column("model", String),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
 financial_reports = Table(            # authoritative record behind REVENUE_REPORT / FINANCIAL_FORECAST packages
     "financial_reports", metadata,
     Column("id", String(36), primary_key=True),
@@ -892,7 +1026,9 @@ stepup_secrets = Table(
 
 FINANCE_TABLES = ("financial_connections", "financial_accounts", "financial_transactions", "revenue_sources", "invoices", "bills",
                   "subscriptions", "expense_categories", "tax_documents", "tax_estimates", "cost_review_packets",
-                  "savings_opportunities", "financial_approvals", "financial_audit_events", "financial_sync_runs", "financial_reports")
+                  "savings_opportunities", "financial_approvals", "financial_audit_events", "financial_sync_runs", "financial_reports", "savings_investigations",
+                  "alternative_candidates", "alternative_evidence", "compatibility_assessments", "sandbox_evaluations",
+                  "cost_comparisons", "investigation_reviews")
 
 APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations", "financial_audit_events")
 

@@ -1,0 +1,304 @@
+{
+  "_label": "FIXTURE candidate catalog for the free-alternative investigation (V5.1). Pricing, license and maintenance entries are illustrative and dated 'fixture'; every claim must be re-verified against its source before the owner relies on it. Live research providers are connected only after their permissions and access are validated.",
+  "as_of": "fixture",
+  "categories": {
+    "design_tools": {
+      "requirements": "design_tools",
+      "candidates": [
+        {
+          "slug": "penpot",
+          "name": "Penpot",
+          "vendor": "Kaleidos",
+          "product_url": "https://penpot.app",
+          "docs_url": "https://help.penpot.app",
+          "license": "MPL-2.0",
+          "license_url": "https://github.com/penpot/penpot/blob/develop/LICENSE",
+          "open_source": true,
+          "pricing": {
+            "model": "free tier + self-host",
+            "price_minor": 0,
+            "interval": "month",
+            "paid_tier_minor": 700,
+            "free_tier_limits": "unlimited files in the free cloud plan (fixture)"
+          },
+          "features": [
+            "vector design",
+            "prototyping",
+            "shared libraries",
+            "real-time collaboration",
+            "SVG-native export"
+          ],
+          "restrictions": [
+            "Figma files import through a converter plugin, with fidelity loss"
+          ],
+          "maintenance": {
+            "activity": "active",
+            "last_release": "fixture",
+            "signal": "frequent releases, large contributor base (fixture)"
+          },
+          "self_host": true,
+          "kit": "penpot",
+          "claims": {
+            "svg_export": "yes",
+            "png_export": "yes",
+            "figma_import": "partial",
+            "shared_libraries": "yes",
+            "realtime_collaboration": "yes"
+          },
+          "migration_minor": 20000
+        },
+        {
+          "slug": "excalidraw",
+          "name": "Excalidraw",
+          "vendor": "Excalidraw",
+          "product_url": "https://excalidraw.com",
+          "docs_url": "https://docs.excalidraw.com",
+          "license": "MIT",
+          "license_url": "https://github.com/excalidraw/excalidraw/blob/master/LICENSE",
+          "open_source": true,
+          "pricing": {
+            "model": "free",
+            "price_minor": 0,
+            "interval": "month",
+            "paid_tier_minor": 700,
+            "free_tier_limits": "whiteboarding; no component libraries (fixture)"
+          },
+          "features": [
+            "whiteboard sketches",
+            "real-time collaboration",
+            "SVG/PNG export"
+          ],
+          "restrictions": [
+            "not a UI design tool: no components, no prototyping"
+          ],
+          "maintenance": {
+            "activity": "active",
+            "last_release": "fixture",
+            "signal": "active repository (fixture)"
+          },
+          "self_host": true,
+          "kit": "excalidraw",
+          "claims": {
+            "svg_export": "yes",
+            "png_export": "yes",
+            "figma_import": "no",
+            "shared_libraries": "no",
+            "realtime_collaboration": "yes"
+          },
+          "migration_minor": 30000
+        },
+        {
+          "slug": "lunacy",
+          "name": "Lunacy",
+          "vendor": "Icons8",
+          "product_url": "https://icons8.com/lunacy",
+          "docs_url": "https://lunacy.docs.icons8.com",
+          "license": "Proprietary freeware",
+          "license_url": "https://icons8.com/license",
+          "open_source": false,
+          "pricing": {
+            "model": "free desktop app",
+            "price_minor": 0,
+            "interval": "month",
+            "paid_tier_minor": 0,
+            "free_tier_limits": "desktop app; cloud features limited (fixture)"
+          },
+          "features": [
+            "UI design",
+            "components",
+            "SVG/PNG export",
+            "Sketch file support"
+          ],
+          "restrictions": [
+            "closed source; terms can change",
+            "Figma import not supported (fixture)"
+          ],
+          "maintenance": {
+            "activity": "active",
+            "last_release": "fixture",
+            "signal": "regular releases (fixture)"
+          },
+          "self_host": false,
+          "kit": "lunacy",
+          "claims": {
+            "svg_export": "yes",
+            "png_export": "yes",
+            "figma_import": "no",
+            "shared_libraries": "yes",
+            "realtime_collaboration": "no"
+          },
+          "migration_minor": 15000
+        },
+        {
+          "slug": "inkscape",
+          "name": "Inkscape",
+          "vendor": "Inkscape Project",
+          "product_url": "https://inkscape.org",
+          "docs_url": "https://inkscape.org/learn/",
+          "license": "GPL-2.0-or-later",
+          "license_url": "https://inkscape.org/about/license/",
+          "open_source": true,
+          "pricing": {
+            "model": "free",
+            "price_minor": 0,
+            "interval": "month",
+            "paid_tier_minor": 0,
+            "free_tier_limits": "desktop only"
+          },
+          "features": [
+            "vector illustration",
+            "SVG-native",
+            "PNG export"
+          ],
+          "restrictions": [
+            "single-user desktop app: no shared libraries or live collaboration"
+          ],
+          "maintenance": {
+            "activity": "active",
+            "last_release": "fixture",
+            "signal": "long-running project (fixture)"
+          },
+          "self_host": false,
+          "kit": "inkscape",
+          "claims": {
+            "svg_export": "yes",
+            "png_export": "yes",
+            "figma_import": "no",
+            "shared_libraries": "no",
+            "realtime_collaboration": "no"
+          },
+          "migration_minor": 30000
+        },
+        {
+          "slug": "akira",
+          "name": "Akira",
+          "vendor": "Akira UX",
+          "product_url": "https://github.com/akiraux/Akira",
+          "docs_url": "https://github.com/akiraux/Akira#readme",
+          "license": "GPL-3.0",
+          "license_url": "https://github.com/akiraux/Akira/blob/master/LICENSE",
+          "open_source": true,
+          "pricing": {
+            "model": "free",
+            "price_minor": 0,
+            "interval": "month",
+            "paid_tier_minor": 0,
+            "free_tier_limits": "Linux desktop only"
+          },
+          "features": [
+            "UI design (early stage)"
+          ],
+          "restrictions": [
+            "alpha quality; Linux only"
+          ],
+          "maintenance": {
+            "activity": "stalled",
+            "last_release": "fixture",
+            "signal": "little recent activity (fixture)"
+          },
+          "self_host": false,
+          "kit": "akira",
+          "claims": {
+            "svg_export": "yes",
+            "png_export": "yes",
+            "figma_import": "no",
+            "shared_libraries": "no",
+            "realtime_collaboration": "no"
+          },
+          "migration_minor": 40000
+        }
+      ]
+    },
+    "error_monitoring": {
+      "requirements": "error_monitoring",
+      "candidates": [
+        {
+          "slug": "glitchtip",
+          "name": "GlitchTip",
+          "vendor": "Burke Software",
+          "product_url": "https://glitchtip.com",
+          "docs_url": "https://glitchtip.com/documentation",
+          "license": "MIT",
+          "license_url": "https://gitlab.com/glitchtip/glitchtip-backend/-/blob/master/LICENSE",
+          "open_source": true,
+          "pricing": {
+            "model": "self-host free / hosted tiers",
+            "price_minor": 0,
+            "interval": "month",
+            "paid_tier_minor": 1500,
+            "free_tier_limits": "hosted free tier event cap (fixture)"
+          },
+          "features": [
+            "Sentry SDK compatible",
+            "uptime checks",
+            "self-hosting"
+          ],
+          "restrictions": [
+            "fewer features than Sentry (performance tracing limited)"
+          ],
+          "maintenance": {
+            "activity": "active",
+            "last_release": "fixture",
+            "signal": "regular releases (fixture)"
+          },
+          "self_host": true,
+          "kit": "glitchtip",
+          "claims": {
+            "sentry_sdk_events": "yes",
+            "issue_grouping": "yes",
+            "alert_rules": "yes",
+            "performance_tracing": "partial"
+          },
+          "migration_minor": 30000
+        }
+      ]
+    }
+  },
+  "vendor_category": {
+    "figma": "design_tools",
+    "sketch": "design_tools",
+    "sentry": "error_monitoring"
+  },
+  "requirements": {
+    "design_tools": [
+      [
+        "svg_export",
+        "Export a frame to SVG with every layer"
+      ],
+      [
+        "png_export",
+        "Export PNG at 2x"
+      ],
+      [
+        "figma_import",
+        "Open existing Figma files"
+      ],
+      [
+        "shared_libraries",
+        "Shared component libraries"
+      ],
+      [
+        "realtime_collaboration",
+        "Real-time collaboration"
+      ]
+    ],
+    "error_monitoring": [
+      [
+        "sentry_sdk_events",
+        "Accept events from the Sentry SDK the apps already use"
+      ],
+      [
+        "issue_grouping",
+        "Group repeated errors into issues"
+      ],
+      [
+        "alert_rules",
+        "Alert on new issues"
+      ],
+      [
+        "performance_tracing",
+        "Performance tracing"
+      ]
+    ]
+  }
+}

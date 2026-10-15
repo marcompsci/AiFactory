@@ -157,8 +157,19 @@ FINANCE_EXECUTE_GRAPH: list[TaskSpec] = [
              max_attempts=1),
 ]
 
+# ---------------------------------------------------------------- V5.1 free-alternative investigation (read-only)
+ALT_RESEARCH_GRAPH = [TaskSpec("alt_research", "research_apps", "Find up to five legitimate alternatives", "data-observatory", "observatory-lens",
+                               ["investigate_alternatives"], expected_outputs={"count": "int"}, validation={"cites_sources": True})]
+ALT_EVALUATION_GRAPH = [TaskSpec("alt_evaluation", "savings_strategist", "Score candidates and build the shortlist", "central-bank", "bank-savings",
+                                 ["score_alternatives"], expected_outputs={"shortlist": "list"})]
+ALT_SANDBOX_GRAPH = [TaskSpec("alt_sandbox", "developer", "Test the strongest candidate in a disposable sandbox", "code-forge", "forge-anvil",
+                              ["sandbox_evaluate_candidate"], expected_outputs={"status": "str"}, validation={"isolated": True}, max_attempts=1)]
+ALT_QA_GRAPH = [TaskSpec("alt_qa", "qa", "Review the sandbox evidence", "sentinel-citadel", "citadel-testbay",
+                         ["review_sandbox_evidence"], expected_outputs={"verdict": "str"})]
+INVESTIGATION_KINDS = ("alt_research", "alt_evaluation", "alt_sandbox", "alt_qa")
+
 KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release",
-         "request_tool", "cost_research", "cost_analysis", "finance_execute")
+         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS)
 
 
 def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list[TaskSpec]:
@@ -179,6 +190,14 @@ def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list
         graph = COST_ANALYSIS_GRAPH
     elif kind == "finance_execute":
         graph = FINANCE_EXECUTE_GRAPH
+    elif kind == "alt_research":
+        graph = [TaskSpec(**{**ALT_RESEARCH_GRAPH[0].__dict__, "agent_key": params.get("agent_key", "research_apps")})]
+    elif kind == "alt_evaluation":
+        graph = ALT_EVALUATION_GRAPH
+    elif kind == "alt_sandbox":
+        graph = ALT_SANDBOX_GRAPH
+    elif kind == "alt_qa":
+        graph = ALT_QA_GRAPH
     else:
         graph = RELEASE_GRAPH
     validate_graph(graph)

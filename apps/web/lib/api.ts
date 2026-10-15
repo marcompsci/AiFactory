@@ -156,4 +156,7 @@ export const bank = {
     return r.blob();
   },
   audit: () => call<Json>("/api/finance/audit?limit=50"),
+  investigations: () => call<{ investigations: Json[] }>("/api/finance/investigations"),
+  investigation: (id: string) => call<Json>(`/api/finance/investigations/${id}`),
+  cancelInvestigation: (id: string) => call<Json>(`/api/finance/investigations/${id}/cancel`, post()),
 };

@@ -99,3 +99,41 @@ def execute_action(env: TaskEnv) -> dict:
 
 FINANCE_HANDLERS = {"request_tool": request_tool, "research_costs": research_costs, "analyze_costs": analyze_costs,
                     "recommend_cost": recommend_cost, "execute_action": execute_action}
+
+
+# ------------------------------------------------------------------ V5.1 free-alternative investigation
+def _inv(env: TaskEnv) -> str:
+    inv = (env.mission.params or {}).get("investigation_id")
+    if not inv:
+        raise TaskError("mission has no investigation attached")
+    return inv
+
+
+def alt_research(env: TaskEnv) -> dict:
+    r = env.tool("investigate_alternatives", investigation_id=_inv(env))
+    env.say(f"Found {r['count']} candidate(s) from authorized sources ({r['data_mode']} data); sending the shortlist to the bank.",
+            to_key="savings_strategist", kind="handoff")
+    return {"count": r["count"]}
+
+
+def alt_evaluation(env: TaskEnv) -> dict:
+    r = env.tool("score_alternatives", investigation_id=_inv(env))
+    env.say(f"Scored the candidates; {r['count']} on the shortlist. Code Forge will test the strongest one.", to_key="developer", kind="handoff")
+    return {"shortlist": r["count"]}
+
+
+def alt_sandbox(env: TaskEnv) -> dict:
+    r = env.tool("sandbox_evaluate_candidate", investigation_id=_inv(env))
+    env.say(f"Sandbox evaluation {r['status'].lower()}: {r['passed']} passed, {r['failed']} failed, {r['errors']} errors. Evidence to QA.",
+            to_key="qa", kind="handoff")
+    return {"status": r["status"], "passed": r["passed"], "failed": r["failed"]}
+
+
+def alt_qa(env: TaskEnv) -> dict:
+    r = env.tool("review_sandbox_evidence", investigation_id=_inv(env))
+    env.say(f"QA verdict: {r['verdict'].replace('_', ' ')}. Sending the investigation to the General Manager.", to_key="general_manager",
+            kind="handoff")
+    return {"verdict": r["verdict"]}
+
+
+FINANCE_HANDLERS.update({"alt_research": alt_research, "alt_evaluation": alt_evaluation, "alt_sandbox": alt_sandbox, "alt_qa": alt_qa})

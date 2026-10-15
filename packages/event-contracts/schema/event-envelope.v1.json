@@ -113,7 +113,9 @@
         "finance.bill_reminder",
         "finance.tax_estimate_updated",
         "finance.forecast_updated",
-        "finance.revenue_reported"
+        "finance.revenue_reported",
+        "finance.investigation_status_changed",
+        "finance.investigation_ready"
       ]
     },
     "sequence": {

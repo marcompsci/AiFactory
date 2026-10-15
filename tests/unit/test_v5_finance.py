@@ -486,7 +486,7 @@ def test_legal_obligations_are_never_shopped_around():
 def test_unknown_vendor_research_admits_no_sources():
     from services.finance import research
     r = research.research(vendor="Obscure Tool Inc", item="Seat", amount_minor=900, interval="month", classification="recurring")
-    assert r["findings"] == [] and "Nothing was guessed" in r["note"]
+    assert [f["source"] for f in r["findings"]] == ["request"] and "Nothing was guessed" in r["note"]
 
 
 def test_research_cites_fixture_sources_and_ranks_by_three_year_cost():

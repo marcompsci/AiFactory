@@ -69,10 +69,17 @@ class FinancePipeline:
     def __init__(self, enqueue: Callable[[str], None], gateway=None) -> None:
         self.enqueue = enqueue
         self.gateway = gateway
+        from .investigations import InvestigationPipeline
+
+        self.investigations = InvestigationPipeline(enqueue, gateway)
 
     # ------------------------------------------------------------------ scheduler entry
     def tick(self) -> dict:
-        out = {"packets": 0, "expired": 0, "bills": 0}
+        out = {"packets": 0, "expired": 0, "bills": 0, "investigations": 0}
+        try:
+            out["investigations"] = self.investigations.tick()
+        except Exception:
+            log.exception("investigation tick failed")
         with db.get_engine().connect() as conn:
             ids = [r.id for r in conn.execute(select(db.cost_review_packets.c.id).where(db.cost_review_packets.c.status.in_(ACTIVE)))]
         for pid in ids:
@@ -308,7 +315,9 @@ class FinancePipeline:
                     if a.packet_id:
                         p = P.get(conn, a.packet_id)
                         live = [x for x in _approvals(conn, a.packet_id) if x.status in ("REQUESTED", "APPROVED", "EXECUTED")]
-                        if p.status in ("OWNER_DECISION", "APPROVED") and not live:
+                        from .investigations import is_investigating
+                        # while the owner's investigation runs, the request stays pending; fresh approvals follow it
+                        if p.status in ("OWNER_DECISION", "APPROVED") and not live and not is_investigating(conn, p.id):
                             P.set_status(conn, p.id, "DEFERRED", "approval expired; reopen to get a fresh one")
         return n
 
@@ -338,6 +347,14 @@ def owner_decision(conn, *, packet_id: str, approval_id: str | None, decision: s
         raise A.ApprovalRefused("only the owner can decide cost reviews")
     if p.status != "OWNER_DECISION":
         raise A.ApprovalRefused(f"this cost review is {p.status.lower().replace('_', ' ')}, not waiting for you")
+    from . import investigations as INV
+
+    if decision == "RESEARCH_FREE_ALTERNATIVE":
+        # Research and sandboxed evaluation only: the request and its approval requests stay exactly as they are.
+        inv_id = INV.start(conn, packet_id=packet_id, owner_id=owner_id, owner_role=owner_role, note=note)
+        return {"packet_id": packet_id, "decision": decision, "investigation_id": inv_id, "request_status": "PENDING_OWNER_DECISION",
+                "authorizes": "research and sandboxed evaluation only"}
+    running = INV.active_for(conn, packet_id)
     open_reqs = [a for a in _approvals(conn, packet_id) if a.status == "REQUESTED"]
     result: dict = {"packet_id": packet_id, "decision": decision}
     if approval_id:
@@ -353,6 +370,9 @@ def owner_decision(conn, *, packet_id: str, approval_id: str | None, decision: s
                    actor_type="owner", actor_id=owner_id, reason=(note or decision.lower())[:300], decided_by=owner_id, decided_role=owner_role,
                    decided_at=db.utcnow())
     conn.execute(update(db.cost_review_packets).where(db.cost_review_packets.c.id == packet_id).values(owner_note=(note or None)))
+    if running is not None:
+        INV.cancel(conn, running.id, reason=f"owner decided ({decision.lower()}) before the investigation finished", actor_type="owner",
+                   actor_id=owner_id)
     if decision == "APPROVE":
         P.set_status(conn, packet_id, "APPROVED", "owner approved (step-up verified)", actor_type="owner", actor_id=owner_id)
     elif decision == "REJECT":

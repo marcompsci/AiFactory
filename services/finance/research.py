@@ -37,10 +37,15 @@ def research(*, vendor: str, item: str, amount_minor: int, interval: str, classi
     if classification == "legally_required":
         return {"category": None, "data_mode": "n/a", "findings": [], "note": "Legally required: no alternatives sought. Pay it on time."}
     cat = category_for(vendor, item)
-    if cat is None:
-        return {"category": None, "data_mode": "fixture", "findings": [],
-                "note": "No authorized source covers this vendor or category yet. Nothing was guessed."}
     current_yearly = _yearly(amount_minor, interval if interval != "one_time" else "year")
+    if cat is None:
+        # no alternatives are known, but the owner still decides on the request itself (its own terms, nothing invented)
+        return {"category": None, "data_mode": "fixture", "note": "No authorized source covers this vendor or category yet. Nothing was guessed.",
+                "findings": [{"vendor": vendor, "item": item, "is_requested": True, "price_minor": amount_minor, "interval": interval,
+                              "yearly_minor": current_yearly, "migration_minor": 0, "three_year_minor": current_yearly * YEARS,
+                              "first_year_minor": current_yearly, "compatibility": "full", "security": "not assessed",
+                              "quality": "as requested", "notes": "The requested option (terms from the request itself).",
+                              "source": "request", "data_mode": "request"}]}
     findings = []
     for alt in catalog()["categories"][cat]:
         same = alt["vendor"].lower() in vendor.lower() or vendor.lower() in alt["vendor"].lower()

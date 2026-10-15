@@ -77,6 +77,9 @@ export const EVENT_TYPES = [
   "finance.tax_estimate_updated",
   "finance.forecast_updated",
   "finance.revenue_reported",
+  // V5.1 — free-alternative investigations (research and sandboxed evaluation only)
+  "finance.investigation_status_changed",
+  "finance.investigation_ready",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

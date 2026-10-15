@@ -84,7 +84,8 @@
         "inspect_diff",
         "scaffold_prototype",
         "build_release_bundle",
-        "request_purchase"
+        "request_purchase",
+        "sandbox_evaluate_candidate"
       ],
       "limits": {
         "max_usd_per_mission": 1.0,
@@ -114,7 +115,8 @@
         "read_file",
         "inspect_diff",
         "create_artifact",
-        "stage_bundle"
+        "stage_bundle",
+        "review_sandbox_evidence"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -221,7 +223,8 @@
       "tools": [
         "query_market_source",
         "create_artifact",
-        "research_cost_alternatives"
+        "research_cost_alternatives",
+        "investigate_alternatives"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
@@ -248,7 +251,8 @@
       "tools": [
         "query_market_source",
         "create_artifact",
-        "research_cost_alternatives"
+        "research_cost_alternatives",
+        "investigate_alternatives"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
@@ -406,7 +410,8 @@
       },
       "tools": [
         "read_ledger_summary",
-        "record_cost_findings"
+        "record_cost_findings",
+        "score_alternatives"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,

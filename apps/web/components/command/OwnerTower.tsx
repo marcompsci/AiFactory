@@ -7,6 +7,7 @@ import { human, money, usd } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { ApprovalQueue } from "./Activity";
 import { StepUpDialog } from "./Bank";
+import { InvestigationCard } from "./Investigation";
 import { Button, Dot, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
 
 const CHECK_COLOR: Record<string, string> = { pass: "#5BF2A5", warn: "#FFBD69", fail: "#FF6178", not_applicable: "#8FA8FF" };
@@ -239,8 +240,9 @@ function CostDecision({ id }: { id: string }) {
     onSettled: () => qc.invalidateQueries({ queryKey: ["bank"] }),
   });
   if (!q.data) return <Skeleton lines={3} />;
-  const { packet: p, approvals } = q.data;
+  const { packet: p, approvals, investigation } = q.data;
   const open = approvals.filter((a: Json) => a.status === "REQUESTED");
+  const investigating = Boolean(investigation?.active);
   return (
     <div className="space-y-2 rounded-xl border border-gold/40 bg-white/[.03] p-3 text-sm" data-testid="cost-decision">
       <div className="flex items-start justify-between gap-2">
@@ -251,6 +253,7 @@ function CostDecision({ id }: { id: string }) {
         {p.data_mode === "simulated" ? <Pill color="#FFBD69">simulated</Pill> : null}
       </div>
       {p.gm_decision?.outcome ? <p className="text-xs text-ink-3">General Manager: {human(p.gm_decision.outcome)} ({p.gm_decision.method}).</p> : null}
+      {investigation ? <InvestigationCard id={investigation.id} compact={false} /> : null}
       {open.map((a: Json) => (
         <div key={a.id} className="space-y-1.5 rounded-lg bg-white/[.04] p-2">
           <p className="text-xs font-semibold">{a.details?.option === "recommended" ? "Recommended option" : "As requested"}</p>
@@ -264,6 +267,11 @@ function CostDecision({ id }: { id: string }) {
         {open.length ? <Button variant="danger" onClick={() => m.mutate({ decision: "REJECT", note })}>Reject</Button> : <Button onClick={() => m.mutate({ decision: "ACKNOWLEDGE", note })}>Acknowledge</Button>}
         <Button onClick={() => m.mutate({ decision: "DEFER", defer_days: 14, note })}>Defer 2 weeks</Button>
         {p.research_rounds < 3 ? <Button onClick={() => m.mutate({ decision: "MORE_RESEARCH", note })}>More research</Button> : null}
+        {!investigating && p.origin === "purchase_request" ? (
+          <Button onClick={() => m.mutate({ decision: "RESEARCH_FREE_ALTERNATIVE", note })} title="Research and sandbox testing only; the request stays pending">
+            Research a free alternative
+          </Button>
+        ) : null}
       </div>
       <ErrorNote error={m.error} />
       {approving ? (

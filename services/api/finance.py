@@ -16,6 +16,7 @@ from services.core.events import transaction
 from services.finance import approvals as A
 from services.finance import audit, crypto, dashboard, retention, stepup, sync, tax
 from services.finance import connectors as C
+from services.finance import investigations as INV
 from services.finance import packets as P
 from services.finance.events import femit
 from services.finance.permissions import require_finance, require_owner
@@ -174,14 +175,19 @@ def packet_detail(packet_id: str, p: Principal = Depends(reader)):
                             .order_by(db.logistics_packages.c.created_at)).fetchall()
         trail = conn.execute(select(db.financial_audit_events).where(db.financial_audit_events.c.subject_id.in_([packet_id] + [a.id for a in apps]))
                              .order_by(db.financial_audit_events.c.seq)).fetchall()
+    with db.get_engine().connect() as conn:
+        inv = INV.latest_for(conn, packet_id)
+        investigating = INV.is_investigating(conn, packet_id)
     return {"packet": _row(pk), "approvals": [_row(a) for a in apps], "savings": [_row(s) for s in savings],
+            "request_status": "PENDING_OWNER_DECISION" if pk.status == "OWNER_DECISION" else pk.status,
+            "investigation": None if inv is None else {"id": inv.id, "status": inv.status, "active": investigating},
             "packages": [{"id": x.id, "type": x.package_type, "status": x.status, "origin": x.origin_district, "destination": x.destination_district,
                           "created_at": x.created_at} for x in pkgs],
             "audit": [{"seq": t.seq, "action": t.action, "actor_type": t.actor_type, "detail": t.detail, "at": t.created_at} for t in trail]}
 
 
 class DecisionIn(BaseModel):
-    decision: str = Field(pattern="^(APPROVE|REJECT|DEFER|MORE_RESEARCH|ACKNOWLEDGE)$")
+    decision: str = Field(pattern="^(APPROVE|REJECT|DEFER|MORE_RESEARCH|ACKNOWLEDGE|RESEARCH_FREE_ALTERNATIVE)$")
     approval_id: str | None = None
     payload_hash: str | None = Field(default=None, pattern="^[0-9a-f]{64}$")
     note: str | None = Field(default=None, max_length=500)
@@ -195,7 +201,7 @@ def decide_packet(packet_id: str, body: DecisionIn, p: Principal = Depends(owner
             out = owner_decision(conn, packet_id=packet_id, approval_id=body.approval_id, decision=body.decision,
                                  presented_hash=body.payload_hash, owner_id=p.user_id, owner_role=p.role, step_up_token=x_step_up,
                                  mfa_fresh=p.mfa_fresh, note=body.note, defer_days=body.defer_days)
-        except (A.ApprovalRefused, stepup.StepUpRequired) as exc:
+        except (A.ApprovalRefused, stepup.StepUpRequired, INV.InvestigationRefused) as exc:
             audit.record(conn, org_id=p.organization_id, actor_type="owner", actor_id=p.user_id, action="decision.refused",
                          subject_type="cost_review_packet", subject_id=packet_id, detail={"decision": body.decision, "reason": str(exc)[:200]})
             femit(conn, "finance.action_refused", {"packet_id": packet_id, "decision": body.decision, "reason_code": "refused"})
@@ -217,6 +223,61 @@ def reopen_packet(packet_id: str, p: Principal = Depends(owner)):
             raise HTTPException(status_code=409, detail=str(exc)) from exc
     _poke()
     return {"packet_id": packet_id, "status": "OWNER_DECISION"}
+
+
+# ------------------------------------------------------------------ V5.1 free-alternative investigations
+@router.get("/investigations")
+def list_investigations(p: Principal = Depends(reader)):
+    with db.get_engine().connect() as conn:
+        rows = conn.execute(select(db.savings_investigations).where(db.savings_investigations.c.organization_id == p.organization_id)
+                            .order_by(db.savings_investigations.c.created_at.desc()).limit(50)).fetchall()
+    return {"investigations": [_row(r) for r in rows]}
+
+
+@router.get("/investigations/{inv_id}")
+def investigation_detail(inv_id: str, p: Principal = Depends(reader)):
+    with db.get_engine().connect() as conn:
+        inv = INV.get(conn, inv_id)
+        if inv is None or inv.organization_id != p.organization_id:
+            raise HTTPException(status_code=404, detail="not found")
+        cands = conn.execute(select(db.alternative_candidates).where(db.alternative_candidates.c.investigation_id == inv_id)
+                             .order_by(db.alternative_candidates.c.rank, db.alternative_candidates.c.name)).fetchall()
+        ids = [c.id for c in cands]
+        evidence = conn.execute(select(db.alternative_evidence).where(db.alternative_evidence.c.candidate_id.in_(ids))).fetchall() if ids else []
+        scores = conn.execute(select(db.compatibility_assessments).where(db.compatibility_assessments.c.candidate_id.in_(ids))).fetchall() if ids else []
+        evals = conn.execute(select(db.sandbox_evaluations).where(db.sandbox_evaluations.c.investigation_id == inv_id)
+                             .order_by(db.sandbox_evaluations.c.started_at)).fetchall()
+        costs = conn.execute(select(db.cost_comparisons).where(db.cost_comparisons.c.investigation_id == inv_id)).fetchall()
+        reviews = conn.execute(select(db.investigation_reviews).where(db.investigation_reviews.c.investigation_id == inv_id)
+                               .order_by(db.investigation_reviews.c.created_at)).fetchall()
+        pkgs = conn.execute(select(db.logistics_packages).where(db.logistics_packages.c.subject_id == inv_id)
+                            .order_by(db.logistics_packages.c.created_at)).fetchall()
+        trail = conn.execute(select(db.financial_audit_events).where(db.financial_audit_events.c.subject_id == inv_id)
+                             .order_by(db.financial_audit_events.c.seq)).fetchall()
+    ev_by = {}
+    for e in evidence:
+        ev_by.setdefault(e.candidate_id, []).append(_row(e))
+    sc_by = {s.candidate_id: _row(s) for s in scores}
+    return {"investigation": _row(inv),
+            "candidates": [{**_row(c), "evidence": ev_by.get(c.id, []), "assessment": sc_by.get(c.id)} for c in cands],
+            "sandbox_evaluations": [_row(e) for e in evals], "cost_comparisons": [_row(c) for c in costs],
+            "reviews": [_row(r) for r in reviews],
+            "packages": [{"id": x.id, "status": x.status, "origin": x.origin_district, "destination": x.destination_district,
+                          "created_at": x.created_at} for x in pkgs],
+            "audit": [{"seq": t.seq, "action": t.action, "actor_type": t.actor_type, "detail": t.detail, "at": t.created_at} for t in trail]}
+
+
+@router.post("/investigations/{inv_id}/cancel")
+def cancel_investigation(inv_id: str, p: Principal = Depends(owner)):
+    with transaction() as conn:
+        inv = INV.get(conn, inv_id)
+        if inv is None or inv.organization_id != p.organization_id:
+            raise HTTPException(status_code=404, detail="not found")
+        try:
+            INV.cancel(conn, inv_id, reason="owner cancelled the investigation", actor_type="owner", actor_id=p.user_id)
+        except INV.InvestigationRefused as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"investigation_id": inv_id, "status": "CANCELLED"}
 
 
 # ------------------------------------------------------------------ approvals (all kinds, including bill payments)
