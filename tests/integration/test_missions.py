@@ -267,7 +267,8 @@ def test_remote_clients_refused_in_dev_mode():
 def test_missions_run_as_langgraph_threads_with_approval_interrupts(client):
     mid = start(client)
     a = pending_approval(client, mid)
-    g = client.get(f"/api/missions/{mid}/graph").json()
+    # the approval row is written a moment before the graph checkpoints its interrupt
+    g = wait_for(lambda: (x := client.get(f"/api/missions/{mid}/graph").json())["next"] == ["await_approval"] and x)
     assert g["engine"] == "langgraph" and g["thread_id"] == mid
     assert g["next"] == ["await_approval"], g
     assert g["interrupts"] == [{"mission_id": mid, "waiting_for": "approval"}]
@@ -290,7 +291,7 @@ def test_graph_checkpoint_survives_process_restart(monkeypatch, isolated_env):
     with TestClient(app) as c:
         mid = start(c)
         a = pending_approval(c, mid)
-        before = c.get(f"/api/missions/{mid}/graph").json()
+        before = wait_for(lambda: (x := c.get(f"/api/missions/{mid}/graph").json())["next"] == ["await_approval"] and x)
     reset_checkpointer()  # new process: no in-memory graph state
     with TestClient(app) as c:
         assert c.get(f"/api/missions/{mid}/graph").json()["next"] == ["await_approval"]
