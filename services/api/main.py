@@ -69,7 +69,10 @@ async def lifespan(app: FastAPI):
     state.publisher.join(timeout=5)
 
 
-app = FastAPI(title="AI Civilization API", version="0.4.0", lifespan=lifespan)
+_dev = get_settings().dev_auth
+# API docs and schema only in local dev mode; in production they would map the attack surface for anyone.
+app = FastAPI(title="AI Civilization API", version="0.5.0", lifespan=lifespan,
+              docs_url="/docs" if _dev else None, redoc_url=None, openapi_url="/openapi.json" if _dev else None)
 from services.api.v4 import router as v4_router  # noqa: E402
 
 app.include_router(v4_router)
@@ -88,9 +91,15 @@ app.include_router(overview_router)
 from services.api.factories import router as factories_router  # noqa: E402
 
 app.include_router(factories_router)
-app.add_middleware(CORSMiddleware, allow_origins=get_settings().allowed_origins, allow_credentials=False,
+app.add_middleware(CORSMiddleware, allow_origins=[o for o in get_settings().allowed_origins if o != "*"], allow_credentials=False,
                    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-                   allow_headers=["authorization", "content-type", "last-event-id", "x-step-up"])
+                   allow_headers=["authorization", "content-type", "last-event-id", "x-step-up"], max_age=600)
+if os.environ.get("AICIV_ALLOWED_HOSTS"):
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[h.strip() for h in os.environ["AICIV_ALLOWED_HOSTS"].split(",") if h.strip()])
+from services.core.security import HardeningMiddleware  # noqa: E402
+
+app.add_middleware(HardeningMiddleware)  # outermost: headers, body caps, request budget, auth lockout
 
 
 @app.middleware("http")
@@ -129,6 +138,17 @@ def _rows(rows) -> list[dict]:
 
 
 # ------------------------------------------------------------------ read models
+
+@app.get("/api/public-config")
+def public_config():
+    """Public sign-in settings for the iPhone app: the Supabase address and its publishable (browser-safe) key.
+    Never a secret: no service-role key, JWT secret or token is returned here."""
+    s = get_settings()
+    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+    if not key.startswith(("sb_publishable_", "eyJ")) or key == s.supabase_service_role_key:
+        key = ""
+    return {"supabase_url": s.supabase_url, "supabase_publishable_key": key}
+
 
 @app.get("/api/health")
 def health(p: Principal = Depends(principal)):

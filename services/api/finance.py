@@ -110,10 +110,16 @@ def stepup_enroll(p: Principal = Depends(owner)):
 
 @router.post("/stepup/verify")
 def stepup_verify(body: CodeIn, p: Principal = Depends(owner)):
+    from services.core.security import stepup_failures
+
+    if stepup_failures.locked(p.user_id):
+        raise HTTPException(status_code=429, detail={"code": "step_up_locked", "message": "too many wrong codes; wait 15 minutes"})
     with transaction() as conn:
         try:
             stepup.check_code(conn, p.user_id, body.code)
+            stepup_failures.succeed(p.user_id)
         except stepup.StepUpRequired as exc:
+            stepup_failures.fail(p.user_id)
             audit.record(conn, org_id=p.organization_id, actor_type="owner", actor_id=p.user_id, action="stepup.failed",
                          subject_type="user", subject_id=p.user_id, detail={"purpose": body.purpose})
             raise HTTPException(status_code=401, detail={"code": "step_up_failed", "message": str(exc)}) from exc

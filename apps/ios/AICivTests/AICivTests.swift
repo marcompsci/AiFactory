@@ -160,3 +160,38 @@ final class EventLedgerTests: XCTestCase {
         XCTAssertFalse(r.needsReplay)
     }
 }
+
+@MainActor
+final class V51Tests: XCTestCase {
+    func testPKCEChallengeMatchesRFC7636Example() {
+        // RFC 7636, appendix B
+        XCTAssertEqual(SupabaseAuth.challenge(for: "dBjftJeZ4CVP-mJ92K9qyhgTx2qmAXOJ2pA5jI8PCyA"), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+        let v = SupabaseAuth.makeVerifier()
+        XCTAssertGreaterThanOrEqual(v.count, 43)
+        XCTAssertNil(v.rangeOfCharacter(from: CharacterSet(charactersIn: "+/=")))
+    }
+
+    func testAuthorizeURLUsesPKCEAndTheAppCallback() throws {
+        let auth = SupabaseAuth(supabaseURL: URL(string: "https://example.supabase.co")!, publishableKey: "sb_publishable_x")
+        let url = auth.authorizeURL(provider: "github", challenge: "abc")
+        let items = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems)
+        XCTAssertEqual(url.path, "/auth/v1/authorize")
+        XCTAssertEqual(items.first { $0.name == "redirect_to" }?.value, "aiciv://auth-callback")
+        XCTAssertEqual(items.first { $0.name == "code_challenge_method" }?.value, "s256")
+    }
+
+    func testJSONValueReadsSnakeKeysAndTreatsNullAsAbsent() throws {
+        let v = try JSONDecoder().decode(JSONValue.self, from: Data(#"{"cash_minor": 1250, "finance": null, "items": [{"id": "a"}]}"#.utf8))
+        XCTAssertEqual(v.get("cash_minor")?.int, 1250)
+        XCTAssertNil(v.get("finance"))
+        XCTAssertEqual(v.get("items")?.list.first?.id, "a")
+        XCTAssertEqual(Money.minor(1250), Money.minor(1250))  // formatting is locale-dependent; just must not crash
+    }
+
+    func testSnapshotCarriesDistricts() throws {
+        let snap = try APIClient.decoder.decode(Snapshot.self, from: fixture("snapshot"))
+        let d = try XCTUnwrap(snap.districts)
+        XCTAssertFalse(d.isEmpty)
+        XCTAssertTrue(d.contains { $0.id == "owners-tower" })
+    }
+}

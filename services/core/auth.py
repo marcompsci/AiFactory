@@ -11,6 +11,7 @@ Modes (decided from the environment, see .env.example):
 from __future__ import annotations
 
 import hmac
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ import jwt
 from fastapi import HTTPException, Request
 
 from .config import get_settings, load_seed
+
+log = logging.getLogger("aiciv.auth")
 
 ROLE_RANK = {"viewer": 0, "operator": 1, "admin": 2, "owner": 3}
 
@@ -49,19 +52,26 @@ def _token_from(request: Request) -> str | None:
 _jwks: dict[str, "jwt.PyJWKClient"] = {}
 
 
-def verify_supabase_token(token: str, secret: str, jwks_url: str) -> dict:
-    """HS256 with the legacy shared secret, or ES256/RS256 against the project's published signing keys."""
+def verify_supabase_token(token: str, secret: str, jwks_url: str, issuer: str | None = None) -> dict:
+    """HS256 with the legacy shared secret, or ES256/RS256 against the project's published signing keys. Tokens must
+    carry `exp` and `sub`, be for `aud=authenticated`, and (when SUPABASE_URL is set) come from this project's issuer."""
+    opts = {"require": ["exp", "sub"]}
+    kw = {"audience": "authenticated", "options": opts, "leeway": 30}
+    if issuer:
+        kw["issuer"] = issuer
     try:
+        if len(token) > 8192:
+            raise jwt.InvalidTokenError("token too large")
         alg = jwt.get_unverified_header(token).get("alg")
         if alg == "HS256":
             if not secret:
                 raise jwt.InvalidTokenError("HS256 tokens need SUPABASE_JWT_SECRET")
-            return jwt.decode(token, secret, algorithms=["HS256"], audience="authenticated")
+            return jwt.decode(token, secret, algorithms=["HS256"], **kw)
         if alg not in ("ES256", "RS256") or not jwks_url:
             raise jwt.InvalidTokenError("unsupported token algorithm")
         client = _jwks.setdefault(jwks_url, jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=600))
         key = client.get_signing_key_from_jwt(token).key
-        return jwt.decode(token, key, algorithms=[alg], audience="authenticated")
+        return jwt.decode(token, key, algorithms=[alg], **kw)
     except jwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="invalid token") from exc
 
@@ -85,16 +95,31 @@ def authenticate(request: Request) -> Principal:
     token = _token_from(request)
     if not token:
         raise HTTPException(status_code=401, detail="missing bearer token")
-    if s.api_token and hmac.compare_digest(token, s.api_token):
+    from .security import auth_failures
+
+    client = request.client.host if request.client else "unknown"
+    if s.api_token and hmac.compare_digest(token.encode(), s.api_token.encode()):
+        auth_failures.succeed(client)
         return Principal(user_id="00000000-0000-4000-8000-000000000001", organization_id=org, role="owner", mode="token")
     if s.supabase_jwt_secret or s.supabase_jwks_url:
-        claims = verify_supabase_token(token, s.supabase_jwt_secret, s.supabase_jwks_url)
+        try:
+            claims = verify_supabase_token(token, s.supabase_jwt_secret, s.supabase_jwks_url, issuer=_issuer(s.supabase_url))
+        except HTTPException:
+            if auth_failures.fail(client):
+                log.warning("auth lockout for client %s after repeated invalid tokens", client)
+            raise
+        auth_failures.succeed(client)
         role = (claims.get("app_metadata") or {}).get("role") or owner_by_email(claims) or "viewer"
         from services.finance.stepup import aal2_fresh
 
         return Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase",
                          mfa_fresh=aal2_fresh(claims))
+    auth_failures.fail(client)
     raise HTTPException(status_code=401, detail="invalid token")
+
+
+def _issuer(supabase_url: str) -> str | None:
+    return supabase_url.rstrip("/") + "/auth/v1" if supabase_url else None
 
 
 class RateLimiter:

@@ -11,6 +11,11 @@ struct OwnerTowerView: View {
         NavigationStack {
             List {
                 FinanceDecisionsSection()
+                Section("App Lab") {
+                    NavigationLink { AppLabView() } label: {
+                        Label("Improvement proposals for your apps", systemImage: "flask")
+                    }
+                }
                 let waiting = app.opportunities.filter { $0.status == "OWNER_APPROVAL" }
                 if waiting.isEmpty {
                     ContentUnavailableView("Nothing is waiting for you",

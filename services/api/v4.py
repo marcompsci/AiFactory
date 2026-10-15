@@ -34,6 +34,13 @@ def operator(request: Request) -> Principal:
     return p
 
 
+def _admin(request: Request) -> Principal:
+    p = authenticate(request)
+    p.require("admin")
+    mutation_limiter.check(p.user_id)
+    return p
+
+
 def owner(request: Request) -> Principal:
     p = authenticate(request)
     p.require("owner")  # release and strategic decisions are the owner's alone
@@ -242,9 +249,7 @@ class RouteStatusIn(BaseModel):
 
 
 @router.post("/logistics/routes/{rid:path}/status")
-def route_status(rid: str, body: RouteStatusIn, request: Request):
-    p = authenticate(request)
-    p.require("admin")
+def route_status(rid: str, body: RouteStatusIn, p: Principal = Depends(_admin)):
     with transaction() as conn:
         if not conn.execute(select(db.logistics_routes.c.id).where(db.logistics_routes.c.id == rid)).first():
             raise HTTPException(404, "no such belt")

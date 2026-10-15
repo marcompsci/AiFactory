@@ -30,6 +30,12 @@ def isolated_env(tmp_path, monkeypatch):
     config.get_settings.cache_clear()
     db.reset_engine()
     auth.mutation_limiter._state.clear()
+    from services.core import security
+
+    security.auth_failures.clear()
+    security.stepup_failures.clear()
+    security.request_budget.clear()
+    monkeypatch.setattr(security.request_budget, "per_minute", 100_000)  # tests poll hard; the budget has its own test
     from services.orchestrator.graph import reset_checkpointer
     reset_checkpointer()
     if pg_url:

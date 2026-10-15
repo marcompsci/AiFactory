@@ -56,7 +56,6 @@ struct CompanyView: View {
     @State private var message: String?
 
     var body: some View {
-        NavigationStack {
             List {
                 Section("Send a researcher out") {
                     Picker("Source", selection: $source) {
@@ -92,7 +91,6 @@ struct CompanyView: View {
             }
             .navigationTitle("Company")
             .refreshable { await app.refresh() }
-        }
     }
 
     private func start() async {
@@ -134,7 +132,6 @@ struct ActivityView: View {
     @Environment(AppState.self) private var app
 
     var body: some View {
-        NavigationStack {
             List(app.ledger.feed) { e in
                 let line = FeedText.line(e, agents: app.agents)
                 VStack(alignment: .leading, spacing: 2) {
@@ -149,7 +146,6 @@ struct ActivityView: View {
             }
             .overlay { if app.ledger.feed.isEmpty { ContentUnavailableView("Quiet for now", systemImage: "waveform") } }
             .navigationTitle("Activity")
-        }
     }
 }
 
@@ -160,8 +156,8 @@ struct SettingsView: View {
     @State private var token = ""
 
     var body: some View {
-        NavigationStack {
             Form {
+                AccountSection()
                 Section {
                     TextField("API address", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
                     TextField("City (web app) address", text: $web).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -170,7 +166,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Server")
                 } footer: {
-                    Text("Use the AICIV_API_TOKEN from your server. It is stored in the iOS Keychain on this device only.")
+                    Text("Signing in above is easiest. Or paste the AICIV_API_TOKEN from your server; it is stored in the iOS Keychain on this device only.")
                 }
                 if let h = app.health {
                     Section("System") {
@@ -183,6 +179,6 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .onAppear { server = app.serverURL; web = app.webURL }
-        }
+            .task { if app.auth == nil { await app.loadPublicConfig() } }
     }
 }

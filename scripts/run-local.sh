@@ -27,7 +27,9 @@ npm install --no-audit --no-fund --loglevel=error
 set -a; [ -f .env ] && . ./.env; set +a
 
 echo "==> Starting the API on http://localhost:8000 and the app on http://localhost:3000"
-.venv/bin/python -m uvicorn services.api.main:app --host 127.0.0.1 --port 8000 &
+# AICIV_HOST=0.0.0.0 lets the iPhone app reach this Mac on your Wi-Fi (sign-in must be configured; plain HTTP on a
+# trusted network only — use Tailscale or a tunnel with HTTPS anywhere else).
+.venv/bin/python -m uvicorn services.api.main:app --host "${AICIV_HOST:-127.0.0.1}" --port 8000 --proxy-headers &
 API=$!
 (cd apps/web && npx next start -p 3000) &
 WEB=$!

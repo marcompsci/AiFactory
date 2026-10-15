@@ -2,13 +2,20 @@
 
 A SwiftUI client for the AI Civilization server.
 
+Same pixel-art look as the web dashboard: dark panels with neon rims, monospaced caps, district colours.
+
 | Tab | What it does |
 |---|---|
+| **Home** | The dashboard frame, native: stats bar (cash, agents working, tasks, projects, 30-day revenue, decisions waiting), a live pixel-art map of the city (tap a district to see who's there), live agent activity, conveyor flow, active projects, financial overview. Figures come from `/api/overview`; money only for the owner and admins, and labeled when simulated |
 | **City** | The live 3D city (the web app) full-screen |
-| **Company** | Send researchers out, follow opportunities through the workflow, see the chain of command and each agent's model |
-| **Owner** | The Owner's Tower, native: manager recommendation, sandboxed prototype preview (network blocked), exact bundle digest, tests on that digest, 12-category checklist, cited research with fixture labels, costs and risks. **Approve requires Face ID or your passcode** and sends the digest you are looking at |
-| **Activity** | Live event feed over Server-Sent Events, ordered and deduplicated, with gap replay |
-| **Settings** | Server and city addresses; the access token is stored in the iOS Keychain (this device only) |
+| **Arena** | The money game: leaderboard on verified money (realized savings, avoided cost, attributed revenue), simulated scores shown apart |
+| **Owner** | The Owner's Tower: finance decisions, release reviews and **App Lab proposals**. Approving needs **Face ID or your passcode**, then the server's step-up (authenticator code) for App Lab and payments |
+| **More** | App Lab (repositories, cycles, proposals with the diff and the General Manager's review), Factories (Claude Code sessions, finished tasks and shared memory; GitHub pull requests and workflow runs), Company, Activity, Settings |
+
+**Sign in with Google or GitHub** (Settings → Account): opens the provider in a secure browser sheet
+(`ASWebAuthenticationSession`, PKCE). The app never sees your password; the Supabase session lives in the iOS Keychain and is
+refreshed before it expires. The app reads the Supabase address and publishable key from the server's `/api/public-config`, so
+there's nothing to type. In Supabase, add `aiciv://auth-callback` under Authentication → URL Configuration → Redirect URLs.
 
 Notifications: a local notification fires when a release reaches the Owner's Tower, both while the app is open (live stream)
 and in the background (BGAppRefresh checks about every 15 minutes, when iOS allows). Instant remote push needs an APNs key on
@@ -27,7 +34,7 @@ open AICiv.xcodeproj
 
 - Simulator: pick an iPhone and Run. Point Settings at `http://localhost:8000` (API) and `http://localhost:3000` (city).
 - Your iPhone: set your team in *Signing & Capabilities* (or `DEVELOPMENT_TEAM` in `project.yml`), start the server with
-  `AICIV_API_TOKEN` and `--host 0.0.0.0`, then enter `http://<your-mac-ip>:8000`, the city address and the token in Settings.
+  `AICIV_HOST=0.0.0.0 bash scripts/run-local.sh`, enter `http://<your-mac-ip>:8000` and the city address in Settings, then sign in.
 
 ## Tests
 

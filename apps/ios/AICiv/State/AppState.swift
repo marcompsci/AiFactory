@@ -11,6 +11,7 @@ final class AppState {
 
     var connection: Connection = .idle
     var agents: [String: Agent] = [:]
+    var districts: [District] = []
     var missions: [MissionRow] = []
     var opportunities: [OpportunitySummary] = []
     var health: Health?
@@ -18,6 +19,11 @@ final class AppState {
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"
     var webURL: String = UserDefaults.standard.string(forKey: "webURL") ?? "http://localhost:3000"
     var tokenSet: Bool = Keychain.load() != nil
+    // Sign in with Google / GitHub (Supabase). Public values only; tokens live in the Keychain.
+    var supabaseURL: String = UserDefaults.standard.string(forKey: "supabaseURL") ?? ""
+    var supabaseKey: String = UserDefaults.standard.string(forKey: "supabaseKey") ?? ""
+    var session: SupabaseAuth.Session? = SupabaseAuth.load()
+    var authError: String?
 
     private var streamTask: Task<Void, Never>?
 
@@ -37,12 +43,61 @@ final class AppState {
         connect()
     }
 
+    var auth: SupabaseAuth? {
+        guard let url = URL(string: supabaseURL), url.scheme == "https", !supabaseKey.isEmpty else { return nil }
+        return SupabaseAuth(supabaseURL: url, publishableKey: supabaseKey)
+    }
+
+    /// Reads the server's public sign-in settings (Supabase address and publishable key) so the owner doesn't type them.
+    func loadPublicConfig() async {
+        guard let api = self.api, let cfg = try? await api.publicConfig() else { return }
+        let url = cfg.s("supabase_url"), key = cfg.s("supabase_publishable_key")
+        if !url.isEmpty, !key.isEmpty {
+            supabaseURL = url
+            supabaseKey = key
+            UserDefaults.standard.set(url, forKey: "supabaseURL")
+            UserDefaults.standard.set(key, forKey: "supabaseKey")
+        }
+    }
+
+    func signIn(provider: String) async {
+        authError = nil
+        if auth == nil { await loadPublicConfig() }
+        guard let auth else { authError = SupabaseAuth.AuthFailure.notConfigured.localizedDescription; return }
+        do {
+            let s = try await auth.signIn(provider: provider)
+            session = s
+            SupabaseAuth.save(s)
+            tokenSet = true
+            connect()
+        } catch {
+            authError = error.localizedDescription
+        }
+    }
+
+    func signOut() {
+        session = nil
+        SupabaseAuth.save(nil)
+        tokenSet = false
+        connect()
+    }
+
+    /// Refreshes the Supabase access token a minute before it expires.
+    func ensureFreshToken() async {
+        guard let s = session, s.expiresAt.timeIntervalSinceNow < 60, let auth else { return }
+        if let fresh = try? await auth.refresh(s) {
+            session = fresh
+            SupabaseAuth.save(fresh)
+        }
+    }
+
     func connect() {
         streamTask?.cancel()
         streamTask = Task { await self.run() }
     }
 
     func refresh() async {
+        await ensureFreshToken()
         guard let api = self.api else { return }
         if let snap = try? await api.snapshot() { apply(snapshot: snap) }
         if let list = try? await api.opportunities() { opportunities = list }
@@ -51,6 +106,7 @@ final class AppState {
 
     private func apply(snapshot snap: Snapshot) {
         agents = Dictionary(uniqueKeysWithValues: snap.agents.map { ($0.id, $0) })
+        if let d = snap.districts { districts = d }
         missions = snap.missions
         if let opps = snap.opportunities { opportunities = opps }
         ledger.reset(lastSequence: snap.sequence,
@@ -60,6 +116,7 @@ final class AppState {
     private func run() async {
         var attempt = 0
         while !Task.isCancelled {
+            await ensureFreshToken()
             guard let api = self.api else { connection = .failed("Server address is not a valid URL"); return }
             connection = attempt == 0 ? .connecting : .reconnecting(attempt)
             do {
@@ -85,6 +142,9 @@ final class AppState {
                         line.append(byte)
                     }
                 }
+            } catch let e as APIError where e.status == 401 || e.status == 403 {
+                connection = .failed("Sign in to connect")
+                return
             } catch {
                 if Task.isCancelled { return }
             }

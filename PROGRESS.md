@@ -225,5 +225,18 @@ Built in the order the spec gave. The secure fee review workflow came first.
   fixtures.
 - App Lab has been exercised against a local bare repository and a mock GitHub API, not a real GitHub repository.
   Connecting one is the owner's step.
-- iOS doesn't show App Lab or the Arena yet.
 - Docker-sandbox tests weren't re-run in this environment (no Docker); CI runs them.
+
+## V5.1 — Native iPhone redesign and backend hardening
+
+- iPhone app redesigned in the pixel-art style: Home (stats bar, live pixel map of the city, activity, conveyor,
+  projects, finance), City, Arena, Owner (now with App Lab proposals: Face ID, then authenticator step-up), More (App Lab,
+  Factories, Company, Activity, Settings). Sign in with Google or GitHub through Supabase (PKCE, Keychain).
+- Backend hardening: security headers, body caps, token rules (exp/aud/issuer), lockouts for bad tokens and step-up codes,
+  per-client request budget, auth before body parsing on every mutating route, generic 500s with a request id, docs off
+  outside dev, supply-chain audit job. See SECURITY.md.
+- `/api/public-config` gives the iPhone app the Supabase address and publishable key.
+
+### Still open
+- The Swift code is compiled and tested only on CI (macOS); it hasn't run on a physical iPhone here.
+- Supabase needs `aiciv://auth-callback` in its redirect URLs, and the Google/GitHub providers saved, before phone sign-in works.

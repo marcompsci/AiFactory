@@ -33,13 +33,13 @@ struct RootView: View {
 
     var body: some View {
         TabView {
+            HomeView().tabItem { Label("Home", systemImage: "square.grid.2x2") }
             CityView().tabItem { Label("City", systemImage: "building.2") }
-            CompanyView().tabItem { Label("Company", systemImage: "person.3") }
+            ArenaView().tabItem { Label("Arena", systemImage: "trophy") }
             OwnerTowerView()
                 .tabItem { Label("Owner", systemImage: "building.columns") }
                 .badge(app.ownerWaiting)
-            ActivityView().tabItem { Label("Activity", systemImage: "waveform") }
-            SettingsView().tabItem { Label("Settings", systemImage: "gear") }
+            MoreView().tabItem { Label("More", systemImage: "ellipsis.circle") }
         }
     }
 }

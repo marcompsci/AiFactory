@@ -54,6 +54,18 @@ jobs:
       - run: npm run typecheck
       - run: npm run build
       - run: npm audit --audit-level=high --omit=dev
+  security:
+    # Known-vulnerability scans for Python and npm dependencies (blocking at high severity) plus the repo secret scan.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: pip install pip-audit && pip-audit -r requirements.txt --progress-spinner off
+      - run: npm ci && npm audit --audit-level=high
+      - run: pip install -r requirements-dev.txt && python -m pytest -o addopts="" -q -p no:cacheprovider tests/security
   e2e:
     runs-on: ubuntu-latest
     needs: [backend, frontend]

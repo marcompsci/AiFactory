@@ -253,7 +253,7 @@ def test_viewer_and_operator_cannot_read_finance(monkeypatch):
     app.state.gateway = None
 
     def tok(role):
-        return jwt.encode({"sub": "11111111-1111-4111-8111-111111111111", "aud": "authenticated", "app_metadata": {"role": role},
+        return jwt.encode({"sub": "11111111-1111-4111-8111-111111111111", "aud": "authenticated", "exp": 4102444800, "app_metadata": {"role": role},
                            "exp": int(time.time()) + 600}, "x" * 40, algorithm="HS256")
     with TestClient(app) as c:
         for role in ("viewer", "operator"):

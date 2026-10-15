@@ -58,9 +58,21 @@ struct OpportunitySummary: Codable, Identifiable, Hashable {
     let updatedAt: String
 }
 
+struct District: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let purpose: String?
+    let position: [Double]
+    let color: String
+    let architecture: String?
+    var x: Double { position.first ?? 0 }
+    var z: Double { position.count > 2 ? position[2] : 0 }
+}
+
 struct Snapshot: Codable {
     let sequence: Int
     let agents: [Agent]
+    let districts: [District]?
     let missions: [MissionRow]
     let opportunities: [OpportunitySummary]?
     let emergencyStopped: Bool

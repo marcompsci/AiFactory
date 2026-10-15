@@ -54,6 +54,23 @@ The AI Central Bank has its own threat model with 17 enforced rules and the test
 - simulated data is labeled everywhere;
 - tax filing is always refused.
 
+## Backend hardening (V5.1)
+
+| Control | Implementation | Verified by |
+|---|---|---|
+| Security headers on every response | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, a locked-down `Permissions-Policy`, a deny-all CSP for JSON (file routes set their own), `Cache-Control: no-store` on the API, HSTS behind HTTPS (`AICIV_HSTS`) | `test_security_headers_on_every_response` |
+| Request body caps | 1 MB (`AICIV_MAX_BODY_BYTES`), 20 MB for uploads, enforced on declared and chunked bodies | `test_oversized_bodies_are_refused` |
+| Token rules | Supabase tokens must be signed (HS256 secret or ES256/RS256 JWKS), unexpired (`exp` required, 30 s leeway), for `aud=authenticated`, from this project's issuer when `SUPABASE_URL` is set; `alg=none` and oversized tokens refused; static token compared in constant time | `test_tokens_must_be_unexpired_signed_and_for_this_audience`, `test_issuer_is_enforced_when_supabase_url_is_set` |
+| Credential stuffing | 10 bad tokens from one address in 5 minutes → that address gets 429 for 15 minutes | `test_repeated_bad_tokens_lock_out_the_client` |
+| Step-up brute force | 5 wrong authenticator codes in 10 minutes → step-up locked for 15 minutes for that user | `test_step_up_codes_lock_after_five_wrong_tries` |
+| Request budget | 600 requests per minute per client address across the API (`AICIV_REQUESTS_PER_MINUTE`), on top of the per-user mutation limiter | `test_request_budget_per_client` |
+| Authorization before parsing | every mutating route resolves the caller before reading the body; anonymous → 401, viewer → 403 on all of them | `test_no_mutating_route_accepts_anonymous_or_viewer_requests` (walks every route) |
+| No internals in errors | unexpected errors return `{"detail":"internal error","request_id":…}`; the stack trace is only in the server log under that id | `HardeningMiddleware` |
+| Smaller attack surface | `/docs` and `/openapi.json` only in local dev mode; optional `AICIV_ALLOWED_HOSTS` (Host header allow-list); CORS never allows `*` | `test_api_docs_are_off_outside_dev_mode` |
+| Public config is public-only | `/api/public-config` (unauthenticated, for the iPhone app) returns only the Supabase address and a key that must look publishable (`sb_publishable_…`/anon JWT); anything else, or the service-role key, is blanked | `test_public_config_exposes_only_public_values` |
+| iPhone sign-in | OAuth PKCE (S256) in `ASWebAuthenticationSession`; session in the iOS Keychain, refreshed before expiry; App Lab approval needs Face ID then the server step-up | `V51Tests` (iOS CI) |
+| Supply chain | `pip-audit` and `npm audit --audit-level=high` block CI (`security` job); a repo scan fails the build if keys, tokens or private keys are committed | `security` job, `test_no_secrets_are_committed` |
+
 ## Known gaps (tracked in PROGRESS.md)
 
 - The process sandbox is a good local default, not a security boundary against a hostile kernel exploit.
@@ -62,7 +79,6 @@ The AI Central Bank has its own threat model with 17 enforced rules and the test
   `userns-remap`.
 - Rate limiting and the mission queue are in-process; multi-instance deployments need Redis.
 - Supabase JWT mode maps every user to the seed organization; multi-org membership lookup is not wired yet.
-- Python dependency scanning (`pip-audit`) is not in CI yet.
 - No real Opus/Sonnet/Haiku call has been made yet: the build environment has no API key. The manual "Live models"
   workflow (`scripts/live_smoke.py`) makes those calls once an `ANTHROPIC_API_KEY` repository secret exists.
 - The API connects to Postgres as the table owner (service role), so RLS read policies protect direct client

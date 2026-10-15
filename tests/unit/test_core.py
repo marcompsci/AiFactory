@@ -218,12 +218,12 @@ def test_supabase_jwt_roles(monkeypatch):
     from services.core import auth, config
     monkeypatch.setenv("SUPABASE_JWT_SECRET", "x" * 32)
     config.get_settings.cache_clear()
-    tok = jwt.encode({"sub": "u1", "aud": "authenticated", "app_metadata": {"role": "viewer"}}, "x" * 32, algorithm="HS256")
+    tok = jwt.encode({"sub": "u1", "aud": "authenticated", "exp": 4102444800, "app_metadata": {"role": "viewer"}}, "x" * 32, algorithm="HS256")
     p = auth.authenticate(_req({"Authorization": f"Bearer {tok}"}))
     assert p.role == "viewer"
     with pytest.raises(HTTPException):
         p.require("operator")
-    forged = jwt.encode({"sub": "u1", "aud": "authenticated", "app_metadata": {"role": "owner"}}, "y" * 32, algorithm="HS256")
+    forged = jwt.encode({"sub": "u1", "aud": "authenticated", "exp": 4102444800, "app_metadata": {"role": "owner"}}, "y" * 32, algorithm="HS256")
     with pytest.raises(HTTPException):
         auth.authenticate(_req({"Authorization": f"Bearer {forged}"}))
 

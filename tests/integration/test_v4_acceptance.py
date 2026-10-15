@@ -275,7 +275,7 @@ def test_viewer_cannot_approve_releases(v4env, monkeypatch):
     import jwt
     monkeypatch.setenv("SUPABASE_JWT_SECRET", "s" * 32)
     config.get_settings.cache_clear()
-    tok = lambda role: jwt.encode({"sub": "u", "aud": "authenticated", "app_metadata": {"role": role}}, "s" * 32, algorithm="HS256")
+    tok = lambda role: jwt.encode({"sub": "u", "aud": "authenticated", "exp": 4102444800, "app_metadata": {"role": role}}, "s" * 32, algorithm="HS256")
     with _client() as c:
         h = {"Authorization": f"Bearer {tok('admin')}"}
         r = c.post("/api/opportunities/x/owner-decision", json={"decision": "APPROVE", "artifact_digest": "a" * 64}, headers=h)
