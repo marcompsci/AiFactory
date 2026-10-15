@@ -22,7 +22,7 @@ jobs:
         run: |
           set -e
           SHA=$(git rev-parse --short HEAD)
-          rm -rf /tmp/xp && mkdir -p /tmp/xp/apps/ios && cp -R apps/ios/AICiv.xcodeproj /tmp/xp/apps/ios/
+          rm -rf /tmp/xp && mkdir -p /tmp/xp/apps/ios && cp -R apps/ios/AICiv.xcodeproj /tmp/xp/apps/ios/ && mkdir -p /tmp/xp/apps/ios/AICiv && cp apps/ios/AICiv/Info.plist /tmp/xp/apps/ios/AICiv/
           cd /tmp/xp && git init -q -b ios-xcodeproj && git add -A
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Xcode project generated from ${SHA}"
           git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-xcodeproj
