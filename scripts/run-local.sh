@@ -29,36 +29,42 @@ set -a; [ -f .env ] && . ./.env; set +a
 export AICIV_LOCAL_MODE=1   # running on your own computer: a stale browser tab here never triggers the sign-in lockout
 
 LAN_IP=""
+LAN_NAME=""
+BIND="${AICIV_HOST:-127.0.0.1}"
 if [ "${AICIV_HOST:-127.0.0.1}" = "0.0.0.0" ]; then
+  BIND="::"   # IPv6 and IPv4: an iPhone Personal Hotspot is often IPv6-only
   export AICIV_ALLOW_LAN_ORIGINS=1   # the city page opened from your phone (http://<this Mac>:3000) may call the API
-  # the interface that carries the default route (Wi-Fi or Ethernet), then the usual suspects
+  # the Mac's Bonjour name works on any network, IPv4 or IPv6 (the phone finds it by itself)
+  LAN_NAME=$(scutil --get LocalHostName 2>/dev/null || true)
+  [ -n "$LAN_NAME" ] && LAN_NAME="$LAN_NAME.local"
   IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}' || true)
   for i in $IFACE en0 en1 en2 en3 en4 en5; do
     LAN_IP=$(ipconfig getifaddr "$i" 2>/dev/null || true)
     [ -n "$LAN_IP" ] && break
   done
   [ -z "$LAN_IP" ] && LAN_IP=$( (ifconfig 2>/dev/null || true) | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
-  [ -z "$LAN_IP" ] && LAN_IP=$( (hostname -I 2>/dev/null || true) | awk '{print $1}')
-  [ -z "$LAN_IP" ] && echo "!! Couldn't find this Mac's network address. Is Wi-Fi on? The phone needs it." >&2
-  if [ -n "$LAN_IP" ]; then
-    # the city opened on your phone (http://<this Mac>:3000) calls the API from that origin
-    export AICIV_ALLOWED_ORIGINS="${AICIV_ALLOWED_ORIGINS:-http://localhost:3000},http://$LAN_IP:3000"
-  fi
+  case "$LAN_IP" in 192.0.0.*) LAN_IP="" ;; esac   # 192.0.0.x is an IPv6 hotspot's translation address: unreachable from the phone
+  [ -z "$LAN_IP$LAN_NAME" ] && echo "!! Couldn't find this Mac's network address. Is Wi-Fi on? The phone needs it." >&2
+  for h in $LAN_IP $LAN_NAME; do
+    LOWER=$(printf '%s' "$h" | tr 'A-Z' 'a-z')
+    export AICIV_ALLOWED_ORIGINS="${AICIV_ALLOWED_ORIGINS:-http://localhost:3000},http://$LOWER:3000"
+  done
 fi
 
 echo "==> Starting the API on http://localhost:8000 and the app on http://localhost:3000"
 # AICIV_HOST=0.0.0.0 lets the iPhone app reach this Mac on your Wi-Fi (sign-in must be configured; plain HTTP on a
 # trusted network only — use Tailscale or a tunnel with HTTPS anywhere else).
-.venv/bin/python -m uvicorn services.api.main:app --host "${AICIV_HOST:-127.0.0.1}" --port 8000 --proxy-headers &
+.venv/bin/python -m uvicorn services.api.main:app --host "$BIND" --port 8000 --proxy-headers &
 API=$!
-(cd apps/web && npx next start -H "${AICIV_HOST:-127.0.0.1}" -p 3000) &
+(cd apps/web && npx next start -H "$BIND" -p 3000) &
 WEB=$!
 trap 'kill $API $WEB 2>/dev/null' EXIT INT TERM
 sleep 4
 open http://localhost:3000 2>/dev/null || true
-if [ -n "$LAN_IP" ]; then
+if [ -n "$LAN_NAME$LAN_IP" ]; then
   echo
-  echo "==> iPhone app: More > Settings > API address:  http://$LAN_IP:8000   (or just $LAN_IP)"
-  echo "    City address fills in as http://$LAN_IP:3000. Phone and Mac must be on the same Wi-Fi."
+  echo "==> iPhone app: More > Settings > address:  ${LAN_NAME:-$LAN_IP}"
+  [ -n "$LAN_NAME" ] && [ -n "$LAN_IP" ] && echo "    (or $LAN_IP on this Wi-Fi)"
+  echo "    The city address fills in by itself. Phone and Mac must share the network (Wi-Fi or the phone's hotspot)."
 fi
 wait
