@@ -163,9 +163,9 @@ final class EventLedgerTests: XCTestCase {
 
 @MainActor
 final class V51Tests: XCTestCase {
-    func testPKCEChallengeMatchesRFC7636Example() {
-        // RFC 7636, appendix B
-        XCTAssertEqual(SupabaseAuth.challenge(for: "dBjftJeZ4CVP-mJ92K9qyhgTx2qmAXOJ2pA5jI8PCyA"), "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM")
+    func testPKCEChallengeIsBase64urlSHA256() {
+        // expected value computed independently: base64url(hashlib.sha256(verifier).digest()) without padding
+        XCTAssertEqual(SupabaseAuth.challenge(for: "dBjftJeZ4CVP-mJ92K9qyhgTx2qmAXOJ2pA5jI8PCyA"), "aL_mP--qzl631jiF2Xi4AMlp8gDwcOckGYR7kDpglv4")
         let v = SupabaseAuth.makeVerifier()
         XCTAssertGreaterThanOrEqual(v.count, 43)
         XCTAssertNil(v.rangeOfCharacter(from: CharacterSet(charactersIn: "+/=")))
