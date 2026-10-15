@@ -24,6 +24,9 @@ final class AppState {
     var supabaseKey: String = UserDefaults.standard.string(forKey: "supabaseKey") ?? ""
     var session: SupabaseAuth.Session? = SupabaseAuth.load()
     var authError: String?
+    let finder = ServerFinder()
+    /// The address was set automatically from a Mac found on the network.
+    var autoConnectedTo: String?
 
     private var streamTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
@@ -107,6 +110,38 @@ final class AppState {
             session = fresh
             SupabaseAuth.save(fresh)
         }
+    }
+
+    /// Look for a Mac running AI Civilization; if the app isn't pointed anywhere yet (or its Mac went away), use it.
+    func startFinding() {
+        finder.start()
+        Task {
+            for _ in 0..<120 {   // about a minute of looking each time the app opens
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                if let pick = pickFound() { use(pick); return }
+                if !Self.isLocalhost(serverURL) && connection == .live { return }
+            }
+        }
+    }
+
+    private func pickFound() -> ServerFinder.Found? {
+        guard let first = finder.found.first else { return nil }
+        if finder.found.contains(where: { $0.apiURL == serverURL }) { return nil }  // already using a Mac we found
+        // switch on our own only when nothing works yet: still on localhost, or the current address can't be reached
+        let stuck: Bool = {
+            if Self.isLocalhost(serverURL) { return true }
+            switch connection {
+            case .reconnecting(let n): return n >= 3
+            case .failed(let why): return !why.contains("Sign in")
+            default: return false
+            }
+        }()
+        return stuck ? first : nil
+    }
+
+    func use(_ f: ServerFinder.Found) {
+        autoConnectedTo = f.name
+        saveSettings(server: f.apiURL, web: f.webURL, token: nil)
     }
 
     func connect() {

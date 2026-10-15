@@ -58,12 +58,18 @@ echo "==> Starting the API on http://localhost:8000 and the app on http://localh
 API=$!
 (cd apps/web && npx next start -H "$BIND" -p 3000) &
 WEB=$!
-trap 'kill $API $WEB 2>/dev/null' EXIT INT TERM
+ANNOUNCE=""
+if [ -n "$LAN_NAME" ] && command -v dns-sd >/dev/null 2>&1; then
+  # let the iPhone app find this Mac by itself (Bonjour); it reads the name and ports from the announcement
+  dns-sd -R "AI Civilization (${LAN_NAME%.local})" _aiciv._tcp local 8000 host="$LAN_NAME" api=8000 web=3000 >/dev/null 2>&1 &
+  ANNOUNCE=$!
+fi
+trap 'kill $API $WEB $ANNOUNCE 2>/dev/null' EXIT INT TERM
 sleep 4
 open http://localhost:3000 2>/dev/null || true
 if [ -n "$LAN_NAME$LAN_IP" ]; then
   echo
-  echo "==> iPhone app: More > Settings > address:  ${LAN_NAME:-$LAN_IP}"
+  echo "==> iPhone app: open it; it finds this Mac by itself. (Or type ${LAN_NAME:-$LAN_IP} in More > Settings.)"
   [ -n "$LAN_NAME" ] && [ -n "$LAN_IP" ] && echo "    (or $LAN_IP on this Wi-Fi)"
   echo "    The city address fills in by itself. Phone and Mac must share the network (Wi-Fi or the phone's hotspot)."
 fi

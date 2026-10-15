@@ -35,7 +35,8 @@ targets:
         UIBackgroundModes: [fetch]
         BGTaskSchedulerPermittedIdentifiers: [ai.civilization.refresh]
         NSFaceIDUsageDescription: Face ID confirms that you, the owner, approve a release.
-        NSLocalNetworkUsageDescription: Connects to your AI Civilization server on your local network.
+        NSLocalNetworkUsageDescription: Finds and connects to AI Civilization running on your Mac over Wi-Fi or your hotspot.
+        NSBonjourServices: [_aiciv._tcp]
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
           # plain HTTP to your own computer on a private network only (Wi-Fi, Personal Hotspot); everything else stays HTTPS

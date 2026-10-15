@@ -232,3 +232,13 @@ final class LookTests: XCTestCase {
         XCTAssertNil(try APIClient.decoder.decode(Agent.Avatar.self, from: Data(##"{"shape":"orb","color":"#fff","height":1.5}"##.utf8)).look)
     }
 }
+
+final class FinderTests: XCTestCase {
+    func testReadsTheMacsAnnouncement() throws {
+        let f = try XCTUnwrap(ServerFinder.found(name: "AI Civilization (Omaris-MacBook-Pro)", txt: ["host": "Omaris-MacBook-Pro.local", "api": "8000", "web": "3000"]))
+        XCTAssertEqual(f.apiURL, "http://Omaris-MacBook-Pro.local:8000")
+        XCTAssertEqual(f.webURL, "http://Omaris-MacBook-Pro.local:3000")
+        XCTAssertNil(ServerFinder.found(name: "x", txt: [:]))
+        XCTAssertNil(ServerFinder.found(name: "x", txt: ["host": "evil.com/@x"]))
+    }
+}

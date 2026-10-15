@@ -19,11 +19,12 @@ struct AICivApp: App {
                 .task {
                     Notifier.requestPermission()
                     app.connect()
+                    app.startFinding()
                 }
         }
         .onChange(of: phase) { _, newPhase in
             if newPhase == .background { BackgroundRefresh.schedule() }
-            if newPhase == .active, app.connection != .live { app.connect() }
+            if newPhase == .active, app.connection != .live { app.connect(); app.startFinding() }
         }
     }
 }

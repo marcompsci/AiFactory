@@ -8,8 +8,7 @@ struct CityView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if AppState.isLocalhost(app.webURL) {
-                ContentUnavailableView("Point the app at your Mac", systemImage: "wifi",
-                                       description: Text("On your iPhone, \"localhost\" is the phone itself. In More → Settings, enter your Mac's Wi-Fi address (for example 192.168.1.20) and start the server with AICIV_HOST=0.0.0.0."))
+                FindMacView()
             } else if let url = URL(string: app.webURL) {
                 let token = Keychain.load() ?? ""
                 CityWebView(url: url, apiURL: app.serverURL, token: token).ignoresSafeArea()
@@ -178,6 +177,7 @@ struct SettingsView: View {
 
     var body: some View {
             Form {
+                FoundMacsSection()
                 AccountSection()
                 Section {
                     TextField("Your Mac's address, e.g. 192.168.1.20", text: $server).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -201,5 +201,52 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .onAppear { server = app.serverURL; web = app.webURL }
             .task { if app.auth == nil { await app.loadPublicConfig() } }
+    }
+}
+
+
+/// Shown until the app has found your Mac: it searches by itself; nothing to type.
+struct FindMacView: View {
+    @Environment(AppState.self) private var app
+    var body: some View {
+        VStack(spacing: 16) {
+            ProgressView().controlSize(.large)
+            Text("Looking for your Mac…").font(.title3.bold())
+            Text("On your Mac, double-click start-for-iphone.command (in aifactory/scripts). Keep the phone and the Mac on the same Wi-Fi, or the Mac on this phone's hotspot. The city opens as soon as it's found.")
+                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            ForEach(app.finder.found) { f in
+                Button { app.use(f) } label: { Label("Connect to \(f.name)", systemImage: "desktopcomputer") }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Pixel.sky.ignoresSafeArea())
+        .onAppear { app.startFinding() }
+    }
+}
+
+struct FoundMacsSection: View {
+    @Environment(AppState.self) private var app
+    var body: some View {
+        Section {
+            if app.finder.found.isEmpty {
+                HStack { ProgressView(); Text("Looking for your Mac…").foregroundStyle(.secondary) }
+            }
+            ForEach(app.finder.found) { f in
+                Button { app.use(f) } label: {
+                    HStack {
+                        Label(f.name, systemImage: "desktopcomputer")
+                        Spacer()
+                        if f.apiURL == app.serverURL { Image(systemName: "checkmark").foregroundStyle(Theme.ok) }
+                    }
+                }
+            }
+        } header: {
+            Text("Your Mac")
+        } footer: {
+            Text("Found automatically on your Wi-Fi or hotspot when start-for-iphone.command is running. Tap to connect.")
+        }
+        .onAppear { app.startFinding() }
     }
 }
