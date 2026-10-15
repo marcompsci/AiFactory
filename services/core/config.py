@@ -27,6 +27,9 @@ class Settings:
     api_token: str = field(default_factory=lambda: os.environ.get("AICIV_API_TOKEN", ""))
     supabase_jwt_secret: str = field(default_factory=lambda: os.environ.get("SUPABASE_JWT_SECRET", ""))
     supabase_url: str = field(default_factory=lambda: os.environ.get("SUPABASE_URL", ""))
+    # Supabase projects created since 2025 sign sessions with asymmetric keys (ES256/RS256), published as JWKS.
+    supabase_jwks_url: str = field(default_factory=lambda: os.environ.get("SUPABASE_JWKS_URL", "") or (
+        os.environ["SUPABASE_URL"].rstrip("/") + "/auth/v1/.well-known/jwks.json" if os.environ.get("SUPABASE_URL") else ""))
     supabase_service_role_key: str = field(default_factory=lambda: os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
     anthropic_api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
     openai_api_key: str = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
@@ -59,8 +62,8 @@ class Settings:
 
     @property
     def dev_auth(self) -> bool:
-        """No token and no Supabase secret configured → local single-user dev mode."""
-        return not self.api_token and not self.supabase_jwt_secret
+        """No token and no Supabase auth configured → local single-user dev mode."""
+        return not self.api_token and not self.supabase_jwt_secret and not self.supabase_jwks_url
 
     @property
     def model_available(self) -> bool:

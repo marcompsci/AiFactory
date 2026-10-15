@@ -273,3 +273,36 @@ def test_owner_mapping_for_google_and_github_sign_in(monkeypatch):
     assert owner_by_email({"email": "stranger@example.com", "user_metadata": {"email_verified": True}}) is None
     monkeypatch.delenv("AICIV_OWNER_EMAILS")
     assert owner_by_email({"email": "owner@example.com", "user_metadata": {"email_verified": True}}) is None
+
+
+def test_supabase_asymmetric_tokens_verified_against_jwks(monkeypatch):
+    """New Supabase projects sign with ES256; the API verifies against the published JWKS and rejects forgeries."""
+    import json as _json
+    import time as _time
+
+    import jwt as pyjwt
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from fastapi import HTTPException
+
+    from services.core import auth
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    jwk = _json.loads(pyjwt.algorithms.ECAlgorithm.to_jwk(key.public_key()))
+    jwk.update({"kid": "k1", "alg": "ES256", "use": "sig"})
+
+    class FakeClient:
+        def get_signing_key_from_jwt(self, token):
+            assert pyjwt.get_unverified_header(token)["kid"] == "k1"
+            return pyjwt.PyJWK(jwk)
+
+    auth._jwks["https://x.supabase.co/auth/v1/.well-known/jwks.json"] = FakeClient()
+    claims = {"sub": "u1", "aud": "authenticated", "exp": int(_time.time()) + 60, "email": "o@example.com"}
+    good = pyjwt.encode(claims, key, algorithm="ES256", headers={"kid": "k1"})
+    url = "https://x.supabase.co/auth/v1/.well-known/jwks.json"
+    assert auth.verify_supabase_token(good, "", url)["sub"] == "u1"
+    forged = pyjwt.encode(claims, ec.generate_private_key(ec.SECP256R1()), algorithm="ES256", headers={"kid": "k1"})
+    import pytest as _pytest
+    with _pytest.raises(HTTPException):
+        auth.verify_supabase_token(forged, "", url)
+    with _pytest.raises(HTTPException):  # alg confusion: an HS256 token signed with nothing configured
+        auth.verify_supabase_token(pyjwt.encode(claims, "x" * 32, algorithm="HS256"), "", url)

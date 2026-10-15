@@ -9,7 +9,9 @@ token (`AICIV_API_TOKEN`), or dev mode on localhost.
    Add the web app's URL to the redirect allow-list.
 2. Web app environment:
    `NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co`, `NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>`.
-3. API environment: `SUPABASE_JWT_SECRET=<project JWT secret>` (the API verifies every session token).
+3. API environment: `SUPABASE_URL=https://<project>.supabase.co`. The API verifies every session token against the
+   project's published signing keys (JWKS, ES256/RS256; the default for new projects). Projects that still sign with
+   the legacy shared secret set `SUPABASE_JWT_SECRET` instead.
 4. Make yourself the owner. Either:
    - set `app_metadata.role = "owner"` for your user (Supabase dashboard or service key; users can't change
      `app_metadata` themselves), or
