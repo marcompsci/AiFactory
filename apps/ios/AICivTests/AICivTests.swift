@@ -221,7 +221,7 @@ final class ConnectionTests: XCTestCase {
 
 final class LookTests: XCTestCase {
     func testDecodesAnAgentsChibiLookFromTheAPI() throws {
-        let json = #"{"shape":"cube","color":"#FF8A5C","height":1.6,"look":{"skin":"#F1C27D","hair":{"style":"spiky","color":"#FF8A5C"},"eyes":"anime","eyeColor":"#C2410C","mouth":"smile","top":{"style":"hoodie","color":"#FF8A5C","accent":"#FFE3D3"},"bottom":{"style":"pants","color":"#3A2A2A"},"shoes":"#FFFFFF","accessory":"headphones","prop":"laptop","blush":false}}"#
+        let json = ##"{"shape":"cube","color":"#FF8A5C","height":1.6,"look":{"skin":"#F1C27D","hair":{"style":"spiky","color":"#FF8A5C"},"eyes":"anime","eyeColor":"#C2410C","mouth":"smile","top":{"style":"hoodie","color":"#FF8A5C","accent":"#FFE3D3"},"bottom":{"style":"pants","color":"#3A2A2A"},"shoes":"#FFFFFF","accessory":"headphones","prop":"laptop","blush":false}}"##
         let avatar = try APIClient.decoder.decode(Agent.Avatar.self, from: Data(json.utf8))
         let look = try XCTUnwrap(avatar.look)
         XCTAssertEqual(look.hair.style, "spiky")
@@ -229,6 +229,6 @@ final class LookTests: XCTestCase {
         XCTAssertEqual(look.accessory, "headphones")
         XCTAssertNil(look.hatColor)
         // an agent without a look still decodes (older servers)
-        XCTAssertNil(try APIClient.decoder.decode(Agent.Avatar.self, from: Data(#"{"shape":"orb","color":"#fff","height":1.5}"#.utf8)).look)
+        XCTAssertNil(try APIClient.decoder.decode(Agent.Avatar.self, from: Data(##"{"shape":"orb","color":"#fff","height":1.5}"##.utf8)).look)
     }
 }
