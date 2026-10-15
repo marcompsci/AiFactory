@@ -11,6 +11,9 @@ import { AgentRoster } from "./Agents";
 import { MissionConsole } from "./Missions";
 import { SystemPanel } from "./System";
 import { Button, Dot } from "./ui";
+import { AppLabPanel } from "./AppLab";
+import { GamePanel } from "./Game";
+import { OverviewTab } from "./Frame";
 
 const STATUS_TEXT = {
   connecting: { text: "Connecting", color: "#8FA8FF" },
@@ -76,7 +79,7 @@ export function DistrictCard() {
   const d = DISTRICT_BY_ID[id];
   const here = Object.values(agents).filter((a) => a.district === id);
   return (
-    <div className="glass fixed left-3 top-[calc(max(12px,env(safe-area-inset-top))+104px)] z-20 w-[min(320px,calc(100vw-24px))] rounded-2xl p-3 lg:top-auto lg:bottom-4">
+    <div className="pixel-panel fixed left-3 top-[calc(max(12px,env(safe-area-inset-top))+104px)] z-20 w-[min(320px,calc(100vw-24px))] p-3 lg:left-[200px] lg:top-[84px]">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-sm" style={{ color: d.color }}>
@@ -113,7 +116,10 @@ export function DistrictCard() {
 }
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "missions", label: "Missions" },
+  { id: "overview", label: "Overview" },
+  { id: "missions", label: "Tasks" },
+  { id: "game", label: "Arena" },
+  { id: "lab", label: "App Lab" },
   { id: "company", label: "Company" },
   { id: "bank", label: "Bank" },
   { id: "agents", label: "Agents" },
@@ -135,7 +141,7 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
   return (
     <aside
       aria-label="Command center"
-      className="glass fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-3xl pb-[env(safe-area-inset-bottom)] transition-[height] duration-300 lg:inset-y-3 lg:left-auto lg:right-3 lg:!h-auto lg:w-[420px] lg:rounded-3xl"
+      className="glass pixel-panel fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl pb-[env(safe-area-inset-bottom)] transition-[height] duration-300 lg:inset-y-2 lg:left-auto lg:right-2 lg:!h-auto lg:w-[424px] lg:rounded"
       style={{ height }}
     >
       <button type="button" onClick={cycle} className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/20 lg:hidden" aria-label={`Resize panel (now ${sheet})`} />
@@ -158,6 +164,9 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
         ))}
       </div>
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3" role="tabpanel">
+        {tab === "overview" ? <OverviewTab /> : null}
+        {tab === "game" ? <GamePanel /> : null}
+        {tab === "lab" ? <AppLabPanel /> : null}
         {tab === "missions" ? <MissionConsole /> : null}
         {tab === "agents" ? <AgentRoster /> : null}
         {tab === "activity" ? <LiveActivityFeed /> : null}

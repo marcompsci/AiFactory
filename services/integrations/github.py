@@ -116,7 +116,9 @@ def patch_paths(patch: str) -> set[str]:
 
 
 class GitHubPublisher:
-    def __init__(self, target: PublishTarget, workdir, client: httpx.Client | None = None, git=None, remote_url: str | None = None) -> None:
+    def __init__(self, target: PublishTarget, workdir, client: httpx.Client | None = None, git=None, remote_url: str | None = None,
+                 token: str | None = None) -> None:
+        self._explicit_token = token  # App Lab: the owner's authorized token for that repository
         self.t = target
         self.remote_url = remote_url or f"https://github.com/{target.repo}.git"
         self.workdir = workdir
@@ -126,6 +128,8 @@ class GitHubPublisher:
 
     # -- credentials
     def _token(self) -> str | None:
+        if self._explicit_token:
+            return self._explicit_token
         if self.t.auth == "token":
             return os.environ["GITHUB_TOKEN"]
         if self.t.auth == "app":
@@ -160,14 +164,16 @@ class GitHubPublisher:
         return p.stdout
 
     # -- the publish flow
-    def publish(self, mission_id: str, patch: str, title: str, body: str) -> dict:
+    def publish(self, mission_id: str, patch: str, title: str, body: str, branch: str | None = None) -> dict:
         paths = patch_paths(patch)
         if not paths:
             raise PublishError("the patch changes no files")
         for p in paths:
             if p.startswith("/") or ".." in p.split("/") or p.startswith(".github/") or p.startswith(".git/"):
                 raise PublishError(f"refusing to publish a change to {p}")
-        branch = f"aiciv/mission-{mission_id[:8]}"
+        branch = branch or f"aiciv/mission-{mission_id[:8]}"
+        if branch in (self.t.base, "main", "master"):
+            raise PublishError("refusing to push to a default branch")
         repo_dir = self.workdir / self.t.repo.replace("/", "__")
         url = self.remote_url
         if not (repo_dir / ".git").exists():
@@ -205,3 +211,20 @@ class GitHubPublisher:
             raise PublishError(f"GitHub refused the pull request ({r.status_code}): {r.text[:500]}")
         pr = r.json()
         return {"pr_number": pr["number"], "pr_url": pr["html_url"], "created": True}
+
+    def create_issue(self, title: str, body: str, labels: list[str]) -> dict:
+        r = self.client.post(f"/repos/{self.t.repo}/issues", headers=self._headers(), json={"title": title, "body": body, "labels": labels})
+        if r.status_code >= 400:
+            raise PublishError(f"GitHub refused the issue ({r.status_code}): {r.text[:300]}")
+        j = r.json()
+        return {"issue_number": j["number"], "issue_url": j["html_url"]}
+
+    def status(self, kind: str, number: int) -> dict:
+        """Read-only: the state of a pull request or issue we opened."""
+        path = f"/repos/{self.t.repo}/{'pulls' if kind == 'pr' else 'issues'}/{number}"
+        r = self.client.get(path, headers=self._headers())
+        if r.status_code >= 400:
+            raise PublishError(f"GitHub status lookup failed ({r.status_code})")
+        j = r.json()
+        return {"state": j.get("state"), "merged": bool(j.get("merged")), "draft": bool(j.get("draft")), "comments": j.get("comments", 0),
+                "url": j.get("html_url")}

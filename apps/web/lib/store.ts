@@ -6,7 +6,7 @@ import { SEED } from "@aiciv/shared-types";
 import { create } from "zustand";
 
 export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "demo";
-export type Tab = "missions" | "company" | "bank" | "agents" | "activity" | "approvals" | "system";
+export type Tab = "overview" | "missions" | "company" | "bank" | "agents" | "activity" | "approvals" | "system" | "lab" | "game";
 export type CameraMode = "overview" | "orbit" | "follow" | "fly";
 export type Quality = "auto" | "high" | "low";
 
@@ -20,6 +20,7 @@ interface Settings {
   quality: Quality;
   labels: boolean;
   drones: boolean;
+  pixelArt: boolean;
 }
 
 export interface LogisticsNode {
@@ -106,7 +107,7 @@ export const useStore = create<Store>((set, get) => ({
   tab: "missions",
   sheet: "peek",
   camera: "overview",
-  settings: { reducedMotion: prefersReduced(), quality: "auto", labels: true, drones: true },
+  settings: { reducedMotion: prefersReduced(), quality: "auto", labels: true, drones: true, pixelArt: true },
   demoApproval: null,
   clock: () => (typeof performance !== "undefined" ? performance.now() : 0),
 

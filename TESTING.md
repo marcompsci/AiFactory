@@ -70,3 +70,17 @@ Locally without Playwright's browser download: `PW_CHROME=/path/to/chrome PYTHON
 | `packages/world-engine/src/world.test.ts` | finance events queue and clear decisions at the Owner's Tower; every bank floor has a desk; the bank is on the belt network |
 | `tests/e2e/app.spec.ts` | V5 in a real browser: load the simulated ledger, request a paid tool, approve the recommended option at the Owner's Tower by entering a real TOTP code, then see it executed (simulated); the bank interior shows all floors |
 | iOS `FinanceTests` | decodes real captured cost-review responses, exact-terms fingerprints, request encoding |
+
+## V5.1 additions
+
+| Suite | What it covers |
+|---|---|
+| `tests/integration/test_v51_investigation.py` (7) | **Acceptance**: research begins without authorizing the purchase; sources and pricing are traceable; the sandbox produces real per-requirement results; failed evaluations are reported accurately; the manager can't authorize; the owner gets a complete comparison; no financial action without a separate approval. Also: survives worker restart and browser reconnection; an unknown tool blocks without guessing; an owner decision cancels a running investigation; investigation missions can't spend, cancel or deploy; tools refuse outside their investigation; broken kits become ERROR and live candidates are refused |
+| `tests/integration/test_applab.py` (3) | **App Lab acceptance** against a local bare repo + mock GitHub API: connect needs step-up and a valid token; research → forge → GM → tower as packages; nothing pushed before approval; approval refusals (no step-up, wrong purpose, wrong hash); draft PR on `aiciv/lab-*` with `main` unchanged; Claude Code issue; single use; read-only tracking and the GM's merge report; no token in events; revoke. Tool confinement (unapproved, wrong mission, non-lab tools, wrong stage). GM blocks `.github/`, `.env` and oversized patches; a cycle resumes after restart |
+| `tests/integration/test_game.py` (2) | executed cheaper purchase → simulated savings split among the agents who did the work, never verified, idempotent, append-only; revenue counts only after an owner link |
+| `tests/unit/test_core.py` | Google/GitHub owner mapping needs a verified listed email |
+| `tests/e2e/app.spec.ts` | dashboard frame stats and panels, Arena leaderboard and App Lab panel render from the backend |
+
+### Last verified run (Oct 14, 2026)
+- `pytest`: **161 passed, 3 skipped** (SQLite) · **PostgreSQL 16**: same suite green
+- `vitest`: **15 passed** · Playwright: **8 passed** · `tsc --noEmit`, `next build`: clean

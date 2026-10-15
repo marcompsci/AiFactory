@@ -115,7 +115,15 @@
         "finance.forecast_updated",
         "finance.revenue_reported",
         "finance.investigation_status_changed",
-        "finance.investigation_ready"
+        "finance.investigation_ready",
+        "lab.repository_changed",
+        "lab.cycle_status_changed",
+        "lab.proposals_ready",
+        "lab.proposal_decided",
+        "lab.change_published",
+        "lab.change_status",
+        "game.score_recorded",
+        "game.season_changed"
       ]
     },
     "sequence": {

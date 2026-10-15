@@ -10,7 +10,7 @@ test("send a mission, approve publishing, and see it survive a refresh", async (
   await page.getByRole("tab", { name: /Owner/ }).click();
   await page.getByRole("button", { name: "Approve and publish" }).click();
 
-  await page.getByRole("tab", { name: /Missions/ }).click();
+  await page.getByRole("tab", { name: /Tasks/ }).click();
   await expect(page.getByText("Outcome: Published")).toBeVisible({ timeout: 60_000 });
 
   // inspect a real artifact
@@ -39,7 +39,7 @@ test("agent inspector opens from the roster", async ({ page }) => {
 test("phone layout keeps the command panel usable", async ({ browser }) => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   await page.goto("http://localhost:3100/");
-  await expect(page.getByRole("tab", { name: "Missions" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Tasks" })).toBeVisible();
   await page.getByRole("tab", { name: "System" }).click();
   await expect(page.getByText("Emergency stop")).toBeVisible();
 });
@@ -133,4 +133,17 @@ test("V5: the AI Central Bank opens up to show its floors", async ({ page }) => 
   await expect(page.getByText(/Vault · Secure Records Vault/)).toBeVisible();
   await page.waitForTimeout(2000);
   await page.screenshot({ path: "test-results/v5-bank-inside.png" });
+});
+
+test("dashboard frame, money game and App Lab come from the backend", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("status")).toContainText("Live", { timeout: 30_000 });
+  await expect(page.getByTestId("stat-agents")).toContainText("/16");
+  await expect(page.getByTestId("panel-conveyor")).toContainText("Owner");
+  await expect(page.getByTestId("panel-finance")).toBeVisible();
+  await page.getByRole("tab", { name: "Arena" }).click();
+  await expect(page.getByTestId("leaderboard")).toContainText("Atlas");
+  await expect(page.getByText("ranked by verified money")).toBeVisible();
+  await page.getByRole("tab", { name: "App Lab" }).click();
+  await expect(page.getByRole("button", { name: "Authorize this repository" })).toBeVisible();
 });

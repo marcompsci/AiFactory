@@ -5,7 +5,56 @@ import { useState } from "react";
 import { api, loadConnection, saveConnection, type Json } from "@/lib/api";
 import { usd } from "@/lib/format";
 import { useStore, type Quality } from "@/lib/store";
-import { Button, Dot, Empty, ErrorNote, Section, Skeleton } from "./ui";
+import { Button, Dot, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
+import { useEffect, useRef } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { authConfigured, githubSigninToken, onSession, signIn, signOut } from "@/lib/auth";
+
+/** Sign in with Google or GitHub, and how Claude is connected. */
+function AccountsPanel({ onReconnect }: { onReconnect: () => void }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [err, setErr] = useState<unknown>(null);
+  const reconnect = useRef(onReconnect);
+  reconnect.current = onReconnect;
+  useEffect(() => onSession((s) => {
+    setSession((prev) => {
+      if ((prev?.access_token ?? null) !== (s?.access_token ?? null)) setTimeout(() => reconnect.current(), 0);
+      return s;
+    });
+  }), []);
+  const go = (p: "google" | "github", repo = false) => signIn(p, repo).catch(setErr);
+  const provider = session?.user?.app_metadata?.provider as string | undefined;
+  return (
+    <Section title="Accounts">
+      {!authConfigured() ? (
+        <p className="text-xs text-ink-3">Sign-in isn't configured on this deployment. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY and enable the Google and GitHub providers in Supabase (docs/AUTH.md). Until then, use an API token below.</p>
+      ) : session ? (
+        <div className="flex items-center gap-2 text-sm">
+          <Pill color="#5BF2A5">Signed in</Pill>
+          <span className="min-w-0 flex-1 truncate">{session.user.email} via {provider}</span>
+          <Button onClick={() => signOut().then(onReconnect)}>Sign out</Button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => go("google")}>Sign in with Google</Button>
+          <Button onClick={() => go("github")}>Sign in with GitHub</Button>
+        </div>
+      )}
+      {authConfigured() ? (
+        <p className="text-xs text-ink-3">
+          {githubSigninToken() ? "Your GitHub sign-in can be used to connect repositories in App Lab." : (
+            <>For App Lab, a fine-grained token for one repository is safest. Or <button type="button" className="text-cyan" onClick={() => go("github", true)}>sign in with GitHub with repository access</button>.</>
+          )}
+        </p>
+      ) : null}
+      <div className="rounded-xl border border-line p-3 text-xs text-ink-2">
+        <p className="font-semibold text-ink">Claude</p>
+        <p className="mt-1">Agents think with Claude through the server's Anthropic API key (ANTHROPIC_API_KEY). Code changes you approve in App Lab can be carried out by Claude Code in GitHub, through Anthropic's Claude Code GitHub Action, using a CLAUDE_CODE_OAUTH_TOKEN repository secret you create with <code>claude setup-token</code>. Third-party apps can't offer claude.ai login, so this app never asks for your Claude password.</p>
+      </div>
+      <ErrorNote error={err} />
+    </Section>
+  );
+}
 
 export function SystemPanel({ onReconnect }: { onReconnect: () => void }) {
   const status = useStore((s) => s.status);
@@ -19,6 +68,7 @@ export function SystemPanel({ onReconnect }: { onReconnect: () => void }) {
           <MemoryPanel />
         </>
       ) : null}
+      <AccountsPanel onReconnect={onReconnect} />
       <ConnectionSettings onReconnect={onReconnect} />
       <WorldSettings />
     </div>
@@ -198,7 +248,7 @@ function ConnectionSettings({ onReconnect }: { onReconnect: () => void }) {
 function WorldSettings() {
   const s = useStore((st) => st.settings);
   const set = useStore((st) => st.setSettings);
-  const toggle = (k: "reducedMotion" | "labels" | "drones", label: string, hint: string) => (
+  const toggle = (k: "reducedMotion" | "labels" | "drones" | "pixelArt", label: string, hint: string) => (
     <label className="flex items-start gap-2 text-sm">
       <input type="checkbox" className="mt-1" checked={s[k]} onChange={(e) => set({ [k]: e.target.checked })} />
       <span>
@@ -212,7 +262,8 @@ function WorldSettings() {
       <div className="space-y-2">
         {toggle("reducedMotion", "Reduce motion", "Agents jump to places instead of walking; no bobbing or pulsing.")}
         {toggle("labels", "Name tags", "Show agent and district names in the city.")}
-        {toggle("drones", "Ambient traffic", "Violet drones are decoration only. They never represent agent work.")}
+        {toggle("drones", "Ambient traffic", "Flying cars are decoration only. They never represent agent work.")}
+        {toggle("pixelArt", "Pixel-art rendering", "Renders the city at a low resolution and scales it up without smoothing.")}
         <label className="flex items-center gap-2 text-sm">
           Rendering
           <select value={s.quality} onChange={(e) => set({ quality: e.target.value as Quality })} className="rounded-md border border-line bg-ground px-2 py-1 text-sm">

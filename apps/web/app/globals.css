@@ -16,6 +16,7 @@
   --font-display: "Unbounded", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-pixel: "Pixelify Sans", "Unbounded", ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
@@ -98,4 +99,45 @@ body {
   * {
     transition-duration: 0ms !important;
   }
+}
+
+/* Pixel-art frame (reference: isometric pixel city dashboard). Hard 2px edges, stepped corners, neon rim. */
+.pixel-panel {
+  background: rgb(10 16 34 / 0.92);
+  border: 2px solid rgb(50 216 255 / 0.35);
+  box-shadow:
+    0 0 0 2px rgb(7 11 24),
+    0 0 18px rgb(50 216 255 / 0.18),
+    inset 0 0 0 1px rgb(166 107 255 / 0.18);
+  border-radius: 4px;
+  image-rendering: pixelated;
+}
+.pixel-title {
+  font-family: var(--font-pixel);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.pixel-avatar {
+  image-rendering: pixelated;
+  box-shadow: inset -2px -2px 0 rgb(0 0 0 / 0.35), inset 2px 2px 0 rgb(255 255 255 / 0.25);
+}
+.pixel-bar {
+  background-image: repeating-linear-gradient(90deg, currentColor 0 6px, transparent 6px 8px);
+}
+/* The 3D city renders at a low internal resolution and is upscaled without smoothing. */
+.pixel-canvas canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.speech {
+  font-family: var(--font-pixel);
+  font-size: 10px;
+  line-height: 1.15;
+  padding: 3px 6px;
+  border-radius: 3px;
+  background: rgb(234 242 255 / 0.95);
+  color: #0b1226;
+  border: 2px solid #0b1226;
+  max-width: 160px;
+  white-space: normal;
 }

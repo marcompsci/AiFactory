@@ -1,0 +1,31 @@
+# Installed by AI Civilization's App Lab after the owner approved it.
+# Runs Anthropic's official Claude Code GitHub Action when an issue is labeled "claude" or a comment mentions @claude.
+# Authentication: add ONE repository secret (Settings → Secrets and variables → Actions):
+#   CLAUDE_CODE_OAUTH_TOKEN  from `claude setup-token` (uses your Claude Pro/Max sign-in), or
+#   ANTHROPIC_API_KEY        an API key (then change the input below to anthropic_api_key).
+# Claude works on a new branch and opens a pull request; protect your default branch so nothing merges without you.
+name: Claude Code (App Lab)
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+jobs:
+  claude:
+    if: >-
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'claude')) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

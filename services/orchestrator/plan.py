@@ -168,8 +168,17 @@ ALT_QA_GRAPH = [TaskSpec("alt_qa", "qa", "Review the sandbox evidence", "sentine
                          ["review_sandbox_evidence"], expected_outputs={"verdict": "str"})]
 INVESTIGATION_KINDS = ("alt_research", "alt_evaluation", "alt_sandbox", "alt_qa")
 
+LAB_RESEARCH_GRAPH = [TaskSpec("lab_research", "research_apps", "Research app designs people engage with, buy and play", "data-observatory",
+                               "observatory-lens", ["research_design_insights"], expected_outputs={"count": "int"}, validation={"cites_sources": True})]
+LAB_ANALYZE_GRAPH = [TaskSpec("lab_analyze", "developer", "Read the repository and draft improvement proposals", "code-forge", "forge-anvil",
+                              ["scan_repository", "propose_improvements", "refine_proposal", "draft_patch"], expected_outputs={"proposals": "int"},
+                              timeout_seconds=900)]
+LAB_PUBLISH_GRAPH = [TaskSpec("lab_publish", "developer", "Publish the owner-approved change to GitHub", "code-forge", "forge-anvil",
+                              ["publish_lab_change"], expected_outputs={"url": "str"}, timeout_seconds=600, max_attempts=1)]
+LAB_KINDS = ("lab_research", "lab_analyze", "lab_publish")
+
 KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release",
-         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS)
+         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS, *LAB_KINDS)
 
 
 def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list[TaskSpec]:
@@ -198,6 +207,12 @@ def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list
         graph = ALT_SANDBOX_GRAPH
     elif kind == "alt_qa":
         graph = ALT_QA_GRAPH
+    elif kind == "lab_research":
+        graph = LAB_RESEARCH_GRAPH
+    elif kind == "lab_analyze":
+        graph = LAB_ANALYZE_GRAPH
+    elif kind == "lab_publish":
+        graph = LAB_PUBLISH_GRAPH
     else:
         graph = RELEASE_GRAPH
     validate_graph(graph)

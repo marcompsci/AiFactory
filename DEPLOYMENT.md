@@ -20,6 +20,11 @@
    the API container that serves requests from the internet without isolating the worker first).
 5. Put the API behind HTTPS (the SSE endpoint needs proxy buffering off: `X-Accel-Buffering: no` is sent).
 6. Build the web app with `NEXT_PUBLIC_API_URL=https://your-api` or set it in the app under System → Server.
+7. Sign-in with Google/GitHub: set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` on the web app and
+   `SUPABASE_JWT_SECRET` (+ optionally `AICIV_OWNER_EMAILS`) on the API. See docs/AUTH.md.
+8. App Lab: set `AICIV_FINANCE_KEY` (tokens are encrypted with it). Optional: `AICIV_APPLAB_AUTOPILOT_HOURS`
+   (default 24). Repositories are connected from the app by the owner, never from env. See docs/APP_LAB.md.
+9. Apply migrations `0001`–`0006` (the API applies pending ones on start when `DATABASE_URL` is Postgres).
 
 ## Docker
 

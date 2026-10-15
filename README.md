@@ -9,6 +9,28 @@ hand work to each other, and stop to ask you before anything is published.
 This repository holds the first vertical slice of the AI Civilization V3.0 spec: one complete,
 verifiable mission path from prompt to reviewable commit, rendered as a navigable city.
 
+## New in V5.1: a game, an App Lab, and free-alternative investigations
+
+- **A pixel-art city with a dashboard frame.** Floating islands, waterfalls, neon signs, flying cars and chibi agents
+  with speech bubbles. A stats bar runs along the top (cash, agents, tasks, projects, 30-day revenue), navigation runs
+  down the left, and the bottom has four live panels: agent activity, conveyor flow, active projects and financial
+  overview. Every number comes from the backend.
+- **The money game (Arena).** Agents compete on a monthly leaderboard to make you the most money, and only
+  *verified* money scores: executed cheaper purchases, purchases you turned down after they found a free
+  alternative, and revenue from products you linked to their work. Simulated plays are labeled and never count.
+  See [docs/GAME.md](docs/GAME.md).
+- **App Lab.** Research finds app designs people engage with, buy and play. Code Forge turns them into proposals for
+  *your* GitHub repository. The General Manager briefs you, and nothing reaches GitHub until you approve the exact
+  change. Changes go out as a draft PR on a separate branch, or as an issue for the Claude Code GitHub Action. See
+  [docs/APP_LAB.md](docs/APP_LAB.md).
+- **Sign in with Google or GitHub** (Supabase Auth). Claude connects through an API key for the agents and the Claude
+  Code GitHub Action for code; third-party apps can't offer claude.ai login. See [docs/AUTH.md](docs/AUTH.md).
+- **Free-alternative investigations.** "Research a free alternative" on any paid-tool request. Researchers find up to
+  five candidates with sources and licenses, the bank scores them, Code Forge tests the best one in a disposable
+  sandbox, QA reviews the evidence, and the GM recommends. The purchase stays pending for your decision.
+
+<p><img src="docs/screenshots/pixel-city-dashboard.png" alt="Pixel-art city on floating islands with the dashboard frame" width="49%"> <img src="docs/screenshots/arena.png" alt="The Arena leaderboard" width="49%"></p>
+
 ## New in V4.0: a company that answers to you
 
 - **Atlas, the General Manager** (Claude Opus 5.5) runs a chain of command: department supervisors, specialists, and two
@@ -92,7 +114,7 @@ The top bar's **Simulation** badge disappears and costs start showing in System 
 ## Tests
 
 ```bash
-python -m pytest                                       # 97 backend unit + integration tests
+python -m pytest                                       # backend unit + integration tests
 npx vitest run                                         # world engine + event contract
 npx playwright test -c tests/e2e/playwright.config.ts  # real browser against a real API
 ```
@@ -113,6 +135,8 @@ services/tools          tool registry with permission checks + sandbox
 services/memory         verified vs hypothesis memory
 services/finance        AI Central Bank: approvals, fee reviews, connectors, dashboard, tax (V5)
 services/integrations   GitHub: approved missions open draft pull requests
+services/applab         App Lab: research → proposals → GM briefing → owner → draft PR / Claude Code issue
+services/game           the money game: scoring verified money, seasons, leaderboard
 infrastructure          Postgres migrations (RLS), Dockerfiles incl. the tool sandbox image
 scripts                 live-model smoke test, CI helpers
 tests                   unit, integration, e2e

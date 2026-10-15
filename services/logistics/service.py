@@ -24,7 +24,9 @@ PACKAGE_TYPES = {"research_brief", "product_proposal", "design_spec", "code_arti
                  # V5 AI Central Bank. Each references its authoritative record via subject_type/subject_id.
                  "revenue_report", "expense_alert", "bill_reminder", "fee_research_request", "savings_recommendation",
                  "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request",
-                 "savings_investigation"}
+                 "savings_investigation",
+                 # App Lab
+                 "design_insights", "lab_proposal"}
 FINANCE_PACKAGE_TYPES = {"revenue_report", "expense_alert", "bill_reminder", "fee_research_request", "savings_recommendation",
                          "purchase_request", "payment_proposal", "tax_review_package", "financial_forecast", "owner_approval_request",
                          "savings_investigation"}

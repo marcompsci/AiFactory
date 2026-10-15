@@ -31,6 +31,9 @@ class Scheduler(threading.Thread):
         from services.finance.pipeline import FinancePipeline
 
         self.finance = FinancePipeline(enqueue, gateway)
+        from services.applab.pipeline import AppLabPipeline
+
+        self.applab = AppLabPipeline(enqueue, gateway)
         self._poke = threading.Event()
         self._halt = threading.Event()
         self.scale = float(os.environ.get("AICIV_TICK_SCALE", "1"))
@@ -39,6 +42,8 @@ class Scheduler(threading.Thread):
             "pipeline": self.pipeline.tick,
             "supervisor": self._supervisor,
             "finance": self.finance.tick,
+            "applab": self.applab.tick,
+            "game": self._game,
         }
 
     def poke(self) -> None:
@@ -51,6 +56,10 @@ class Scheduler(threading.Thread):
     def _logistics(self) -> dict:
         with transaction() as conn:
             return logistics.tick(conn)
+
+    def _game(self) -> dict:
+        from services.game.scoring import tick
+        return tick()
 
     def _supervisor(self) -> dict:
         with transaction() as conn:

@@ -79,15 +79,18 @@ class ToolSpec:
     finance: bool = False       # V5: arguments and results are financial; withheld from events and mission views
     finance_gate: bool = False  # V5: needs an owner-approved, unexpired, unused financial approval for exactly these terms
     investigation: bool = False  # V5.1: read-only investigation tool; only usable by investigation missions
+    lab: bool = False            # App Lab tool; only usable by App Lab missions on their own cycle / proposal
+    lab_gate: bool = False       # App Lab: needs the owner's step-up approval of exactly this change
 
 
 REGISTRY: dict[str, ToolSpec] = {}
 
 
 def tool(name: str, protected: bool = False, description: str = "", release_gate: bool = False, finance: bool = False,
-         finance_gate: bool = False, investigation: bool = False):
+         finance_gate: bool = False, investigation: bool = False, lab: bool = False, lab_gate: bool = False):
     def deco(fn: Callable[..., dict]) -> Callable[..., dict]:
-        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate, finance or finance_gate, finance_gate, investigation)
+        REGISTRY[name] = ToolSpec(name, protected, description, fn, release_gate, finance or finance_gate, finance_gate, investigation,
+                                  lab or lab_gate, lab_gate)
         return fn
     return deco
 
@@ -335,6 +338,7 @@ def _check_permissions(conn, ctx: ToolContext, spec: ToolSpec, args: dict | None
         if not granted:
             raise ToolDenied(f"{spec.name} is protected and has no granted approval")
     _check_investigation(conn, ctx, spec, mission, args or {})
+    _check_lab(conn, ctx, spec, mission, args or {})
     if spec.finance or spec.name == "request_purchase":
         _check_finance(conn, ctx, spec, mission, args or {})
     if spec.release_gate:
@@ -366,6 +370,49 @@ def _check_investigation(conn, ctx: ToolContext, spec: ToolSpec, mission, args: 
         inv = conn.execute(select(db.savings_investigations).where(db.savings_investigations.c.id == inv_id)).first()
         if inv is None or inv.status not in ("RESEARCHING", "EVALUATING", "TESTING"):
             raise ToolDenied(f"investigation is {inv.status.lower() if inv else 'missing'}")
+
+
+LAB_TOOLS = {"research_design_insights", "scan_repository", "propose_improvements", "refine_proposal", "draft_patch", "publish_lab_change"}
+LAB_STAGE = {"research_design_insights": ("lab_research", "RESEARCHING"), "scan_repository": ("lab_analyze", "ANALYZING"),
+             "propose_improvements": ("lab_analyze", "ANALYZING"), "refine_proposal": ("lab_analyze", "ANALYZING"),
+             "draft_patch": ("lab_analyze", "ANALYZING"), "publish_lab_change": ("lab_publish", None)}
+
+
+def _check_lab(conn, ctx: ToolContext, spec: ToolSpec, mission, args: dict) -> None:
+    """App Lab: its missions can use only App Lab tools; each tool works only for the cycle (or proposal) its mission
+    was created for, at the right stage; publishing needs the owner's step-up approval of exactly this change."""
+    from services.orchestrator.plan import LAB_KINDS
+
+    in_lab = mission.kind in LAB_KINDS
+    if in_lab and spec.name not in LAB_TOOLS:
+        raise ToolDenied(f"{spec.name} is not allowed in an App Lab mission")
+    if not spec.lab:
+        return
+    kind, stage = LAB_STAGE[spec.name]
+    if mission.kind != kind:
+        raise ToolDenied(f"{spec.name} only runs in a {kind} mission")
+    params = mission.params or {}
+    if spec.lab_gate:
+        if not params.get("proposal_id") or args.get("proposal_id") != params.get("proposal_id"):
+            raise ToolDenied("this mission was not created for that proposal")
+        from services.applab.lab import LabRefused, authorize_publish
+        try:
+            p, _ = authorize_publish(conn, args["proposal_id"], ctx.org_id)
+        except LabRefused as exc:
+            raise ToolDenied(f"publishing refused: {exc}") from exc
+        if p.publish_mission_id != ctx.mission_id:
+            raise ToolDenied("the owner's approval was issued to a different mission")
+        if args.get("payload_hash") != p.payload_hash:
+            raise ToolDenied("publishing refused: the change differs from what the owner approved")
+        return
+    if not params.get("cycle_id") or args.get("cycle_id") != params.get("cycle_id"):
+        raise ToolDenied("this mission is not working on that App Lab cycle")
+    c = conn.execute(select(db.lab_cycles).where(db.lab_cycles.c.id == params["cycle_id"])).first()
+    if c is None or c.status != stage:
+        raise ToolDenied(f"App Lab cycle is {c.status.lower() if c else 'missing'}")
+    repo = conn.execute(select(db.lab_repositories).where(db.lab_repositories.c.id == c.repository_id)).first()
+    if repo is None or repo.status != "ACTIVE":
+        raise ToolDenied("repository is not authorized for the App Lab")
 
 
 def _check_finance(conn, ctx: ToolContext, spec: ToolSpec, mission, args: dict) -> None:
@@ -435,7 +482,10 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
         result, status, error = {}, "FAILED", f"{type(exc).__name__}: {exc}"
     duration = int((time.monotonic() - started) * 1000)
     excerpt = redact(json.dumps(result, default=str))[:4000] if status == "COMPLETED" else error
-    if (spec.finance or spec.investigation) and status == "COMPLETED":
+    if spec.lab and status == "COMPLETED":
+        excerpt = json.dumps({k: v for k, v in result.items() if k in ("cycle_id", "proposal_id", "status", "count", "base_sha", "stack",
+                                                                         "file_count", "kind", "number", "url", "data_mode", "detail")})
+    elif (spec.finance or spec.investigation) and status == "COMPLETED":
         excerpt = json.dumps({k: v for k, v in result.items() if k in ("packet_id", "approval_id", "investigation_id", "status", "action",
                                                                          "count", "data_mode", "verdict", "passed", "failed", "errors")})
     with transaction() as conn:
@@ -458,6 +508,8 @@ def _summarize(name: str, result: dict) -> str:
         return f"{result.get('files_changed', 0)} file(s) changed"
     if name == "inspect_repository":
         return f"{result.get('file_count')} files"
+    if name == "publish_lab_change":
+        return f"{'draft pull request' if result.get('kind') == 'pr' else 'Claude Code issue'} #{result.get('number')} {result.get('url')}"
     if name == "prepare_pull_request":
         if result.get("pr_url"):
             return f"draft pull request #{result.get('pr_number')} {result.get('pr_url')}"
@@ -467,3 +519,4 @@ def _summarize(name: str, result: dict) -> str:
 from . import studio_tools  # noqa: E402,F401  (registers the V4 tools)
 from services.finance import tools as _finance_tools  # noqa: E402,F401  (registers the V5 financial tools)
 from services.finance import investigation_tools as _investigation_tools  # noqa: E402,F401  (V5.1)
+from services.applab import tools as _applab_tools  # noqa: E402,F401  (App Lab)

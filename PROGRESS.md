@@ -174,3 +174,56 @@ Built in the order the spec gave. The secure fee review workflow came first.
 - No payment, transfer or filing rails exist, by design (D13).
 - Step-up is TOTP or aal2. WebAuthn/passkeys are next.
 - Accounting, marketplace-payout and billing integrations are listed as gaps and not built.
+
+## Increment 5: V5.1 free-alternative investigation, App Lab, money game, pixel-art city (Oct 14, 2026)
+
+### Built
+- **Free-alternative investigations (V5.1 spec).**
+  - The owner's `RESEARCH_FREE_ALTERNATIVE` decision keeps the request `PENDING_OWNER_DECISION` and starts a
+    durable investigation.
+  - The investigation travels as a physical packet: Central Bank → Data Observatory → bank → Code Forge →
+    Sentinel Citadel → Nexus Spire → Owner's Tower.
+  - It runs on 7 new tables (migration `0004`), a persisted state machine with realtime events, and real sandboxed
+    pytest against labeled fixture kits.
+  - QA gives a verdict and the GM makes a recommendation that can't authorize anything.
+  - The owner gets the full comparison with sources, licenses, prices, test results and costs.
+- **App Lab.**
+  - The owner authorizes a repository with step-up and an encrypted token, from a fine-grained token or GitHub
+    sign-in.
+  - Research collects design patterns people engage with, buy and play. Code Forge reads the repository read-only
+    and drafts proposals.
+  - The GM reviews them against hard rules and briefs the owner.
+  - An owner approval of the exact change publishes it once: a draft PR on `aiciv/lab-*`, or a `claude`-labeled issue
+    for the Claude Code GitHub Action, never the default branch. Status is tracked read-only.
+  - Includes autopilot and migration `0005`.
+- **The money game.** A monthly leaderboard scored only on verified money: realized savings, avoided costs and
+  owner-linked revenue. Scores are append-only and idempotent, simulated plays are labeled, amounts are visible to
+  owners and admins only. Migration `0006`.
+- **Sign in with Google and GitHub** via Supabase Auth, with owner mapping through `app_metadata.role` or verified
+  `AICIV_OWNER_EMAILS`. Claude is connected through an API key for the agents and Anthropic's Claude Code GitHub
+  Action for code; there is no claude.ai login, by Anthropic's policy.
+- **Pixel-art city and dashboard frame** following the reference image:
+  - low-resolution, pixelated rendering;
+  - floating islands, waterfalls, neon signs, flying cars, chibi agents and pixel speech bubbles;
+  - a stats bar (cash, agents, tasks, projects, 30-day revenue, date and time) and left navigation;
+  - four live bottom panels (activity, conveyor flow, active projects, financial overview) fed by `/api/overview`.
+
+### Results
+- pytest **161 passed, 3 skipped** on SQLite and on PostgreSQL 16 · vitest **15** · Playwright **8** · tsc and next build clean
+- Acceptance logs: `docs/acceptance/v51-acceptance-log.md`, `docs/acceptance/app-lab-acceptance-log.md`
+
+### Bugs found and fixed while building
+- With an unknown vendor, research returned no options, so the GM rejected the request before the owner could ask
+  for an investigation. Research now always includes the requested option.
+- The new stats bar selected a fresh array from the store on every render and looped in React. It now selects a
+  count.
+
+### Still open
+- Weather from the reference image is not shown: there's no weather source, and a made-up one would be fabricated
+  data. The bar shows the local date and time.
+- Live alternatives and live design research need authorized search/chart connectors; today both use labeled
+  fixtures.
+- App Lab has been exercised against a local bare repository and a mock GitHub API, not a real GitHub repository.
+  Connecting one is the owner's step.
+- iOS doesn't show App Lab or the Arena yet.
+- Docker-sandbox tests weren't re-run in this environment (no Docker); CI runs them.

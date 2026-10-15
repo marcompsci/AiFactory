@@ -102,3 +102,28 @@ around it.
 **D14. Financial data never rides the event stream.** The city, the activity feed and every viewer-visible API
 show that a cost review moved, not what it costs. Amounts live only behind `/api/finance` (owners and admins).
 Financial tool arguments and results are withheld from `tool_executions` and `tool.*` events.
+
+## V5.1
+
+**D15. Fixture compatibility kits instead of downloading candidates.** The spec says to test the strongest candidate
+in an isolated sandbox and never to run downloaded software outside one. This build runs **real pytest** in the
+sandbox, against bundled, labeled kits that model each candidate's documented behavior. Results (including Penpot
+failing Figma import) are real test outcomes for those kits, not claims about the products. Live candidates are
+refused until a vetted download-and-isolate path exists.
+
+**D16. App Lab publishes drafts and issues, never merges.** Merging is the owner's, on GitHub, where branch
+protection and CI already live. A draft PR (patch route) or an issue for the Claude Code GitHub Action
+(`claude_code` route) keeps a human between the agents and the default branch. The Action runs with the owner's own
+`CLAUDE_CODE_OAUTH_TOKEN` secret, which this app never sees.
+
+**D17. No "Sign in with Claude".** Anthropic doesn't allow third-party apps to offer claude.ai login
+([legal and compliance](https://code.claude.com/docs/en/legal-and-compliance)). Users sign in with Google or GitHub.
+Agents use an API key. Claude Code runs in GitHub through Anthropic's Action.
+
+**D18. The money game scores only verified money.** A leaderboard invites gaming, so no agent and no endpoint can
+write a score. The scorer reads executed approvals, owner decisions in the audit chain, and owner-linked revenue,
+and splits each amount equally among the agents who did the work. Simulated plays are kept separate.
+
+**D19. A GitHub sign-in token is accepted for App Lab, with a nudge toward fine-grained tokens.** The `repo` OAuth
+scope reaches every repository the user can, so the UI recommends a single-repository fine-grained token. Either
+way, the owner authorizes one repository at a time, with step-up.

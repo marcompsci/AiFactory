@@ -85,7 +85,12 @@
         "scaffold_prototype",
         "build_release_bundle",
         "request_purchase",
-        "sandbox_evaluate_candidate"
+        "sandbox_evaluate_candidate",
+        "scan_repository",
+        "propose_improvements",
+        "refine_proposal",
+        "draft_patch",
+        "publish_lab_change"
       ],
       "limits": {
         "max_usd_per_mission": 1.0,
@@ -224,7 +229,8 @@
         "query_market_source",
         "create_artifact",
         "research_cost_alternatives",
-        "investigate_alternatives"
+        "investigate_alternatives",
+        "research_design_insights"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,

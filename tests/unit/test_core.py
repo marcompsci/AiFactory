@@ -262,3 +262,14 @@ def test_secret_redaction():
     from services.tools.registry import redact
     s = redact("key sk-ant-abcdefghijklmnop token ghp_" + "a" * 30)
     assert "sk-ant" not in s and "ghp_" not in s
+
+
+def test_owner_mapping_for_google_and_github_sign_in(monkeypatch):
+    from services.core.auth import owner_by_email
+
+    monkeypatch.setenv("AICIV_OWNER_EMAILS", "Owner@Example.com, other@example.com")
+    assert owner_by_email({"email": "owner@example.com", "user_metadata": {"email_verified": True}}) == "owner"
+    assert owner_by_email({"email": "owner@example.com", "user_metadata": {"email_verified": False}}) is None  # unverified
+    assert owner_by_email({"email": "stranger@example.com", "user_metadata": {"email_verified": True}}) is None
+    monkeypatch.delenv("AICIV_OWNER_EMAILS")
+    assert owner_by_email({"email": "owner@example.com", "user_metadata": {"email_verified": True}}) is None

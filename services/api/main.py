@@ -76,6 +76,15 @@ app.include_router(v4_router)
 from services.api.finance import router as finance_router  # noqa: E402
 
 app.include_router(finance_router)
+from services.api.applab import router as applab_router  # noqa: E402
+
+app.include_router(applab_router)
+from services.api.game import router as game_router  # noqa: E402
+
+app.include_router(game_router)
+from services.api.overview import router as overview_router  # noqa: E402
+
+app.include_router(overview_router)
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().allowed_origins, allow_credentials=False,
                    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
                    allow_headers=["authorization", "content-type", "last-event-id", "x-step-up"])

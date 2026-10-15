@@ -233,3 +233,40 @@ narrative text, from a redacted view.
 `fee_research_request`, `savings_recommendation`, `purchase_request`, `payment_proposal`, `tax_review_package`,
 `financial_forecast` and `owner_approval_request`. Each one must name its authoritative record (`subject_type` and
 `subject_id`); this is enforced in code and by a Postgres check constraint.
+
+## V5.1: investigations, App Lab, the money game, the dashboard frame
+
+**Free-alternative investigations** (`services/finance/investigations.py`, `alt_research.py`, `investigation_tools.py`).
+The owner's `RESEARCH_FREE_ALTERNATIVE` decision creates a durable `savings_investigations` row. The original request
+stays pending. A `savings_investigation` package then travels Central Bank → Data Observatory → Central Bank → Code
+Forge → Sentinel Citadel → Nexus Spire → Owner's Tower, with one mission per stage:
+
+- `alt_research` (Haiku): up to 5 candidates with evidence;
+- `alt_evaluation`: weighted scoring and the cost comparison;
+- `alt_sandbox`: real pytest against the candidate's compatibility kit in a disposable sandbox;
+- `alt_qa`: verdict;
+- GM: a rules recommendation, with Opus explaining only.
+
+State: `REQUESTED → RESEARCHING → EVALUATING → TESTING → MANAGER_REVIEW → AWAITING_OWNER`, plus `BLOCKED`, `FAILED`
+and `CANCELLED`. The finance job advances it from database state only, so it survives restarts.
+
+**App Lab** (`services/applab/`). The `applab` scheduled job advances `lab_cycles` through
+`RESEARCHING → ANALYZING → MANAGER_REVIEW → AWAITING_OWNER → DONE`. Packages travel Observatory → Forge → Nexus →
+Tower. Missions: `lab_research` (insights), `lab_analyze` (read-only clone, proposals, optional patch), and
+`lab_publish` (created only by the owner's approval). Publishing goes through `GitHubPublisher` with the owner's
+per-repository token. Details and the enforcement list: [docs/APP_LAB.md](docs/APP_LAB.md).
+
+**The money game** (`services/game/scoring.py`). The `game` scheduled job turns authoritative records into
+append-only `game_scores`:
+
+- executed approvals → realized savings;
+- an owner rejection after an investigation recommended the alternative → avoided cost;
+- revenue from owner-linked payers → attributed revenue.
+
+`GET /api/game` ranks agents per monthly season. See [docs/GAME.md](docs/GAME.md).
+
+**Dashboard frame** (`apps/web/components/command/Frame.tsx`, `GET /api/overview`). The stats bar, side navigation,
+and the four bottom panels (live activity from the event feed; conveyor counts by destination district; active
+products, App Lab cycles and investigations with progress; and 30-day finance) are all read from the database.
+Pixel-art rendering renders the canvas at `dpr 0.5` and upscales it with `image-rendering: pixelated`.
+`PixelWorld.tsx` adds decorative islands, waterfalls, signs and flying cars.

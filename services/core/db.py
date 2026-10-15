@@ -1003,6 +1003,131 @@ investigation_reviews = Table(
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
+
+# ---------------------------------------------------------------- App Lab: owner-gated improvements to the owner's GitHub repos
+lab_repositories = Table(
+    "lab_repositories", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("full_name", String, nullable=False),              # owner/name
+    Column("default_branch", String, nullable=False, default="main"),
+    Column("status", String, nullable=False, default="PENDING_AUTHORIZATION"),  # PENDING_AUTHORIZATION | ACTIVE | REVOKED | ERROR
+    Column("auth_mode", String, nullable=False, default="token"),  # token | github_signin | ambient
+    Column("secret_ciphertext", Text),
+    Column("authorized_by", String(36)),
+    Column("authorized_at", String),
+    Column("claude_code_ready", Integer, nullable=False, default=0),   # the Claude Code GitHub Action workflow is installed
+    Column("autopilot", Integer, nullable=False, default=0),          # research + proposals on a schedule (publishing stays gated)
+    Column("head_sha", String),
+    Column("last_scan_at", String),
+    Column("last_error", Text),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "full_name"),
+)
+
+lab_cycles = Table(
+    "lab_cycles", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("repository_id", String(36), nullable=False, index=True),
+    Column("status", String, nullable=False),   # RESEARCHING ANALYZING MANAGER_REVIEW AWAITING_OWNER DONE FAILED CANCELLED
+    Column("trigger", String, nullable=False),  # owner | autopilot
+    Column("research_mission_id", String(36)),
+    Column("analysis_mission_id", String(36)),
+    Column("reason", Text),
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+)
+
+design_insights = Table(
+    "design_insights", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("cycle_id", String(36), nullable=False, index=True),
+    Column("pattern", String, nullable=False),
+    Column("title", String, nullable=False),
+    Column("why_it_works", Text, nullable=False),
+    Column("signals", JSON, nullable=False, default=dict),    # engagement / purchase / play
+    Column("evidence", JSON, nullable=False, default=list),   # [{claim, source_url, as_of, data_mode}]
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+lab_proposals = Table(
+    "lab_proposals", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("cycle_id", String(36), nullable=False, index=True),
+    Column("repository_id", String(36), nullable=False),
+    Column("status", String, nullable=False),     # PROPOSED MANAGER_REVIEW AWAITING_OWNER APPROVED PUBLISHING PUBLISHED REJECTED DEFERRED WITHDRAWN FAILED
+    Column("title", String, nullable=False),
+    Column("summary", Text, nullable=False),
+    Column("insight_ids", JSON, nullable=False, default=list),
+    Column("files", JSON, nullable=False, default=list),
+    Column("plan", JSON, nullable=False, default=list),
+    Column("risk", String, nullable=False),
+    Column("route", String, nullable=False),      # patch | claude_code
+    Column("base_sha", String),
+    Column("patch", Text),
+    Column("patch_sha256", String),
+    Column("checks", JSON, nullable=False, default=dict),
+    Column("instructions", Text),                 # what Claude Code will be asked to do (claude_code route)
+    Column("payload_hash", String, nullable=False),
+    Column("gm_review", JSON, nullable=False, default=dict),
+    Column("decided_by", String(36)),
+    Column("decided_at", String),
+    Column("step_up_method", String),
+    Column("publish_mission_id", String(36)),
+    Column("published", JSON, nullable=False, default=dict),   # {pr_url | issue_url, number, branch}
+    Column("tracking", JSON, nullable=False, default=dict),
+    Column("authored_by", String),                # model id, or "simulation template"
+    Column("data_mode", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+)
+
+# ---------------------------------------------------------------- the money game: agents compete on *verified* money only
+game_seasons = Table(
+    "game_seasons", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("key", String, nullable=False),                  # YYYY-MM
+    Column("starts_at", String, nullable=False),
+    Column("ends_at", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "key"),
+)
+
+game_scores = Table(               # append-only; one row per (source, agent)
+    "game_scores", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("season_id", String(36), nullable=False, index=True),
+    Column("agent_id", String(36), nullable=False, index=True),
+    Column("kind", String, nullable=False),                 # realized_savings | avoided_cost | attributed_revenue
+    Column("amount_minor", Integer, nullable=False),        # this agent's share
+    Column("currency", String(3), nullable=False),
+    Column("share", Float, nullable=False),
+    Column("source_type", String, nullable=False),          # financial_approval | savings_investigation | financial_transaction
+    Column("source_id", String(36), nullable=False),
+    Column("evidence", JSON, nullable=False, default=dict),
+    Column("data_mode", String, nullable=False),            # live | simulated (simulated never counts as verified)
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "source_type", "source_id", "agent_id"),
+)
+
+revenue_links = Table(             # the owner's explicit statement: revenue from this payer comes from this product
+    "revenue_links", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("merchant", String, nullable=False),
+    Column("opportunity_id", String(36), nullable=False),
+    Column("created_by", String(36), nullable=False),
+    Column("active", Integer, nullable=False, default=1),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
 financial_reports = Table(            # authoritative record behind REVENUE_REPORT / FINANCIAL_FORECAST packages
     "financial_reports", metadata,
     Column("id", String(36), primary_key=True),
@@ -1028,9 +1153,9 @@ FINANCE_TABLES = ("financial_connections", "financial_accounts", "financial_tran
                   "subscriptions", "expense_categories", "tax_documents", "tax_estimates", "cost_review_packets",
                   "savings_opportunities", "financial_approvals", "financial_audit_events", "financial_sync_runs", "financial_reports", "savings_investigations",
                   "alternative_candidates", "alternative_evidence", "compatibility_assessments", "sandbox_evaluations",
-                  "cost_comparisons", "investigation_reviews")
+                  "cost_comparisons", "investigation_reviews", "game_scores", "revenue_links")
 
-APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations", "financial_audit_events")
+APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations", "financial_audit_events", "game_scores")
 
 
 _engine: Engine | None = None
@@ -1188,7 +1313,7 @@ def seed(engine: Engine) -> None:
             if not _ensure(conn, logistics_routes, {"id": sg.id}, {"organization_id": org_id, "from_node": sg.from_node,
                                                                   "to_node": sg.to_node, "length": sg.length, "status": "UP"}):
                 conn.execute(update(logistics_routes).where(logistics_routes.c.id == sg.id).values(length=sg.length))
-        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2)):
+        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2), ("applab", 2), ("game", 5)):
             _ensure(conn, scheduled_jobs, {"key": key}, {"interval_seconds": interval, "next_run_at": utcnow()})
         from services.finance.categories import seed as seed_categories
 

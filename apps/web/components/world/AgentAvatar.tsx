@@ -134,6 +134,29 @@ function bubbleStyle(kind: string): { color: string; label: string } {
   }
 }
 
+/** A big chibi head with pixel eyes on top of the silhouette, so agents read as characters. */
+function ChibiFace({ height, color }: { height: number; color: string }) {
+  const y = height + 0.35;
+  return (
+    <group position={[0, y, 0]}>
+      <mesh>
+        <boxGeometry args={[0.9, 0.8, 0.8]} />
+        <meshStandardMaterial color="#F6D7B8" roughness={0.8} />
+      </mesh>
+      <mesh position={[0, 0.38, 0]}>
+        <boxGeometry args={[0.98, 0.2, 0.88]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} />
+      </mesh>
+      {[-0.2, 0.2].map((x) => (
+        <mesh key={x} position={[x, 0, 0.41]}>
+          <boxGeometry args={[0.12, 0.18, 0.02]} />
+          <meshBasicMaterial color="#0b1226" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions: Map<string, THREE.Vector3> }) {
   const group = useRef<THREE.Group>(null);
   const body = useRef<THREE.Group>(null);
@@ -181,6 +204,7 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
     >
       <group ref={body}>
         <Body shape={agent.shape} color={agent.color} height={agent.height} />
+        <ChibiFace height={agent.height} color={agent.color} />
         {agent.carrying ? (
           // the holographic package an agent carries to its dispatch terminal
           <mesh position={[0, agent.height + 0.6, 0]} rotation={[0.4, 0.6, 0]}>
@@ -200,10 +224,16 @@ export function AgentAvatar({ agent, positions }: { agent: WorldAgent; positions
         <meshBasicMaterial />
       </mesh>
       {labels || selected ? (
-        <Html position={[0, agent.height + 0.9, 0]} center zIndexRange={[20, 0]}>
+        <Html position={[0, agent.height + 1.4, 0]} center zIndexRange={[20, 0]}>
           <div className="world-label flex flex-col items-center gap-1" style={{ transform: "none" }}>
-            {showBubble && b ? (
-              <div className="max-w-[200px] truncate rounded-lg px-2 py-1 text-[11px]" style={{ background: "rgb(7 11 24 / .85)", border: `1px solid ${b.color}`, color: "#EAF2FF" }}>
+            {showBubble && b && ind!.kind === "message" ? (
+              // pixel speech bubble: what the agent just said to another agent
+              <div className="speech relative" data-testid="speech-bubble">
+                {ind!.text.length > 90 ? `${ind!.text.slice(0, 88)}…` : ind!.text}
+                <span className="absolute -bottom-[7px] left-1/2 size-0 -translate-x-1/2 border-x-[6px] border-t-[7px] border-x-transparent border-t-[#0b1226]" />
+              </div>
+            ) : showBubble && b ? (
+              <div className="max-w-[200px] truncate rounded px-2 py-1 text-[11px]" style={{ background: "rgb(7 11 24 / .85)", border: `2px solid ${b.color}`, color: "#EAF2FF" }}>
                 <span style={{ color: b.color }}>{b.label}</span> {ind!.text.replaceAll("_", " ")}
               </div>
             ) : null}

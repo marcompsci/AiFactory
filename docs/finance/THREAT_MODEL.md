@@ -54,3 +54,20 @@ rule names the test that enforces it.
 - In dev mode, anyone on localhost is the owner (unchanged from V3). Step-up still applies to financial approvals.
 - Database-level RLS gives finance tables owner/admin-only read policies for direct client access. The API still
   connects as the service role, so organization scoping in the API is by query.
+
+## V5.1 addendum: free-alternative investigations, App Lab, money game
+
+| # | Rule | Where | Test |
+|---|---|---|---|
+| F18 | **An investigation authorizes research and sandboxed evaluation only.** The owner's `RESEARCH_FREE_ALTERNATIVE` decision leaves the request `PENDING_OWNER_DECISION` with its approvals untouched. Investigation missions can use only the four investigation tools, and those tools work only for their own investigation while it is running. No tool exists that cancels, transfers, pays out or deploys. | `registry._check_investigation`, `finance/investigations.py` | `test_investigation_missions_cannot_spend_cancel_or_deploy`, `test_investigation_tools_refuse_outside_their_investigation` |
+| F19 | **Never execute downloaded software outside an isolated sandbox.** Candidates are tested in a disposable, network-less sandbox with no credentials. In this build, only the bundled, labeled fixture kits run; a live candidate is refused ("executing downloaded software is not enabled"). | `alt_research.run_sandbox` | `test_failed_sandbox_runs_are_reported_as_errors` |
+| F20 | **The manager cannot authorize.** The GM's recommendation always carries `authorizes_transaction: false`. Any financial action still needs a separate, valid owner approval. | `investigations.manager_review` | acceptance test |
+| L1 | **A repository is used only after the owner authorizes it** with step-up and a credential GitHub accepts. Nothing is picked up from the environment unless the server explicitly enables ambient credentials. Tokens are encrypted at rest and never returned. | `api/applab.connect_repository` | `test_acceptance_app_lab_cycle` |
+| L2 | **Nothing reaches GitHub without the owner's approval of the exact change.** That means step-up bound to the proposal, plus a payload hash over repository, base commit, route, title, and patch or instructions. It is re-checked at the tool boundary, issued to one mission, and single-use (compare-and-swap). | `registry._check_lab`, `applab/lab.authorize_publish` | `test_lab_tools_are_confined`, acceptance |
+| L3 | **Never the default branch.** Patches go to `aiciv/lab-*` as draft PRs. Claude Code tasks go to issues whose instructions forbid default-branch pushes. | `GitHubPublisher.publish`, `lab.instructions_for` | acceptance |
+| L4 | **No CI, secret or credential changes.** `.github/`, `.git/`, `.env`, keys and secrets are refused, except the byte-exact pinned Claude Code workflow, which the owner approves like any other change. | `lab.gm_rules`, `tools.draft_patch` | `test_gm_blocks_protected_paths_and_restart_survives` |
+| L5 | **The owner's code is never executed.** Analysis reads files; validation is `git apply --check` in a throwaway copy. | `applab/tools.py` | — |
+| L6 | **App Lab missions can use App Lab tools only**, each tool only on its own cycle or proposal and at its stage. | `registry._check_lab` | `test_lab_tools_are_confined` |
+| L7 | **Status tracking is read-only.** | `pipeline.track` | acceptance |
+| G1 | **The money game scores only verified money**, from authoritative records, by a scheduled job; no endpoint or agent writes a score. Simulated money is labeled and never counts as verified. Scores are append-only. | `game/scoring.py`, migration 0006 | `tests/integration/test_game.py` |
+| G2 | **Revenue is attributed only through an explicit owner link,** and only revenue posted after the link was made counts. | `scoring.score_revenue` | `test_revenue_counts_only_after_an_owner_link` |

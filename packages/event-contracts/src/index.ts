@@ -80,6 +80,15 @@ export const EVENT_TYPES = [
   // V5.1 — free-alternative investigations (research and sandboxed evaluation only)
   "finance.investigation_status_changed",
   "finance.investigation_ready",
+  // V5.1 — App Lab (owner-gated improvements to the owner's GitHub repositories) and the money game
+  "lab.repository_changed",
+  "lab.cycle_status_changed",
+  "lab.proposals_ready",
+  "lab.proposal_decided",
+  "lab.change_published",
+  "lab.change_status",
+  "game.score_recorded",
+  "game.season_changed",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

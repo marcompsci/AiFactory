@@ -45,6 +45,17 @@ def _token_from(request: Request) -> str | None:
     return None
 
 
+def owner_by_email(claims: dict) -> str | None:
+    """Sign in with Google / GitHub: map the owner by a *verified* email listed in AICIV_OWNER_EMAILS. `app_metadata.role`
+    (writable only with the Supabase service key) always wins; everyone else is a viewer until given a role."""
+    import os
+
+    allowed = {e.strip().lower() for e in os.environ.get("AICIV_OWNER_EMAILS", "").split(",") if e.strip()}
+    email = str(claims.get("email") or "").lower()
+    verified = bool((claims.get("user_metadata") or {}).get("email_verified"))
+    return "owner" if email and verified and email in allowed else None
+
+
 def authenticate(request: Request) -> Principal:
     s = get_settings()
     org = load_seed()["organization_id"]
@@ -60,7 +71,7 @@ def authenticate(request: Request) -> Principal:
             claims = jwt.decode(token, s.supabase_jwt_secret, algorithms=["HS256"], audience="authenticated")
         except jwt.PyJWTError as exc:
             raise HTTPException(status_code=401, detail="invalid token") from exc
-        role = (claims.get("app_metadata") or {}).get("role", "viewer")
+        role = (claims.get("app_metadata") or {}).get("role") or owner_by_email(claims) or "viewer"
         from services.finance.stepup import aal2_fresh
 
         return Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase",

@@ -189,6 +189,22 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: `Free-alternative investigation: ${human(s("to")).toLowerCase()}${p.label ? ` (${s("label")})` : ""}${sim(p)}`, tone: "#3DFFB8" };
     case "finance.investigation_ready":
       return { who, text: `Investigation complete; the recommendation is at your tower${sim(p)}`, tone: "#3DFFB8" };
+    case "lab.repository_changed":
+      return { who, text: `App Lab: ${s("repo")} ${s("label")}`, tone: "#32D8FF" };
+    case "lab.cycle_status_changed":
+      return { who, text: `App Lab cycle: ${human(s("to")).toLowerCase()}${p.label ? ` (${s("label")})` : ""}${sim(p)}`, tone: "#32D8FF" };
+    case "lab.proposals_ready":
+      return { who, text: `${s("label")}: the General Manager's briefing is at your tower${sim(p)}`, tone: "#FFD36B" };
+    case "lab.proposal_decided":
+      return { who, text: `Owner ${s("decision") === "APPROVE" ? "approved" : s("decision") === "REJECT" ? "rejected" : "deferred"} "${s("title")}"`, tone: "#FFD36B" };
+    case "lab.change_published":
+      return { who, text: `Published "${s("title")}" as ${s("kind") === "pr" ? "draft pull request" : "Claude Code issue"} #${s("number")}`, tone: "#3DFFB8" };
+    case "lab.change_status":
+      return { who, text: `GitHub #${s("number")} is ${p.merged ? "merged" : s("state")}`, tone: "#3DFFB8" };
+    case "game.score_recorded":
+      return { who, text: `scored in the money game (${human(s("kind")).toLowerCase()}${p.verified ? ", verified" : ", simulated"})`, tone: "#FFD36B" };
+    case "game.season_changed":
+      return { who, text: `New money-game season ${s("season")}`, tone: "#FFD36B" };
     case "finance.tax_estimate_updated":
       return { who, text: `Tax estimate updated for ${s("tax_year")} (an estimate)${sim(p)}`, tone: "#A66BFF" };
     default:
@@ -217,4 +233,7 @@ export const PACKAGE_COLORS: Record<string, string> = {
   financial_forecast: "#9AD1FF",
   owner_approval_request: "#FFD86B",
   savings_investigation: "#3DFFB8",
+  // App Lab
+  design_insights: "#7CF7FF",
+  lab_proposal: "#FFD36B",
 };

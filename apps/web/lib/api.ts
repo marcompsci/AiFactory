@@ -109,6 +109,7 @@ export const api = {
     if (!r.ok) throw new ApiError(r.status, "download failed");
     return r.blob();
   },
+  overview: () => call<Json>("/api/overview"),
   emergencyStop: (engaged: boolean) => call<Json>("/api/emergency-stop", { method: "POST", body: JSON.stringify({ engaged }) }),
 };
 
@@ -159,4 +160,26 @@ export const bank = {
   investigations: () => call<{ investigations: Json[] }>("/api/finance/investigations"),
   investigation: (id: string) => call<Json>(`/api/finance/investigations/${id}`),
   cancelInvestigation: (id: string) => call<Json>(`/api/finance/investigations/${id}/cancel`, post()),
+};
+
+/** App Lab: research-driven, owner-gated improvements to the owner's GitHub repositories. */
+export const lab = {
+  overview: () => call<Json>("/api/applab"),
+  connect: (body: { full_name: string; default_branch?: string; auth_mode: string; token?: string }, stepUp?: string) =>
+    call<Json>("/api/applab/repositories", post(body, stepUp)),
+  revoke: (id: string) => call<Json>(`/api/applab/repositories/${id}/revoke`, post()),
+  autopilot: (id: string, enabled: boolean) => call<Json>(`/api/applab/repositories/${id}/autopilot`, post({ enabled })),
+  startCycle: (id: string) => call<Json>(`/api/applab/repositories/${id}/cycles`, post()),
+  cycle: (id: string) => call<Json>(`/api/applab/cycles/${id}`),
+  cancelCycle: (id: string) => call<Json>(`/api/applab/cycles/${id}/cancel`, post()),
+  proposal: (id: string) => call<Json>(`/api/applab/proposals/${id}`),
+  decide: (id: string, body: { decision: "APPROVE" | "REJECT" | "DEFER"; payload_hash: string; note?: string }, stepUp?: string) =>
+    call<Json>(`/api/applab/proposals/${id}/decide`, post(body, stepUp)),
+};
+
+/** The money game: agents compete on verified money only. */
+export const game = {
+  board: (season?: string) => call<Json>(`/api/game${season ? `?season=${season}` : ""}`),
+  link: (merchant: string, opportunity_id: string) => call<Json>("/api/game/revenue-links", post({ merchant, opportunity_id })),
+  unlink: (id: string) => call<Json>(`/api/game/revenue-links/${id}/deactivate`, post()),
 };

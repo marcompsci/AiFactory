@@ -5,7 +5,8 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { ApprovalCall } from "@/components/command/Activity";
 import { PackageCard } from "@/components/command/Company";
-import { DistrictCard, Dock, TopBar } from "@/components/command/Shell";
+import { DistrictCard, Dock } from "@/components/command/Shell";
+import { BottomPanels, CameraChips, SideNav, StatsBar } from "@/components/command/Frame";
 import { useRealtime } from "@/hooks/useRealtime";
 
 // WebGL only runs in the browser.
@@ -23,7 +24,10 @@ function App() {
   return (
     <main>
       <CityScene />
-      <TopBar />
+      <StatsBar />
+      <SideNav />
+      <CameraChips />
+      <BottomPanels />
       <ApprovalCall />
       <DistrictCard />
       <PackageCard />

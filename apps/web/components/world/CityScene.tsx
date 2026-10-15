@@ -11,8 +11,9 @@ import { useStore } from "@/lib/store";
 import { AgentAvatar } from "./AgentAvatar";
 import { Conveyors } from "./Conveyors";
 import { District } from "./District";
+import { PixelWorld } from "./PixelWorld";
 
-const OVERVIEW = { pos: new THREE.Vector3(46, 96, 104), target: new THREE.Vector3(-15, 0, 0) }; // V5: framed to include the AI Central Bank in the west
+const OVERVIEW = { pos: new THREE.Vector3(70, 82, 142), target: new THREE.Vector3(-12, -8, 0) }; // V5: framed to include the AI Central Bank in the west
 
 function Plaza() {
   const ring = useRef<THREE.Mesh>(null);
@@ -40,37 +41,6 @@ function Plaza() {
   );
 }
 
-/** Ambient traffic. Pure decoration, labeled as such in World settings — never mistaken for agent work. */
-function Drones() {
-  const count = 36;
-  const mesh = useRef<THREE.InstancedMesh>(null);
-  const reduced = useStore((s) => s.settings.reducedMotion);
-  const on = useStore((s) => s.settings.drones);
-  const lanes = useMemo(
-    () => Array.from({ length: count }, (_, i) => ({ r: 22 + (i % 6) * 9, h: 14 + (i % 5) * 4, speed: 0.08 + (i % 7) * 0.025, phase: (i * 2.399) % (Math.PI * 2), dir: i % 2 ? 1 : -1 })),
-    [],
-  );
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  useFrame(({ clock }) => {
-    if (!mesh.current) return;
-    lanes.forEach((l, i) => {
-      const a = l.phase + (reduced ? 0 : clock.elapsedTime * l.speed * l.dir);
-      dummy.position.set(Math.cos(a) * l.r, l.h, Math.sin(a) * l.r);
-      dummy.rotation.y = -a;
-      dummy.updateMatrix();
-      mesh.current!.setMatrixAt(i, dummy.matrix);
-    });
-    mesh.current.instanceMatrix.needsUpdate = true;
-  });
-  if (!on) return null;
-  return (
-    <instancedMesh ref={mesh} args={[undefined, undefined, count]}>
-      <boxGeometry args={[0.9, 0.18, 0.4]} />
-      <meshBasicMaterial color="#A66BFF" toneMapped={false} />
-    </instancedMesh>
-  );
-}
-
 /** Keeps the city centred in the part of the screen the command panel does not cover. */
 function ViewFit() {
   const { camera, size, scene } = useThree();
@@ -78,13 +48,14 @@ function ViewFit() {
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera;
     const desktop = size.width >= 1024;
-    const panelX = desktop ? 444 : 0;
+    // desktop: side nav (200px) on the left, command panel (440px) on the right, stats bar on top, panels at the bottom
+    const panelX = desktop ? 440 - 200 : 0;
     const peek = { peek: 168, half: size.height * 0.52, full: size.height * 0.52 }[sheet];
-    const panelY = desktop ? 0 : peek * 0.5;
+    const panelY = desktop ? 200 - 60 : peek * 0.5;
     const k = size.width < size.height ? Math.min(2.1, 1.05 / (size.width / size.height)) : 1;
     if (scene.fog instanceof THREE.Fog) {
-      scene.fog.near = 70 * k;
-      scene.fog.far = 210 * k;
+      scene.fog.near = 90 * k;
+      scene.fog.far = 260 * k;
     }
     if (panelX || panelY) cam.setViewOffset(size.width + panelX, size.height + panelY, panelX, panelY, size.width, size.height);
     else cam.clearViewOffset();
@@ -209,13 +180,14 @@ export function CityScene() {
   const [degraded, setDegraded] = useState(false);
   const positions = useMemo(() => new Map<string, THREE.Vector3>(), []);
   const low = quality === "low" || (quality === "auto" && degraded);
+  const pixel = useStore((s) => s.settings.pixelArt);
 
   return (
     <Canvas
-      className="!fixed inset-0"
+      className={`!fixed inset-0 ${pixel ? "pixel-canvas" : ""}`}
       camera={{ position: OVERVIEW.pos.toArray(), fov: 45, near: 0.5, far: 600 }}
-      dpr={low ? [1, 1.25] : [1, 2]}
-      gl={{ antialias: !low, powerPreference: "high-performance" }}
+      dpr={pixel ? 0.5 : low ? [1, 1.25] : [1, 2]}
+      gl={{ antialias: !low && !pixel, powerPreference: "high-performance" }}
       onPointerMissed={() => {
         focus(null);
         select(null);
@@ -223,16 +195,17 @@ export function CityScene() {
       }}
       aria-label="3D city of AI agents"
     >
-      <color attach="background" args={["#070B18"]} />
-      <fog attach="fog" args={["#070B18", 70, 210]} />
-      <ambientLight intensity={0.35} color="#8FA8FF" />
-      <hemisphereLight args={["#32D8FF", "#070B18", 0.4]} />
-      <directionalLight position={[40, 80, 20]} intensity={0.6} color="#A66BFF" />
+      <color attach="background" args={["#121a44"]} />
+      <fog attach="fog" args={["#121a44", 90, 260]} />
+      <ambientLight intensity={0.55} color="#9fb4ff" />
+      <hemisphereLight args={["#5fd8ff", "#2a1f4a", 0.7]} />
+      <directionalLight position={[40, 80, 20]} intensity={0.9} color="#ffd9a8" />
+      <directionalLight position={[-60, 40, -40]} intensity={0.4} color="#A66BFF" />
       <PerformanceMonitor onDecline={() => setDegraded(true)} onIncline={() => setDegraded(false)} />
-      <AdaptiveDpr pixelated />
+      {pixel ? null : <AdaptiveDpr pixelated />}
       <Suspense fallback={null}>
         <Grid
-          position={[0, 0, 0]}
+          position={[0, -42, 0]}
           args={[400, 400]}
           cellSize={4}
           cellThickness={0.5}
@@ -244,6 +217,7 @@ export function CityScene() {
           fadeStrength={1.5}
           infiniteGrid
         />
+        <PixelWorld />
         <Plaza />
         {DISTRICTS.map((d) => (
           <District key={d.id} d={d} />
@@ -252,7 +226,6 @@ export function CityScene() {
           <AgentAvatar key={a.id} agent={a} positions={positions} />
         ))}
         <Conveyors />
-        <Drones />
       </Suspense>
       <ViewFit />
       <CameraRig positions={positions} />
