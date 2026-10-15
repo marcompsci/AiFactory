@@ -8,6 +8,7 @@ import { PackageCard } from "@/components/command/Company";
 import { DistrictCard, Dock } from "@/components/command/Shell";
 import { BottomPanels, CameraChips, SideNav, StatsBar } from "@/components/command/Frame";
 import { useRealtime } from "@/hooks/useRealtime";
+import { onSession } from "@/lib/auth";
 
 // WebGL only runs in the browser.
 const CityScene = dynamic(() => import("@/components/world/CityScene").then((m) => m.CityScene), {
@@ -18,6 +19,18 @@ const CityScene = dynamic(() => import("@/components/world/CityScene").then((m) 
 function App() {
   const [reconnectKey, setReconnectKey] = useState(0);
   useRealtime(reconnectKey);
+  useEffect(() => {
+    // Sign-in (Google/GitHub via Supabase): reconnect whenever the session token changes, including right after the
+    // OAuth redirect lands back here.
+    let last: string | null = null;
+    return onSession((s) => {
+      const t = s?.access_token ?? null;
+      if (t !== last) {
+        last = t;
+        setReconnectKey((k) => k + 1);
+      }
+    });
+  }, []);
   useEffect(() => {
     if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);

@@ -5,7 +5,7 @@ import { demoScript } from "@aiciv/world-engine";
 import { SEED } from "@aiciv/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { api, bank, streamUrl } from "@/lib/api";
+import { api, ApiError, bank, streamUrl } from "@/lib/api";
 import { useStore } from "@/lib/store";
 
 /**
@@ -55,6 +55,12 @@ export function useRealtime(reconnectKey: number) {
       try {
         snap = await api.snapshot();
       } catch (err) {
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          // The server is there but wants a signed-in user: no demo, send them to Settings → Accounts.
+          store().setStatus("signin", "sign in with Google or GitHub");
+          store().setTab("system");
+          return;
+        }
         if (retry === 0) return startDemo(String(err));
         scheduleReconnect();
         return;

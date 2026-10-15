@@ -33,6 +33,7 @@ const STATUS_TEXT = {
   live: { text: "Live", color: "#5BF2A5" },
   reconnecting: { text: "Reconnecting", color: "#FFBD69" },
   demo: { text: "Demo, no server", color: "#FFBD69" },
+  signin: { text: "Sign in to connect", color: "#FFD36B" },
 } as const;
 
 function Clock() {

@@ -6,7 +6,7 @@ import { api, loadConnection, saveConnection, type Json } from "@/lib/api";
 import { usd } from "@/lib/format";
 import { useStore, type Quality } from "@/lib/store";
 import { Button, Dot, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { authConfigured, githubSigninToken, onSession, signIn, signOut } from "@/lib/auth";
 
@@ -14,14 +14,7 @@ import { authConfigured, githubSigninToken, onSession, signIn, signOut } from "@
 function AccountsPanel({ onReconnect }: { onReconnect: () => void }) {
   const [session, setSession] = useState<Session | null>(null);
   const [err, setErr] = useState<unknown>(null);
-  const reconnect = useRef(onReconnect);
-  reconnect.current = onReconnect;
-  useEffect(() => onSession((s) => {
-    setSession((prev) => {
-      if ((prev?.access_token ?? null) !== (s?.access_token ?? null)) setTimeout(() => reconnect.current(), 0);
-      return s;
-    });
-  }), []);
+  useEffect(() => onSession(setSession), []);
   const go = (p: "google" | "github", repo = false) => signIn(p, repo).catch(setErr);
   const provider = session?.user?.app_metadata?.provider as string | undefined;
   return (

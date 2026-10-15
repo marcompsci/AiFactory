@@ -5,7 +5,7 @@ import { applyEvent, hydrate as hydrateWorld, initialWorld, type AgentSeed, type
 import { SEED } from "@aiciv/shared-types";
 import { create } from "zustand";
 
-export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "demo";
+export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "demo" | "signin";
 export type Tab = "overview" | "missions" | "company" | "bank" | "agents" | "activity" | "approvals" | "system" | "lab" | "game";
 export type CameraMode = "overview" | "orbit" | "follow" | "fly";
 export type Quality = "auto" | "high" | "low";
