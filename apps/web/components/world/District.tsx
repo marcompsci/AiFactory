@@ -1,6 +1,6 @@
 "use client";
 
-import { Html } from "@react-three/drei";
+import { Html, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { gatePosition, PLAZA_RADIUS, type District as D } from "@aiciv/world-engine";
 import { useMemo, useRef } from "react";
@@ -62,6 +62,12 @@ function towersFor(d: D): Tower[] {
       out.push({ pos: [0, H / 2, -2], size: [5, H, 5], rot: Math.PI / 4, kind: "box" });
       out.push({ pos: [0, H + 1.5, -2], size: [3.2, 3, 3.2], rot: 0, kind: "cyl" });
       out.push({ pos: [0, 2.5, 3], size: [12, 5, 6], rot: 0, kind: "box" });
+      break;
+    case "bank":
+      // AI Central Bank: a vault podium, the floor shaft (floors drawn by BankFloors) and a crown
+      out.push({ pos: [-2, 2, 0], size: [12, 4, 14], rot: 0, kind: "box" });
+      out.push({ pos: [-2, H / 2, 0], size: [8, H, 8], rot: 0, kind: "box" });
+      out.push({ pos: [-2, H + 2.5, 0], size: [5, 5, 5], rot: Math.PI / 4, kind: "cone" });
       break;
     case "vault":
       out.push({ pos: [0, 3, 3], size: [16, 6, 8], rot: 0, kind: "box" });
@@ -130,6 +136,57 @@ function Workstation({ id, label, pos, color, active }: { id: string; label: str
         <ringGeometry args={[1.6, 1.75, 32]} />
         <meshBasicMaterial color={color} transparent opacity={0.4} toneMapped={false} />
       </mesh>
+    </group>
+  );
+}
+
+const FLOOR_H = 4.6;
+
+/**
+ * The bank's floors, stacked in the shaft. A floor lights up while its desk is working (from real tool events), a
+ * beam joins the desk to its floor, and "Go inside" turns the shaft see-through and labels every floor with who is there.
+ */
+function BankFloors({ d, color, interior }: { d: D; color: string; interior: boolean }) {
+  const active = useStore((s) => s.world.activeWorkstations);
+  const agents = useStore((s) => s.world.agents);
+  const reduced = useStore((s) => s.settings.reducedMotion);
+  const bands = useRef<(THREE.MeshBasicMaterial | null)[]>([]);
+  const floors = d.workstations.filter((w) => w.floor !== undefined).sort((a, b) => (a.floor ?? 0) - (b.floor ?? 0));
+  useFrame(({ clock }) => {
+    floors.forEach((w, i) => {
+      const m = bands.current[i];
+      if (!m) return;
+      const on = Boolean(active[w.id]);
+      m.opacity = on ? (reduced ? 0.95 : 0.65 + Math.sin(clock.elapsedTime * 5 + i) * 0.3) : interior ? 0.35 : 0.18;
+    });
+  });
+  return (
+    <group>
+      {floors.map((w, i) => {
+        const y = (w.floor ?? 0) * FLOOR_H + 2.2;
+        const on = Boolean(active[w.id]);
+        const here = Object.values(agents).filter((a) => a.district === d.id && a.waypoint === w.id);
+        return (
+          <group key={w.id}>
+            <mesh position={[-2, y, 0]}>
+              <boxGeometry args={[8.6, 0.35, 8.6]} />
+              <meshBasicMaterial ref={(m) => { bands.current[i] = m; }} color={on ? color : "#7a6a3a"} transparent opacity={0.2} toneMapped={false} />
+            </mesh>
+            {on ? (
+              <Line points={[[w.offset[0], 1.1, w.offset[2]], [2.3, y, Math.max(-4, Math.min(4, w.offset[2]))]]} color={color} lineWidth={1.5}
+                transparent opacity={0.8} toneMapped={false} />
+            ) : null}
+            {interior || on ? (
+              <Html position={[-7, y, 0]} center zIndexRange={[8, 0]}>
+                <div className="world-label whitespace-nowrap rounded px-1.5 py-0.5 text-[10px]"
+                  style={{ transform: "none", background: "rgb(7 11 24 / .85)", color: on ? color : "#d9c48a", border: `1px solid ${color}44` }}>
+                  {w.floor === 0 ? "Vault" : `Floor ${w.floor}`} · {w.label}{here.length ? ` · ${here.map((a) => a.name).join(", ")}` : ""}
+                </div>
+              </Html>
+            ) : null}
+          </group>
+        );
+      })}
     </group>
   );
 }
@@ -218,6 +275,7 @@ export function District({ d }: { d: D }) {
         ))}
         <pointLight position={[0, 8, 4]} color={d.color} intensity={30 + activity * 120} distance={28} decay={2} />
         {ownerWaiting ? <OwnerBeacon height={d.height} color={d.color} /> : null}
+        {d.architecture === "bank" ? <BankFloors d={d} color={d.color} interior={interior} /> : null}
         {labels ? (
           <Html position={[0, Math.min(d.height + 3, 24), -2]} center zIndexRange={[5, 0]}>
             <button

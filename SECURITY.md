@@ -41,6 +41,19 @@ web page says can widen what a tool call is allowed to do.
 | Bundle extraction | rejects path traversal entries | `test_bundle_is_deterministic_and_safe` |
 | Untrusted research text | fenced in `<untrusted>` in every Haiku/Opus prompt; the spec used for building is read from the approved record, never from tool arguments | `scaffold_prototype` |
 
+## Financial district (V5)
+
+The AI Central Bank has its own threat model with 17 enforced rules and the test for each:
+[docs/finance/THREAT_MODEL.md](docs/finance/THREAT_MODEL.md). In short:
+- no money moves without an owner approval for exact terms, with step-up, unexpired and unused;
+- financial tools belong to the finance department, are scoped to one packet, and are re-checked at execution;
+- integrations are read-only and authorized explicitly in this app;
+- credentials are Fernet-encrypted (`AICIV_FINANCE_KEY`, required outside dev mode);
+- events and models see no amounts or account data;
+- the audit log is append-only and hash-chained;
+- simulated data is labeled everywhere;
+- tax filing is always refused.
+
 ## Known gaps (tracked in PROGRESS.md)
 
 - The process sandbox is a good local default, not a security boundary against a hostile kernel exploit.
@@ -54,6 +67,8 @@ web page says can widen what a tool call is allowed to do.
   workflow (`scripts/live_smoke.py`) makes those calls once an `ANTHROPIC_API_KEY` repository secret exists.
 - The API connects to Postgres as the table owner (service role), so RLS read policies protect direct client
   access, not the API itself; organization scoping in the API is by query.
+- Financial step-up uses TOTP (or Supabase aal2); WebAuthn/passkeys would resist phishing better.
+- Financial rate limiting shares the in-process mutation limiter (single instance).
 - Live Etsy, Depop, Apple and App Store Connect access was not exercised (no credentials or network); fixtures cover those paths.
 
 ## Reporting

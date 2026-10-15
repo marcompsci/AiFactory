@@ -79,3 +79,26 @@ through `GIT_CONFIG_*` environment variables, never argv or `.git/config`.
 (and, for a git worktree, the repository's shared `.git`) at the same absolute path as on the host, so `git -C` and
 worktree links work unchanged, and runs as the worker's uid:gid so files stay owned by the worker. Containers are
 named and killed on timeout. The image is `infrastructure/docker/sandbox.Dockerfile`.
+
+**D10. The fee review workflow before account aggregation (V5).** The spec asked for this order. The full path
+runs end to end on simulated data: request → bank → research → bank → GM → Owner's Tower → approval → gated
+execution. Read-only connectors (CSV, Stripe, Plaid, App Store Connect) plug into the same sync, but no
+real account has been connected yet.
+
+**D11. Approvals are for exact terms, and the gate is at the tool.** An approval binds a hash of action, amount
+(minor units), currency, recipient, funding account and packet. The tool recomputes it from what it is asked to do
+and from the packet's current option, inside the executing transaction. That makes "approved something slightly
+different" impossible rather than unlikely. Execution is compare-and-swap, so an approval works once.
+
+**D12. Step-up is TOTP or Supabase `aal2`, not the session.** A stolen session token can read, reject or defer,
+but it can't approve: approving needs a fresh second factor bound to that one approval. On iPhone, Face ID is
+added on top as a local gate. WebAuthn would be stronger and is the next step.
+
+**D13. No payment, transfer or filing rails.** Approved actions on simulated data are recorded as simulated. On
+live data the bank hands the owner a checklist and records the owner's own completion (with step-up). Tax filing
+is refused even with an approval. A real rail would be a new executor behind the same gate, never a shortcut
+around it.
+
+**D14. Financial data never rides the event stream.** The city, the activity feed and every viewer-visible API
+show that a cost review moved, not what it costs. Amounts live only behind `/api/finance` (owners and admins).
+Financial tool arguments and results are withheld from `tool_executions` and `tool.*` events.

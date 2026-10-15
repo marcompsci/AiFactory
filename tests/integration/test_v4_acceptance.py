@@ -76,7 +76,9 @@ def test_acceptance_research_to_owner_gated_release(v4env, tmp_path):
         r = c.post("/api/research", json={"source": "apple_charts", "query": "productivity"})
         assert r.status_code == 201
         o = opp_of(c)
-        d = until_owner(c, o["id"])
+        until_owner(c, o["id"])
+        # the tower takes the release package off the belt on the next pipeline tick
+        d = wait_for(lambda: (x := dossier(c, o["id"]))["packages"] and all(p["status"] == "RECEIVED" for p in x["packages"]) and x)
         opp = d["opportunity"]
         log.append(f"1. Research: **{opp['title']}** scored {opp['opportunity_score']:.2f} ({opp['confidence']}), data_mode `{opp['data_mode']}`.")
 

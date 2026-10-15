@@ -111,6 +111,7 @@ services/workers        background worker + crash recovery
 services/model_gateway  Anthropic / OpenAI adapters, retries, cost estimates
 services/tools          tool registry with permission checks + sandbox
 services/memory         verified vs hypothesis memory
+services/finance        AI Central Bank: approvals, fee reviews, connectors, dashboard, tax (V5)
 services/integrations   GitHub: approved missions open draft pull requests
 infrastructure          Postgres migrations (RLS), Dockerfiles incl. the tool sandbox image
 scripts                 live-model smoke test, CI helpers

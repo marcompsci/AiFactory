@@ -10,6 +10,7 @@ struct OwnerTowerView: View {
     var body: some View {
         NavigationStack {
             List {
+                FinanceDecisionsSection()
                 let waiting = app.opportunities.filter { $0.status == "OWNER_APPROVAL" }
                 if waiting.isEmpty {
                     ContentUnavailableView("Nothing is waiting for you",
@@ -37,6 +38,7 @@ struct OwnerTowerView: View {
             }
             .navigationTitle("Owner's Tower")
             .navigationDestination(for: String.self) { id in ReleaseReviewView(opportunityId: id) }
+            .navigationDestination(for: FinanceRoute.self) { r in FinanceDecisionView(packetId: r.packetId) }
             .refreshable { await app.refresh() }
         }
     }

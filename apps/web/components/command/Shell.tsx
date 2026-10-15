@@ -5,6 +5,7 @@ import { useStore, type CameraMode, type Tab } from "@/lib/store";
 import { human, STATUS_COLOR } from "@/lib/format";
 import { LiveActivityFeed } from "./Activity";
 import { CompanyPanel } from "./Company";
+import { BankPanel } from "./Bank";
 import { OwnerDesk } from "./OwnerTower";
 import { AgentRoster } from "./Agents";
 import { MissionConsole } from "./Missions";
@@ -114,6 +115,7 @@ export function DistrictCard() {
 const TABS: { id: Tab; label: string }[] = [
   { id: "missions", label: "Missions" },
   { id: "company", label: "Company" },
+  { id: "bank", label: "Bank" },
   { id: "agents", label: "Agents" },
   { id: "activity", label: "Activity" },
   { id: "approvals", label: "Owner" },
@@ -160,6 +162,7 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
         {tab === "agents" ? <AgentRoster /> : null}
         {tab === "activity" ? <LiveActivityFeed /> : null}
         {tab === "company" ? <CompanyPanel /> : null}
+        {tab === "bank" ? <BankPanel /> : null}
         {tab === "approvals" ? <OwnerDesk /> : null}
         {tab === "system" ? <SystemPanel onReconnect={onReconnect} /> : null}
       </div>

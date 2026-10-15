@@ -5,7 +5,7 @@ import { demoScript } from "@aiciv/world-engine";
 import { SEED } from "@aiciv/shared-types";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { api, streamUrl } from "@/lib/api";
+import { api, bank, streamUrl } from "@/lib/api";
 import { useStore } from "@/lib/store";
 
 /**
@@ -60,10 +60,15 @@ export function useRealtime(reconnectKey: number) {
         return;
       }
       if (closed) return;
+      // Financial reviews waiting for the owner light the tower too; only owners and admins can see them (403 otherwise).
+      const fin = await bank.packets().catch(() => null);
       const lg = snap.logistics;
       store().hydrate(snap.agents, snap.sequence, snap.execution_mode, snap.approvals.map((a: { id: string }) => a.id), {
         packages: lg?.packages ?? [],
-        ownerQueue: (snap.opportunities ?? []).filter((o: { status: string }) => o.status === "OWNER_APPROVAL").map((o: { id: string }) => o.id),
+        ownerQueue: [
+          ...(snap.opportunities ?? []).filter((o: { status: string }) => o.status === "OWNER_APPROVAL").map((o: { id: string }) => o.id),
+          ...(fin?.packets ?? []).filter((p) => p.status === "OWNER_DECISION").map((p) => `fin:${p.id}`),
+        ],
         logistics: lg ? { nodes: lg.nodes, routes: lg.routes, beltSpeed: lg.belt_speed } : undefined,
         serverTime: lg?.server_time,
       });

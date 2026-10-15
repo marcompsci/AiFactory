@@ -12,7 +12,7 @@ import { AgentAvatar } from "./AgentAvatar";
 import { Conveyors } from "./Conveyors";
 import { District } from "./District";
 
-const OVERVIEW = { pos: new THREE.Vector3(66, 80, 84), target: new THREE.Vector3(0, 0, -2) };
+const OVERVIEW = { pos: new THREE.Vector3(46, 96, 104), target: new THREE.Vector3(-15, 0, 0) }; // V5: framed to include the AI Central Bank in the west
 
 function Plaza() {
   const ring = useRef<THREE.Mesh>(null);
@@ -118,7 +118,11 @@ function CameraRig({ positions }: { positions: Map<string, THREE.Vector3> }) {
     const d = DISTRICT_BY_ID[focused];
     if (!d) return;
     const c = new THREE.Vector3(...d.position);
-    if (interior) {
+    if (interior && d.architecture === "bank") {
+      // the bank's interior is its stack of floors: stand back toward the plaza and look up the see-through shaft
+      const toward = c.clone().setY(0).normalize().multiplyScalar(-1);
+      goal.current = { pos: c.clone().add(toward.multiplyScalar(54)).add(new THREE.Vector3(0, 24, 20)), target: c.clone().add(new THREE.Vector3(-2, 19, 0)) };
+    } else if (interior) {
       const ws = new THREE.Vector3(...workstationPosition(d.id, d.workstations[0]?.id));
       const out = ws.clone().sub(c).setY(0).normalize();
       goal.current = { pos: ws.clone().add(out.multiplyScalar(7)).setY(4), target: ws.clone().setY(1) };

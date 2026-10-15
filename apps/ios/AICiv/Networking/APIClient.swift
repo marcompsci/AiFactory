@@ -44,7 +44,8 @@ final class APIClient {
         let (data, resp) = try await session.data(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
-            let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
+            let raw = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"]
+            let detail = (raw as? String) ?? ((raw as? [String: Any])?["message"] as? String)
             throw APIError(status: status, detail: detail ?? HTTPURLResponse.localizedString(forStatusCode: status))
         }
         return try Self.decoder.decode(T.self, from: data)
@@ -75,6 +76,28 @@ final class APIClient {
         let (data, resp) = try await session.data(for: request("/api/artifacts/\(artifactId)/files/\(path)"))
         guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw APIError(status: 0, detail: "Preview unavailable") }
         return String(decoding: data, as: UTF8.self)
+    }
+
+    // MARK: AI Central Bank (owners and admins; deciding is the owner's alone)
+
+    func financePackets() async throws -> [FinancePacket] {
+        try await send(request("/api/finance/packets"), as: FinancePacketList.self).packets
+    }
+
+    func financePacket(_ id: String) async throws -> FinancePacketDetail {
+        try await send(request("/api/finance/packets/\(id)"), as: FinancePacketDetail.self)
+    }
+
+    /// Exchanges a fresh authenticator code for a 5-minute token that works for `purpose` (one approval) only.
+    func stepUp(code: String, purpose: String) async throws -> String {
+        let body = try Self.encoder.encode(StepUpVerifyRequest(code: code, purpose: purpose))
+        return try await send(request("/api/finance/stepup/verify", method: "POST", body: body), as: StepUpToken.self).stepUpToken
+    }
+
+    func decidePacket(_ id: String, _ decision: PacketDecisionRequest, stepUpToken: String? = nil) async throws {
+        var r = request("/api/finance/packets/\(id)/decide", method: "POST", body: try Self.encoder.encode(decision))
+        if let stepUpToken { r.setValue(stepUpToken, forHTTPHeaderField: "X-Step-Up") }
+        _ = try await send(r, as: [String: JSONValue].self)
     }
 
     func streamRequest(after: Int) -> URLRequest {

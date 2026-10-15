@@ -60,3 +60,13 @@ Locally without Playwright's browser download: `PW_CHROME=/path/to/chrome PYTHON
 - iOS: build, XCTest and unsigned device build **passed** on GitHub's macOS runner
 - `scripts/live_smoke.py` was exercised against a local stand-in that speaks the Messages API, only to check the
   script itself; **no real model has been called**
+
+## V5 additions (AI Central Bank)
+
+| Suite | What it covers |
+|---|---|
+| `tests/unit/test_v5_finance.py` (37) | Every THREAT_MODEL rule: no execution without the owner's approval; changed amount, recipient, account, type or packet refused; expiry; replay; emergency stop; tax filing refused; step-up required, bound to user and action, expiring, single-use TOTP, Supabase aal2 freshness; viewers and operators locked out; non-finance agents refused; packet scoping; redaction; event allowlist; explicit connection authorization; read-only scopes; encryption at rest; key required outside dev; audit chain tamper detection and append-only; idempotent resync; gaps not zeros; simulated labeling (rows, dashboard, tax export); bill reminders never skipped and never auto-paid; deletion keeps the audit trail; classification; no shopping around legal obligations; no invented sources; usage-priced options never ranked on price; CSV, Stripe, Plaid and App Store Connect adapters |
+| `tests/integration/test_v5_acceptance.py` (5) | **Acceptance scenario** over HTTP with the real worker, scheduler and belts: request → bank → research → bank → GM → Owner's Tower; refusals (no step-up, wrong fingerprint, token for another action); more research; approve with TOTP; simulated execution; reject; defer and reopen; 13-step state sequence in the event log; no money in any finance or package event. Also: fee reviews from the simulated ledger, bill payment with step-up, tax estimate/export/no filing, CSV upload with idempotent re-upload. Log: [`docs/acceptance/v5-acceptance-log.md`](docs/acceptance/v5-acceptance-log.md) |
+| `packages/world-engine/src/world.test.ts` | finance events queue and clear decisions at the Owner's Tower; every bank floor has a desk; the bank is on the belt network |
+| `tests/e2e/app.spec.ts` | V5 in a real browser: load the simulated ledger, request a paid tool, approve the recommended option at the Owner's Tower by entering a real TOTP code, then see it executed (simulated); the bank interior shows all floors |
+| iOS `FinanceTests` | decodes real captured cost-review responses, exact-terms fingerprints, request encoding |

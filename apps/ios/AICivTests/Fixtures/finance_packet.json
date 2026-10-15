@@ -1,0 +1,421 @@
+{
+ "packet": {
+  "id": "5a41be27-4259-4a1b-b8f6-d82e6606510c",
+  "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+  "origin": "purchase_request",
+  "status": "OWNER_DECISION",
+  "requested_by_agent_id": "a1000000-0000-4000-8000-000000000003",
+  "request_mission_id": "95925ee8-bbdb-4566-b9b1-6f847199e336",
+  "research_mission_id": "e2abaa6c-bd54-4777-89d5-2761bc960096",
+  "analysis_mission_id": "f953a068-08da-49dc-89ae-d94763a43806",
+  "execution_mission_id": null,
+  "subject_type": "tool_request",
+  "subject_id": null,
+  "vendor": "Figma",
+  "item": "Professional (per editor)",
+  "justification": "Design reviews for the iOS app redesign",
+  "amount_minor": 1500,
+  "currency": "USD",
+  "interval": "month",
+  "classification": "recurring",
+  "classification_reason": "billed every month",
+  "annualized_minor": 18000,
+  "significant": 1,
+  "risk": "medium",
+  "research_rounds": 1,
+  "findings": [
+   {
+    "vendor": "Figma",
+    "item": "Professional (per editor)",
+    "is_requested": true,
+    "price_minor": 1500,
+    "interval": "month",
+    "yearly_minor": 18000,
+    "migration_minor": 0,
+    "three_year_minor": 54000,
+    "first_year_minor": 18000,
+    "compatibility": "full",
+    "security": "SOC 2 Type II",
+    "quality": "industry standard",
+    "notes": "Reference option.",
+    "source": "fixture://vendor-catalog/design_tools/figma",
+    "data_mode": "fixture"
+   },
+   {
+    "vendor": "Penpot",
+    "item": "Cloud (free tier)",
+    "is_requested": false,
+    "price_minor": 0,
+    "interval": "month",
+    "yearly_minor": 0,
+    "migration_minor": 20000,
+    "three_year_minor": 20000,
+    "first_year_minor": 20000,
+    "compatibility": "partial",
+    "security": "open source; self-hosting option",
+    "quality": "good for UI design; fewer plugins",
+    "notes": "Imports .fig via plugin with fidelity loss.",
+    "source": "fixture://vendor-catalog/design_tools/penpot",
+    "data_mode": "fixture"
+   },
+   {
+    "vendor": "Sketch",
+    "item": "Standard (per editor)",
+    "is_requested": false,
+    "price_minor": 1200,
+    "interval": "month",
+    "yearly_minor": 14400,
+    "migration_minor": 15000,
+    "three_year_minor": 58200,
+    "first_year_minor": 29400,
+    "compatibility": "partial",
+    "security": "local files by default",
+    "quality": "mature; macOS only",
+    "notes": "Mac-only team requirement.",
+    "source": "fixture://vendor-catalog/design_tools/sketch",
+    "data_mode": "fixture"
+   }
+  ],
+  "recommendation": {
+   "action": "choose_alternative",
+   "chosen": "Penpot",
+   "saving_three_year_minor": 34000,
+   "summary": "Penpot (Cloud (free tier)) costs less over three years, migration included. Compatibility is partial: check the notes before switching.",
+   "options": {
+    "recommended": {
+     "vendor": "Penpot",
+     "item": "Cloud (free tier)",
+     "amount_minor": 0,
+     "currency": "USD",
+     "interval": "month",
+     "recipient": "Penpot",
+     "account_ref": "acct:6983a39a-5c6b-4434-8320-a8d5619f07a0",
+     "account_label": "SIM Business Card \u2022\u20224242",
+     "three_year_minor": 20000
+    },
+    "requested": {
+     "vendor": "Figma",
+     "item": "Professional (per editor)",
+     "amount_minor": 1500,
+     "currency": "USD",
+     "interval": "month",
+     "recipient": "Figma",
+     "account_ref": "acct:6983a39a-5c6b-4434-8320-a8d5619f07a0",
+     "account_label": "SIM Business Card \u2022\u20224242",
+     "three_year_minor": 54000
+    }
+   },
+   "narrative": "[simulation \u00b7 templated text] Penpot (Cloud (free tier)) costs less over three years, migration included. Compatibility is partial: check the notes before switching."
+  },
+  "gm_decision": {
+   "outcome": "forward",
+   "reasons": [],
+   "method": "rules",
+   "model": null,
+   "note": null,
+   "at": "2026-10-15T01:10:13.265768+00:00"
+  },
+  "owner_note": null,
+  "deferred_until": null,
+  "data_mode": "simulated",
+  "created_at": "2026-10-15T01:10:11.690504+00:00",
+  "updated_at": "2026-10-15T01:10:13.269689+00:00"
+ },
+ "approvals": [
+  {
+   "id": "b48e1506-ad23-4146-b38b-c245e91947c7",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "packet_id": "5a41be27-4259-4a1b-b8f6-d82e6606510c",
+   "action_type": "purchase",
+   "amount_minor": 0,
+   "currency": "USD",
+   "recipient": "Penpot",
+   "account_ref": "acct:6983a39a-5c6b-4434-8320-a8d5619f07a0",
+   "details": {
+    "option": "recommended",
+    "item": "Cloud (free tier)",
+    "interval": "month",
+    "account_label": "SIM Business Card \u2022\u20224242"
+   },
+   "payload_hash": "bdcc1b993d2e52c62ebad878c3603870c57112028e521363f09b398e41a0a9dc",
+   "status": "REQUESTED",
+   "requested_by_agent_id": "a1000000-0000-4000-8000-000000000010",
+   "expires_at": "2026-10-18T01:10:12.964956+00:00",
+   "decided_by": null,
+   "decided_role": null,
+   "decided_at": null,
+   "step_up_method": null,
+   "executed_at": null,
+   "execution_ref": null,
+   "execution_mode": null,
+   "data_mode": "simulated",
+   "created_at": "2026-10-15T01:10:12.965197+00:00"
+  },
+  {
+   "id": "0dda68c9-435d-4720-9281-dc23b89edf16",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "packet_id": "5a41be27-4259-4a1b-b8f6-d82e6606510c",
+   "action_type": "purchase",
+   "amount_minor": 1500,
+   "currency": "USD",
+   "recipient": "Figma",
+   "account_ref": "acct:6983a39a-5c6b-4434-8320-a8d5619f07a0",
+   "details": {
+    "option": "requested",
+    "item": "Professional (per editor)",
+    "interval": "month",
+    "account_label": "SIM Business Card \u2022\u20224242"
+   },
+   "payload_hash": "6f4e8527d13468cefa998cd44a60105e2f65ef20cc63b0a04a2c3036408eec1c",
+   "status": "REQUESTED",
+   "requested_by_agent_id": "a1000000-0000-4000-8000-000000000010",
+   "expires_at": "2026-10-18T01:10:12.965922+00:00",
+   "decided_by": null,
+   "decided_role": null,
+   "decided_at": null,
+   "step_up_method": null,
+   "executed_at": null,
+   "execution_ref": null,
+   "execution_mode": null,
+   "data_mode": "simulated",
+   "created_at": "2026-10-15T01:10:12.966178+00:00"
+  }
+ ],
+ "savings": [
+  {
+   "id": "9224c685-7742-45dd-bf2b-fa54543e23a4",
+   "organization_id": "0b3a6f1e-6c1d-4b8e-9f0a-1a2b3c4d5e60",
+   "packet_id": "5a41be27-4259-4a1b-b8f6-d82e6606510c",
+   "title": "Penpot instead of Figma",
+   "current_annual_minor": 18000,
+   "proposed_annual_minor": 0,
+   "migration_cost_minor": 20000,
+   "first_year_saving_minor": -2000,
+   "confidence": "low",
+   "alternative": {
+    "vendor": "Penpot",
+    "item": "Cloud (free tier)",
+    "is_requested": false,
+    "price_minor": 0,
+    "interval": "month",
+    "yearly_minor": 0,
+    "migration_minor": 20000,
+    "three_year_minor": 20000,
+    "first_year_minor": 20000,
+    "compatibility": "partial",
+    "security": "open source; self-hosting option",
+    "quality": "good for UI design; fewer plugins",
+    "notes": "Imports .fig via plugin with fidelity loss.",
+    "source": "fixture://vendor-catalog/design_tools/penpot",
+    "data_mode": "fixture"
+   },
+   "status": "PROPOSED",
+   "data_mode": "simulated",
+   "created_at": "2026-10-15T01:10:12.893055+00:00"
+  }
+ ],
+ "packages": [
+  {
+   "id": "0784db6a-01dd-4f26-968a-18c1e868958b",
+   "type": "purchase_request",
+   "status": "RECEIVED",
+   "origin": "code-forge",
+   "destination": "central-bank",
+   "created_at": "2026-10-15T01:10:11.692370+00:00"
+  },
+  {
+   "id": "07436ad9-2087-41da-8090-21c0b85bf8bf",
+   "type": "fee_research_request",
+   "status": "RECEIVED",
+   "origin": "central-bank",
+   "destination": "data-observatory",
+   "created_at": "2026-10-15T01:10:11.955137+00:00"
+  },
+  {
+   "id": "4d3dd32a-96b2-45f2-a597-bc95c40c0268",
+   "type": "savings_recommendation",
+   "status": "RECEIVED",
+   "origin": "data-observatory",
+   "destination": "central-bank",
+   "created_at": "2026-10-15T01:10:12.351765+00:00"
+  },
+  {
+   "id": "be1776c6-fb51-44f8-aaac-759ebf4a2c6f",
+   "type": "purchase_request",
+   "status": "RECEIVED",
+   "origin": "central-bank",
+   "destination": "nexus-spire",
+   "created_at": "2026-10-15T01:10:13.045156+00:00"
+  },
+  {
+   "id": "fb2ed965-5b4b-4faa-a2a8-e3a31591bea3",
+   "type": "owner_approval_request",
+   "status": "IN_TRANSIT",
+   "origin": "nexus-spire",
+   "destination": "owners-tower",
+   "created_at": "2026-10-15T01:10:13.267299+00:00"
+  }
+ ],
+ "audit": [
+  {
+   "seq": 17,
+   "action": "packet.created",
+   "actor_type": "agent",
+   "detail": {
+    "origin": "purchase_request",
+    "vendor": "Figma",
+    "amount_minor": 1500,
+    "interval": "month",
+    "classification": "recurring",
+    "classification_reason": "billed every month",
+    "annualized_minor": 18000,
+    "significant": 1,
+    "risk": "medium"
+   },
+   "at": "2026-10-15T01:10:11.690935+00:00"
+  },
+  {
+   "seq": 23,
+   "action": "packet.status_changed",
+   "actor_type": "system",
+   "detail": {
+    "from": "SUBMITTED",
+    "to": "AT_BANK",
+    "reason": "received at the AI Central Bank"
+   },
+   "at": "2026-10-15T01:10:11.905723+00:00"
+  },
+  {
+   "seq": 25,
+   "action": "packet.status_changed",
+   "actor_type": "system",
+   "detail": {
+    "from": "AT_BANK",
+    "to": "RESEARCH_REQUESTED",
+    "reason": "sent to the Research Division"
+   },
+   "at": "2026-10-15T01:10:11.958519+00:00"
+  },
+  {
+   "seq": 29,
+   "action": "packet.status_changed",
+   "actor_type": "system",
+   "detail": {
+    "from": "RESEARCH_REQUESTED",
+    "to": "RESEARCHING",
+    "reason": "research mission started"
+   },
+   "at": "2026-10-15T01:10:12.182854+00:00"
+  },
+  {
+   "seq": 31,
+   "action": "research.completed",
+   "actor_type": "agent",
+   "detail": {
+    "round": 1,
+    "category": "design_tools",
+    "count": 3,
+    "data_mode": "fixture",
+    "note": "Catalog prices are FIXTURE placeholders for development; verify current pricing before deciding."
+   },
+   "at": "2026-10-15T01:10:12.292211+00:00"
+  },
+  {
+   "seq": 41,
+   "action": "packet.status_changed",
+   "actor_type": "system",
+   "detail": {
+    "from": "RESEARCHING",
+    "to": "FINDINGS_RETURNED",
+    "reason": "findings received by the Savings Strategist"
+   },
+   "at": "2026-10-15T01:10:12.682524+00:00"
+  },
+  {
+   "seq": 48,
+   "action": "analysis.recorded",
+   "actor_type": "agent",
+   "detail": {
+    "action": "choose_alternative",
+    "chosen": "Penpot"
+   },
+   "at": "2026-10-15T01:10:12.893562+00:00"
+  },
+  {
+   "seq": 49,
+   "action": "packet.classified",
+   "actor_type": "agent",
+   "detail": {
+    "classification": "recurring",
+    "classification_reason": "billed every month",
+    "annualized_minor": 18000,
+    "significant": 1,
+    "risk": "medium"
+   },
+   "at": "2026-10-15T01:10:12.953128+00:00"
+  },
+  {
+   "seq": 50,
+   "action": "approval.requested",
+   "actor_type": "agent",
+   "detail": {
+    "packet_id": "5a41be27-4259-4a1b-b8f6-d82e6606510c",
+    "action_type": "purchase",
+    "amount_minor": 0,
+    "currency": "USD",
+    "recipient": "Penpot",
+    "account_ref": "[account]a39a-5c6b-4434-8320-a8d5619f07a0",
+    "payload_hash": "bdcc1b993d2e52c62ebad878c3603870c57112028e521363f09b398e41a0a9dc"
+   },
+   "at": "2026-10-15T01:10:12.965617+00:00"
+  },
+  {
+   "seq": 51,
+   "action": "approval.requested",
+   "actor_type": "agent",
+   "detail": {
+    "packet_id": "5a41be27-4259-4a1b-b8f6-d82e6606510c",
+    "action_type": "purchase",
+    "amount_minor": 1500,
+    "currency": "USD",
+    "recipient": "Figma",
+    "account_ref": "[account]a39a-5c6b-4434-8320-a8d5619f07a0",
+    "payload_hash": "6f4e8527d13468cefa998cd44a60105e2f65ef20cc63b0a04a2c3036408eec1c"
+   },
+   "at": "2026-10-15T01:10:12.966483+00:00"
+  },
+  {
+   "seq": 57,
+   "action": "packet.status_changed",
+   "actor_type": "system",
+   "detail": {
+    "from": "FINDINGS_RETURNED",
+    "to": "GM_REVIEW",
+    "reason": "significant: escalated to the General Manager"
+   },
+   "at": "2026-10-15T01:10:13.049126+00:00"
+  },
+  {
+   "seq": 60,
+   "action": "gm.reviewed",
+   "actor_type": "agent",
+   "detail": {
+    "outcome": "forward",
+    "reasons": [],
+    "method": "rules"
+   },
+   "at": "2026-10-15T01:10:13.266225+00:00"
+  },
+  {
+   "seq": 61,
+   "action": "packet.status_changed",
+   "actor_type": "system",
+   "detail": {
+    "from": "GM_REVIEW",
+    "to": "OWNER_DECISION",
+    "reason": "General Manager forwarded it to the owner"
+   },
+   "at": "2026-10-15T01:10:13.270045+00:00"
+  }
+ ]
+}

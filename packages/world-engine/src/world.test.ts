@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validateEnvelope, type EventEnvelope, type EventType } from "@aiciv/event-contracts";
 import { SEED } from "../../shared-types/src/index";
-import { applyEvent, demoScript, DISTRICTS, initialWorld, route, routeLength, sampleRoute, workstationPosition } from "./index";
+import { applyEvent, demoScript, DISTRICT_BY_ID, DISTRICTS, initialWorld, route, routeLength, sampleRoute, workstationPosition } from "./index";
 
 const ORG = SEED.organization_id;
 const ids = Object.fromEntries(SEED.agents.map((a) => [a.key, a.id])) as Record<string, string>;
@@ -157,5 +157,27 @@ describe("V4 package events", () => {
     expect(w.ownerQueue).toEqual(["o1"]);
     w = applyEvent(w, ev(5, "release.owner_approved", null, { opportunity_id: "o1" }), 0).state;
     expect(w.ownerQueue).toEqual([]);
+  });
+});
+
+describe("V5 AI Central Bank events", () => {
+  it("queues a cost review at the Owner's Tower and clears it when the owner decides", () => {
+    let w = initialWorld(SEED.agents);
+    w = applyEvent(w, ev(1, "finance.approval_requested", null, { packet_id: "k1", data_mode: "simulated" }), 0).state;
+    expect(w.ownerQueue).toEqual(["fin:k1"]);
+    w = applyEvent(w, ev(2, "finance.approval_decided", null, { packet_id: "k1", decision: "APPROVE" }), 0).state;
+    expect(w.ownerQueue).toEqual([]);
+    w = applyEvent(w, ev(3, "finance.approval_requested", null, { packet_id: "k2" }), 0).state;
+    w = applyEvent(w, ev(4, "finance.packet_status_changed", null, { packet_id: "k2", from: "OWNER_DECISION", to: "RESEARCH_REQUESTED" }), 0).state;
+    expect(w.ownerQueue).toEqual([]);
+    expect(w.districtActivity["central-bank"]).toBeGreaterThan(0);
+  });
+
+  it("puts every bank floor on a real desk and the bank on the belt network", () => {
+    const bank = DISTRICT_BY_ID["central-bank"];
+    expect(bank.architecture).toBe("bank");
+    expect(bank.workstations.map((w) => w.floor).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([0, 2, 3, 4, 5, 6, 7, 8]);
+    const ids = buildLogistics().nodes.map((n) => n.id);
+    expect(ids).toEqual(expect.arrayContaining(["central-bank:dispatch", "central-bank:receiving", "junction:central-bank"]));
   });
 });

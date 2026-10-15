@@ -122,3 +122,55 @@ Connect real credentials (Anthropic key, Etsy key) and run one live research →
 - Supabase-hosted specifics (real `auth.uid()` RLS, Broadcast) and the GitHub App token exchange are untested; the
   PR run used the environment's own git credentials.
 - Marketplace research still runs on labeled fixtures without Etsy/App Store Connect credentials.
+
+---
+
+## Increment 4: V5.0 AI Central Bank (Oct 14, 2026)
+
+Built in the order the spec gave. The secure fee review workflow came first.
+
+### Built
+- **Threat model** with 17 rules, each enforced in code and tested: `docs/finance/THREAT_MODEL.md`.
+- **Database**: 15 finance tables, a financial reports table and step-up secrets. Migration `0003` adds owner/admin
+  RLS, an append-only and hash-chained audit log, check constraints, and the 10 financial package types with
+  required subject references.
+- **Agents**: Sterling (CFO) → Atlas, with six specialists under Sterling. Haiku does routine work, Sonnet does
+  judgment. Routine classification uses rules, not models.
+- **Fee review workflow**: paid-tool requests from Kade and fees detected in the ledger both travel the belts
+  through the bank, the Research Division, the bank again, the GM (when significant) and the Owner's Tower.
+  Decisions are approve, reject, defer or more research. Execution is gated at the tool on exact, expiring,
+  single-use, step-up-verified approvals.
+- **Data**: a labeled simulated ledger (6 months of a small app business) and read-only adapters for CSV,
+  Stripe, Plaid and App Store Connect. Sync covers dedupe, categorization, recurring detection, reconciliation,
+  coverage gaps and sync runs. Bills get reminders and payment proposals and are never autopaid.
+- **Dashboard**: cash and available balances, revenue, fees, refunds, operating costs, gross and net profit
+  *estimates*, cash flow, bills, subscriptions, tax reserve, a 90-day forecast band, AI costs (ledger and agents'
+  own estimate), savings, reconciliation, freshness and gaps.
+- **Tax**: deadlines (US federal; CA optional), document checklist and upload, labeled estimates with uncertainty
+  and missing evidence, and an export zip for a tax professional. Filing is always refused.
+- **3D**: an AI Central Bank skyscraper west of the plaza. Floors light up from real tool events, staff stand at
+  their floor desks, "Go inside" shows the labeled floor stack, the belts carry financial packages, and the Owner's
+  Tower beacon also lights for financial decisions.
+- **Web**: a Bank tab, and financial decisions at the Owner's Tower with a step-up dialog (enroll once, then a
+  6-digit code per approval).
+- **iPhone**: financial decisions in the Owner tab, with Face ID and then an authenticator code.
+
+### Results
+- pytest **148 passed, 3 skipped** on SQLite and on PostgreSQL 16 · vitest **15** · Playwright **7** · tsc and next build clean
+- Acceptance log: `docs/acceptance/v5-acceptance-log.md`
+
+### Bugs found and fixed while building V5
+- A second research round never reached the General Manager, because the first review was still on record. Each
+  round now gets a fresh GM review, and the old one stays in the audit log.
+- Postgres rejected Python booleans for `significant` (stored as an integer now). A malformed account
+  reference reached a uuid query (now validated).
+- Payment-processor and AI-usage pricing is per transaction or per use, so a "$0 plan" in the catalog would have
+  ranked as cheapest. Usage-priced options are now never ranked on price.
+- Unknown deposits were going to count as revenue. They are now "other" and wait for review.
+
+### Still open
+- No real financial account has been connected; the adapters are tested against mock responses.
+- Live alternatives research needs an authorized search connector. Today it uses the labeled fixture catalog.
+- No payment, transfer or filing rails exist, by design (D13).
+- Step-up is TOTP or aal2. WebAuthn/passkeys are next.
+- Accounting, marketplace-payout and billing integrations are listed as gaps and not built.

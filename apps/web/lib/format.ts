@@ -36,6 +36,16 @@ export function usd(n: number | null | undefined): string {
   return v < 0.01 && v > 0 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
 }
 
+function sim(p: Record<string, unknown>): string {
+  return p.data_mode === "simulated" ? " [simulated data]" : "";
+}
+
+/** Money in minor units → "$1,234.56". Null means "no data", never zero. */
+export function money(minor: number | null | undefined, currency = "USD"): string {
+  if (minor === null || minor === undefined) return "No data";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(minor / 100);
+}
+
 /** One plain-language line per event for the activity feed. */
 export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): { who: string; text: string; tone: string } {
   const p = e.payload as Record<string, unknown>;
@@ -143,6 +153,40 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: `Belt ${s("status") === "DOWN" ? "down" : "restored"}`, tone: s("status") === "DOWN" ? "#FF6178" : "#5BF2A5" };
     case "system.emergency_stop":
       return { who, text: p.engaged ? "Emergency stop engaged" : "Emergency stop released", tone: "#FF6178" };
+    // V5 AI Central Bank: the stream never carries amounts; details live in the Bank tab (owners and admins only)
+    case "finance.packet_created":
+      return { who, text: `New cost review (${human(s("origin"))}, ${human(s("classification")).toLowerCase()})${sim(p)}`, tone: "#F4D58D" };
+    case "finance.packet_status_changed":
+      return { who, text: `Cost review: ${human(s("to")).toLowerCase()} (${s("label")})${sim(p)}`, tone: "#F4D58D" };
+    case "finance.fee_detected":
+      return { who, text: `Fee detected; opened a review${sim(p)}`, tone: "#FFBD69" };
+    case "finance.research_requested":
+    case "finance.findings_returned":
+      return { who, text: `Cost research ${e.event_type.endsWith("returned") ? "returned to the bank" : "requested"}${sim(p)}`, tone: "#5BF2A5" };
+    case "finance.recommendation_ready":
+      return { who, text: `Recommendation ready${p.significant ? ", escalating to the General Manager" : ""}${sim(p)}`, tone: "#F4D58D" };
+    case "finance.gm_reviewed":
+      return { who, text: `General Manager: ${human(s("decision")).toLowerCase()}`, tone: "#EAF2FF" };
+    case "finance.approval_requested":
+      return { who, text: `A cost review is waiting for your decision${sim(p)}`, tone: "#F4D58D" };
+    case "finance.approval_decided":
+      return { who, text: `You decided: ${human(s("decision")).toLowerCase()}`, tone: s("decision") === "APPROVE" ? "#5BF2A5" : "#FFBD69" };
+    case "finance.approval_expired":
+      return { who, text: "A financial approval expired unused", tone: "#FFBD69" };
+    case "finance.action_executed":
+      return { who, text: `Owner-approved ${human(s("action_type")).toLowerCase()} carried out (${s("label")})`, tone: "#5BF2A5" };
+    case "finance.action_refused":
+      return { who, text: `Refused: ${human(s("reason_code") || s("action_type")).toLowerCase()}`, tone: "#FF6178" };
+    case "finance.connection_status_changed":
+      return { who, text: `${human(s("provider") || "Connection")} ${human(s("status")).toLowerCase()}`, tone: "#8FA8FF" };
+    case "finance.sync_completed":
+      return { who, text: `Synced ${s("provider")}: ${s("inserted")} new, ${s("duplicates")} already known${sim(p)}`, tone: "#8FA8FF" };
+    case "finance.sync_failed":
+      return { who, text: `Sync failed (${s("reason_code")})`, tone: "#FF6178" };
+    case "finance.bill_reminder":
+      return { who, text: `${s("label") || "Bill due"}: reminder sent to your tower${sim(p)}`, tone: "#FFBD69" };
+    case "finance.tax_estimate_updated":
+      return { who, text: `Tax estimate updated for ${s("tax_year")} (an estimate)${sim(p)}`, tone: "#A66BFF" };
     default:
       return { who, text: e.event_type, tone: "#8FA8FF" };
   }
@@ -157,4 +201,15 @@ export const PACKAGE_COLORS: Record<string, string> = {
   revision_request: "#FF6178",
   approval_request: "#F4D58D",
   release_package: "#F4D58D",
+  // V5 AI Central Bank
+  revenue_report: "#5BF2A5",
+  expense_alert: "#FFBD69",
+  bill_reminder: "#FF9F43",
+  fee_research_request: "#F4D58D",
+  savings_recommendation: "#7CFFCB",
+  purchase_request: "#E7C66A",
+  payment_proposal: "#FF8FA3",
+  tax_review_package: "#B794FF",
+  financial_forecast: "#9AD1FF",
+  owner_approval_request: "#FFD86B",
 };

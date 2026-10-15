@@ -58,10 +58,30 @@ Add an `ANTHROPIC_API_KEY` repository secret (GitHub → Settings → Secrets an
 **Live models** workflow from the Actions tab. It calls each model the roster uses and, optionally, runs one live
 mission to the approval gate. Locally: `ANTHROPIC_API_KEY=… python scripts/live_smoke.py --mission`.
 
+### AI Central Bank (V5)
+
+```bash
+AICIV_FINANCE_KEY=…   # required outside dev mode: encrypts financial credentials and step-up secrets
+```
+Then, in the app (Bank tab, as the owner):
+1. **Set up step-up.** The first approval asks you to enroll an authenticator app. With Supabase Auth, an `aal2`
+   session whose MFA happened in the last 10 minutes also counts.
+2. **Connect read-only sources.** Add a connection, then **Authorize** it. Stripe needs a *restricted* key (`rk_…`)
+   with read access to Balance and Balance transactions. Plaid needs a Link access token for the transactions product.
+   App Store Connect needs an API key with the Finance or Sales role. CSV statements can be uploaded any time.
+   Nothing is read from environment variables.
+3. Until something is connected, the dashboard shows gaps, not zeros. The **Load simulated ledger** button gives a
+   labeled test ledger for trying the workflow.
+
+No payment, transfer or tax-filing integration exists. Approved actions on live data become a checklist that you
+complete yourself and then mark done (with step-up).
+
 ## Status
 
 Verified: SQLite and **PostgreSQL 16** (full test suite on both), the **Docker sandbox** (real containers, a whole
 mission), **real draft pull requests** (see `docs/acceptance/github-pr-log.md`), and the native iOS app's build and
 unit tests on GitHub's macOS runners. Not yet verified: Supabase-hosted Postgres specifically (RLS with real
 `auth.uid()`), Supabase Broadcast, the GitHub App token exchange (the PR run used ambient git credentials), and any
-real model call (needs your key).
+real model call (needs your key). AI Central Bank: verified end to end on simulated data (API tests, the Postgres
+suite, and a browser test that approves with a real TOTP code). The Stripe, Plaid and App Store Connect adapters are
+tested against recorded-shape mock responses only; no real financial account has been connected.

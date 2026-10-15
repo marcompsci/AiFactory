@@ -77,3 +77,60 @@ test("V4: research reaches the Owner's Tower and ships only after the owner appr
   await page.getByRole("tab", { name: "Activity" }).click();
   await expect(page.getByText(/Released to local release/).first()).toBeVisible({ timeout: 30_000 });
 });
+
+/** RFC 6238 TOTP, so the test can act as the owner's authenticator app. */
+function totp(secret: string, at = Date.now()): string {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const crypto = require("node:crypto") as typeof import("node:crypto");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const ch of secret.replace(/=+$/, "").toUpperCase()) bits += alphabet.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(at / 1000 / 30)));
+  const mac = crypto.createHmac("sha1", key).update(counter).digest();
+  const off = mac[mac.length - 1] & 0x0f;
+  return String((mac.readUInt32BE(off) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+test("V5: a paid-tool request travels through the AI Central Bank and is bought only after step-up approval", async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.goto("/");
+  await expect(page.getByRole("status")).toContainText("Live", { timeout: 30_000 });
+  await page.getByRole("tab", { name: "Bank" }).click();
+  await page.getByRole("button", { name: "Load simulated ledger" }).click();
+  await expect(page.getByText(/SIMULATED DATA/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Available cash")).toBeVisible();
+  await page.screenshot({ path: "test-results/v5-bank-dashboard.png" });
+
+  await page.getByRole("button", { name: "Send to the bank" }).click();
+  await page.getByRole("tab", { name: /Owner/ }).click();
+  const decision = page.getByTestId("cost-decision").filter({ hasText: "Paid tool request" });
+  await expect(decision).toBeVisible({ timeout: 200_000 });
+  await expect(decision.getByText("Recommended option")).toBeVisible();
+  await page.screenshot({ path: "test-results/v5-owner-decision.png" });
+
+  await decision.getByRole("button", { name: "Approve exactly this" }).first().click();
+  await page.getByRole("button", { name: "Set up an authenticator" }).click();
+  const secret = (await page.getByTestId("totp-secret").textContent())!.trim();
+  await page.getByLabel("6-digit code").fill(totp(secret));
+  await page.getByRole("button", { name: "Confirm" }).click();
+  await expect(decision).toHaveCount(0, { timeout: 30_000 });
+
+  await page.getByRole("tab", { name: "Bank" }).click();
+  await expect(page.getByRole("button", { name: /Figma: Professional/ }).getByText("Executed")).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("button", { name: /Figma: Professional/ }).click();
+  await expect(page.getByText(/^Purchase .* to /).first()).toBeVisible();
+  await page.screenshot({ path: "test-results/v5-executed.png" });
+});
+
+test("V5: the AI Central Bank opens up to show its floors", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("status")).toContainText("Live", { timeout: 30_000 });
+  await page.getByRole("button", { name: "AI Central Bank" }).dispatchEvent("click");
+  await page.getByRole("button", { name: "Go inside" }).dispatchEvent("click");
+  await expect(page.getByText(/Floor 8 · Executive Dashboard/)).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText(/Vault · Secure Records Vault/)).toBeVisible();
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: "test-results/v5-bank-inside.png" });
+});

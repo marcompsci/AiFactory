@@ -64,6 +64,11 @@ export function workstationPosition(districtId: string, workstationId?: string |
 export function homePosition(districtId: string, slot = 0): Vec3 {
   const d = DISTRICT_BY_ID[districtId];
   if (!d) return [0, 0, 0];
+  if (d.architecture === "bank" && d.workstations.length) {
+    // the bank's staff wait at the floor desks in front of the tower rather than crowding its gate
+    const w = d.workstations[slot % d.workstations.length];
+    return add(d.position, [w.offset[0] + 1.6, 0, w.offset[2]]);
+  }
   const g = gatePosition(districtId);
   const side = slot % 2 === 0 ? 1 : -1;
   const spread = Math.ceil(slot / 2) * 4.5 * side;

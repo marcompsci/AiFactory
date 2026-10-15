@@ -83,6 +83,42 @@ final class DecodingTests: XCTestCase {
     }
 }
 
+final class FinanceTests: XCTestCase {
+    func testDecodesARealCostReviewWaitingForTheOwner() throws {
+        let d = try APIClient.decoder.decode(FinancePacketDetail.self, from: fixture("finance_packet"))
+        XCTAssertEqual(d.packet.status, "OWNER_DECISION")
+        XCTAssertEqual(d.packet.origin, "purchase_request")
+        XCTAssertTrue(d.packet.isSimulated, "simulated data must stay labeled")
+        XCTAssertNotNil(d.packet.summary)
+        let open = d.approvals.filter { $0.status == "REQUESTED" }
+        XCTAssertEqual(Set(open.compactMap(\.option)), ["recommended", "requested"])
+        for a in open {
+            XCTAssertEqual(a.payloadHash.count, 64, "the exact-terms fingerprint the server checks")
+            XCTAssertEqual(a.actionType, "purchase")
+            XCTAssertFalse(a.accountLabel.isEmpty)
+        }
+    }
+
+    func testDecodesThePacketList() throws {
+        let list = try APIClient.decoder.decode(FinancePacketList.self, from: fixture("finance_packets"))
+        XCTAssertTrue(list.packets.contains { $0.origin == "fee_detected" })
+    }
+
+    func testDecisionRequestUsesServerKeysAndOmitsEmptyFields() throws {
+        let data = try APIClient.encoder.encode(PacketDecisionRequest(decision: "APPROVE", approvalId: "a1", payloadHash: String(repeating: "b", count: 64),
+                                                                       note: nil, deferDays: nil))
+        let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(obj["approval_id"] as? String, "a1")
+        XCTAssertNotNil(obj["payload_hash"])
+        XCTAssertNil(obj["note"])
+    }
+
+    func testMoneyFormattingUsesMinorUnits() {
+        XCTAssertTrue(Format.money(1500).contains("15"))
+        XCTAssertFalse(Format.money(1500).contains("1,500"))
+    }
+}
+
 final class EventLedgerTests: XCTestCase {
     private func event(_ seq: Int, _ type: String, _ payload: [String: JSONValue] = [:]) -> EventEnvelope {
         EventEnvelope(eventId: UUID().uuidString, schemaVersion: 1, organizationId: "o", missionId: nil, agentId: nil, eventType: type,

@@ -174,3 +174,62 @@ packet, review, Owner's Tower and acceptance log all say so. Runs are rate-limit
 | Scheduling, status, routing, supervision | deterministic code |
 
 Per-agent, per-department, per-mission and daily budgets; per-source research query limits; temperature-0 response cache in the gateway; deduplicated research runs.
+
+---
+
+# V5.0: AI Central Bank (financial district)
+
+The rules come first: [docs/finance/THREAT_MODEL.md](docs/finance/THREAT_MODEL.md) (F1–F17). Each rule names its
+enforcement point and its test.
+
+```
+ Kade (Developer) ──request_purchase──▶ purchase_request ═══belt═══▶ AI CENTRAL BANK (west of the plaza)
+                                                                     Sterling (CFO, Sonnet) classifies (rules)
+                    ◀═══ fee_research_request ═══                    │
+ DATA OBSERVATORY: Pip / Wren (Haiku) research_cost_alternatives      │  (authorized sources only; fixture catalog today)
+                    ═══ savings_recommendation ═══▶                  Penny (Savings, Sonnet) compares 3-year cost
+                                                                     Sterling proposes exact, expiring approvals
+                                       significant? ═══▶ NEXUS SPIRE: Atlas (GM, Opus) forward / more research / reject
+                                                         ═══ owner_approval_request ═══▶ OWNER'S TOWER
+ Owner: approve (Face ID / TOTP step-up, exact fingerprint) │ reject │ defer │ more research
+        ──▶ finance_execute mission: Billie (Bill Manager, Haiku) → execute_financial_action
+            re-checks approval + terms + expiry + emergency stop in the executing transaction; single-use
+```
+
+| Piece | Where |
+|---|---|
+| Tables (15 + reports + step-up secrets), RLS, append-only audit | `services/core/db.py`, `infrastructure/migrations/0003_financial_district.sql` |
+| Cost review packets and classification (rules) | `services/finance/packets.py` |
+| Fee review workflow (scheduled job `finance`) | `services/finance/pipeline.py` |
+| Approval engine: exact terms, expiry, step-up, single use | `services/finance/approvals.py`, `services/finance/stepup.py` |
+| Financial tools and the tool-boundary gate | `services/finance/tools.py`, `services/tools/registry.py` (`_check_finance`) |
+| Mission templates: `request_tool`, `cost_research`, `cost_analysis`, `finance_execute` | `services/orchestrator/plan.py`, `services/finance/handlers.py` |
+| Read-only connectors: simulated, CSV, Stripe, Plaid, App Store Connect | `services/finance/connectors.py` |
+| Sync: dedupe, categorize, reconcile, coverage, fee detection | `services/finance/sync.py`, `services/finance/categories.py` |
+| Bills: reminders and payment proposals (never autopaid) | `services/finance/bills.py` |
+| Dashboard (labeled figures, freshness, gaps) and forecast | `services/finance/dashboard.py` |
+| Tax: deadlines, checklist, labeled estimates, export; filing always refused | `services/finance/tax.py` |
+| Encryption, keyed hashing, redaction, audit chain, retention | `services/finance/{crypto,redaction,audit,retention}.py` |
+| API (`/api/finance/*`, owner/admin; step-up header `X-Step-Up`) | `services/api/finance.py` |
+| 3D bank: floors light from real tool events; staff at their desks | `apps/web/components/world/District.tsx` (`BankFloors`) |
+| Bank tab and financial decisions at the Owner's Tower | `apps/web/components/command/{Bank,OwnerTower}.tsx` |
+| iPhone: financial decisions with Face ID plus an authenticator code | `apps/ios/AICiv/Views/FinanceViews.swift` |
+
+**Agents.** Sterling (Chief Financial Agent, Sonnet) reports to Atlas. Six others report to Sterling:
+
+| Agent | Role | Model |
+|---|---|---|
+| Tally | Revenue Analyst | Haiku |
+| Audra | Expense Auditor | Haiku |
+| Billie | Bill Manager | Haiku |
+| Ledger | Tax Preparation Agent | Sonnet |
+| Penny | Savings Strategist | Sonnet |
+| Vesta | Financial Forecaster | Haiku |
+
+Routine classification, categorization and reconciliation use rules, with no model call. Models write only
+narrative text, from a redacted view.
+
+**Packages.** There are ten financial package types: `revenue_report`, `expense_alert`, `bill_reminder`,
+`fee_research_request`, `savings_recommendation`, `purchase_request`, `payment_proposal`, `tax_review_package`,
+`financial_forecast` and `owner_approval_request`. Each one must name its authoritative record (`subject_type` and
+`subject_id`); this is enforced in code and by a Postgres check constraint.

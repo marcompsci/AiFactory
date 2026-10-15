@@ -277,6 +277,31 @@ export function applyEvent(state: WorldState, e: EventEnvelope, now: number): Ap
     case "release.executed":
       next.celebrate = { district: "owners-tower", at: now };
       break;
+    // ---------------------------------------------------------------- V5: AI Central Bank (payloads carry no money)
+    case "finance.approval_requested": {
+      const key = `fin:${str(p.packet_id)}`;
+      if (!state.ownerQueue.includes(key)) next.ownerQueue = [...state.ownerQueue, key];
+      next.districtActivity = bump(next, "owners-tower", 1);
+      break;
+    }
+    case "finance.approval_decided":
+      next.ownerQueue = state.ownerQueue.filter((x) => x !== `fin:${str(p.packet_id)}`);
+      break;
+    case "finance.packet_status_changed":
+      if (str(p.from) === "OWNER_DECISION") next.ownerQueue = state.ownerQueue.filter((x) => x !== `fin:${str(p.packet_id)}`);
+      next.districtActivity = bump(next, "central-bank", 0.3);
+      break;
+    case "finance.action_executed":
+      next.celebrate = { district: "central-bank", at: now };
+      break;
+    case "finance.fee_detected":
+    case "finance.sync_completed":
+    case "finance.recommendation_ready":
+    case "finance.tax_estimate_updated":
+    case "finance.bill_reminder":
+      next.districtActivity = bump(next, "central-bank", 0.5);
+      if (e.event_type === "finance.fee_detected") setAgent({ indicator: { kind: "tool", text: "Fee detected", at: now } });
+      break;
     default:
       break;
   }

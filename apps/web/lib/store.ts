@@ -6,7 +6,7 @@ import { SEED } from "@aiciv/shared-types";
 import { create } from "zustand";
 
 export type ConnectionStatus = "connecting" | "live" | "reconnecting" | "demo";
-export type Tab = "missions" | "company" | "agents" | "activity" | "approvals" | "system";
+export type Tab = "missions" | "company" | "bank" | "agents" | "activity" | "approvals" | "system";
 export type CameraMode = "overview" | "orbit" | "follow" | "fly";
 export type Quality = "auto" | "high" | "low";
 

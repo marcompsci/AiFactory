@@ -94,7 +94,7 @@ def recommend(packet, findings: list[dict], *, min_saving_ratio: float = 0.2) ->
         if packet.origin == "fee_detected":
             caveat += " Switching is your call and you make the change yourself; nothing is cancelled or moved automatically."
         return {"action": "choose_alternative", "chosen": best["vendor"], "saving_three_year_minor": saving,
-                "summary": f"{best['vendor']} ({best['item']}) costs less over three years, migration included.{compat}{caveat}"}
+                "summary": f"{best['vendor']} {best['item']} costs less over three years, migration included.{compat}{caveat}"}
     if packet.origin == "fee_detected":
         if packet.classification == "optional":
             return {"action": "avoid_fee", "chosen": None, "saving_three_year_minor": requested["three_year_minor"],
