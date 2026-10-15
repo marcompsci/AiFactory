@@ -16,3 +16,6 @@ venv/
 next-env.d.ts
 .DS_Store
 pytest.log
+knowledge/skills/
+knowledge/phoronomics/
+knowledge/phoronomic-studios/

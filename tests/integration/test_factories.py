@@ -68,7 +68,9 @@ def test_claude_code_factory_reads_sessions_tasks_and_memory_only_when_linked(fe
         # the agents really did the work: Coda's tool call is in the mission log, without transcript content
         with db.get_engine().connect() as conn:
             ex = conn.execute(select(db.tool_executions).where(db.tool_executions.c.mission_id == mid)).fetchall()
-        assert [e.tool_name for e in ex] == ["sync_claude_code"] and "streak" not in (ex[0].output_excerpt or "")
+        # Coda's check-in, plus Nyx's and Coda's plan meters (linking Claude Code turns the meters on)
+        assert sorted(e.tool_name for e in ex) == ["read_plan_usage", "read_plan_usage", "sync_claude_code"]
+        assert all("streak" not in (e.output_excerpt or "") for e in ex)
         # unlinking forgets the snapshot
         c.post("/api/factories/claude_code/link", json={"enabled": False})
         assert c.get("/api/factories").json()["claude_code"]["data"] is None

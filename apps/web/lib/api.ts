@@ -187,6 +187,22 @@ export const game = {
 /** Claude Code and GitHub factories (owner/admin; read-only). */
 export const factories = {
   get: () => call<Json>("/api/factories"),
-  link: (kind: "claude_code" | "github", enabled: boolean) => call<Json>(`/api/factories/${kind}/link`, post({ enabled })),
+  link: (kind: "claude_code" | "github" | "codex", enabled: boolean) => call<Json>(`/api/factories/${kind}/link`, post({ enabled })),
   sync: () => call<Json>("/api/factories/sync", post()),
+  usage: () => call<Json>("/api/factories/usage"),
+  usageSettings: (body: Json) => call<Json>("/api/factories/usage/settings", { method: "PUT", body: JSON.stringify(body) }),
+};
+
+/** Company knowledge base: Phoronomics and Phoronomic Studios docs and skills. Members read; owner/admin edit. */
+export const knowledge = {
+  list: (q = "", company = "", kind = "") =>
+    call<Json>(`/api/knowledge?${new URLSearchParams({ ...(q ? { q } : {}), ...(company ? { company } : {}), ...(kind ? { kind } : {}) })}`),
+  get: (slug: string) => call<Json>(`/api/knowledge/${encodeURIComponent(slug)}`),
+  create: (doc: Json) => call<Json>("/api/knowledge", post(doc)),
+  update: (slug: string, doc: Json) => call<Json>(`/api/knowledge/${encodeURIComponent(slug)}`, { method: "PUT", body: JSON.stringify(doc) }),
+  remove: (slug: string) => call<Json>(`/api/knowledge/${encodeURIComponent(slug)}`, { method: "DELETE" }),
+  upload: (file: File, company: string) =>
+    file.text().then((text) =>
+      call<Json>(`/api/knowledge/upload?${new URLSearchParams({ filename: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name, company })}`,
+        { method: "PUT", body: text, headers: { "content-type": "text/markdown" } })),
 };

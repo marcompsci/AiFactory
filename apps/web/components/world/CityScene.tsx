@@ -11,6 +11,7 @@ import { useStore } from "@/lib/store";
 import { AgentAvatar } from "./AgentAvatar";
 import { Conveyors } from "./Conveyors";
 import { District } from "./District";
+import { KnowledgeBase } from "./KnowledgeBase";
 import { PixelWorld } from "./PixelWorld";
 
 const OVERVIEW = { pos: new THREE.Vector3(50, 108, 166), target: new THREE.Vector3(0, -12, -30) }; // isometric-ish, from the front, like the reference art // V5: framed to include the AI Central Bank in the west
@@ -214,6 +215,7 @@ export function CityScene() {
           <AgentAvatar key={a.id} agent={a} positions={positions} />
         ))}
         <Conveyors />
+        <KnowledgeBase />
       </Suspense>
       <ViewFit />
       <CameraRig positions={positions} />

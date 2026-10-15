@@ -3,13 +3,15 @@ owner links a source or asks for a sync. Everything is read-only."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, update
 
 from services.core import db
 from services.core.auth import Principal, authenticate, mutation_limiter
 from services.core.events import transaction
 from services.factories import claude_code as CC
+from services.factories import codex as CX
+from services.model_gateway import plans as PL
 from services.factories.pipeline import start_sync
 from services.finance import audit
 from services.finance.permissions import require_finance, require_owner
@@ -40,10 +42,14 @@ def factories(p: Principal = Depends(reader)):
     with db.get_engine().connect() as conn:
         links = {r.kind: bool(r.enabled) for r in conn.execute(select(db.factory_links).where(db.factory_links.c.organization_id == p.organization_id))}
         out = {}
-        for kind in ("claude_code", "github"):
+        for kind in ("claude_code", "github", "codex"):
             snap = _latest(conn, p.organization_id, kind)
             out[kind] = {"linked": links.get(kind, False), "synced_at": snap.synced_at if snap else None, "data": snap.data if snap else None}
         out["claude_code"]["found_on_server"] = CC.available()
+        out["codex"]["found_on_server"] = CX.available()
+        usage = _latest(conn, p.organization_id, "plan_usage")
+        out["plan_usage"] = {"synced_at": usage.synced_at if usage else None, "data": usage.data if usage else None,
+                             "plans_enabled": PL.enabled(), "codex_cli": bool(PL.codex_bin()), "claude_cli": bool(PL.claude_bin())}
         out["github"]["repositories"] = [r.full_name for r in conn.execute(select(db.lab_repositories.c.full_name).where(
             db.lab_repositories.c.organization_id == p.organization_id, db.lab_repositories.c.status == "ACTIVE"))]
         running = conn.execute(select(db.missions.c.id, db.missions.c.status).where(db.missions.c.kind == "factory_sync")
@@ -58,7 +64,7 @@ class LinkIn(BaseModel):
 
 @router.post("/{kind}/link")
 def link(kind: str, body: LinkIn, p: Principal = Depends(owner)):
-    if kind not in ("claude_code", "github"):
+    if kind not in ("claude_code", "github", "codex"):
         raise HTTPException(status_code=404, detail="unknown factory")
     with transaction() as conn:
         row = conn.execute(select(db.factory_links).where(db.factory_links.c.organization_id == p.organization_id, db.factory_links.c.kind == kind)).first()
@@ -95,3 +101,37 @@ def _enqueue(mid: str) -> None:
         state.worker.enqueue(mid)
     except Exception:  # noqa: BLE001
         pass
+
+
+class PlanSettingsIn(BaseModel):
+    codex_stop_percent: float | None = Field(default=None, ge=10, le=100)
+    claude_reserve_percent: float | None = Field(default=None, ge=0, le=90)
+    claude_5h_token_budget: float | None = Field(default=None, ge=0, le=1e9)   # 0 clears it
+    owner_active_minutes: float | None = Field(default=None, ge=1, le=240)
+    app_open_counts_as_active: bool | None = None
+    prefer: str | None = Field(default=None, pattern="^(codex|claude)$")
+
+
+@router.get("/usage")
+def usage_now(p: Principal = Depends(reader)):
+    """The plan meters right now (no agent needed): which plan and model the next agent call would use, and why."""
+    from services.factories.tools import usage_view
+    with db.get_engine().connect() as conn:
+        return usage_view(PL.decide(conn=conn))
+
+
+@router.put("/usage/settings")
+def usage_settings(body: PlanSettingsIn, p: Principal = Depends(owner)):
+    changes = body.model_dump(exclude_none=True)
+    if "claude_5h_token_budget" in changes and not changes["claude_5h_token_budget"]:
+        changes["claude_5h_token_budget"] = None
+    with transaction() as conn:
+        row = conn.execute(select(db.plan_settings).where(db.plan_settings.c.organization_id == p.organization_id)).first()
+        data = {**(row.data if row else {}), **changes}
+        if row:
+            conn.execute(update(db.plan_settings).where(db.plan_settings.c.id == row.id).values(data=data, updated_by=p.user_id, updated_at=db.utcnow()))
+        else:
+            conn.execute(db.plan_settings.insert().values(id=db.new_id(), organization_id=p.organization_id, data=data, updated_by=p.user_id))
+        audit.record(conn, org_id=p.organization_id, actor_type="owner", actor_id=p.user_id, action="plans.settings", subject_type="plans",
+                     subject_id=None, detail=changes)
+    return {"settings": PL.settings()}

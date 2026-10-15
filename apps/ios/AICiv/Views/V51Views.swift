@@ -295,6 +295,8 @@ struct FactoriesView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 12) {
+                meters
+                codex
                 claude
                 github
                 if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
@@ -306,6 +308,66 @@ struct FactoriesView: View {
         .toolbar { Button("Sync") { Task { await sync() } } }
         .refreshable { await load() }
         .task(id: app.ledger.lastSequence / 10) { await load() }
+    }
+
+    private var meters: some View {
+        let u = data?.get("plan_usage")?.get("data")
+        let color = Pixel.districtColor["codex-factory"]!
+        return VStack(alignment: .leading, spacing: 8) {
+            PixelHeader(text: "Plan meters", color: color, trailing: data?.get("plan_usage")?.get("plans_enabled")?.isTrue == true ? "agents on your plans" : "plans off")
+            if let u {
+                let plan = u.s("plan")
+                Text(plan.isEmpty ? "No plan has usage left; tasks wait." : "Agents run on the \(plan == "codex" ? "Codex" : "Claude") plan" + (u.s("model").isEmpty ? "." : " with \(u.s("model")).")).font(.subheadline.bold())
+                Text(u.s("reason")).font(.caption).foregroundStyle(.secondary)
+                if u.get("owner_active")?.isTrue == true {
+                    Text("You're using Claude, so agents on the Claude plan use the smallest model.").font(.caption).foregroundStyle(color)
+                }
+                meterRow("Codex · 5 hours", u.get("codex")?.get("primary")?.get("used_percent")?.double, color)
+                meterRow("Codex · week", u.get("codex")?.get("secondary")?.get("used_percent")?.double, color)
+                meterRow("Claude · 5 hours (estimate)", u.get("claude")?.get("used_percent")?.double, Pixel.districtColor["claude-code-factory"]!)
+                Text("\(u.get("claude")?.get("tokens_5h")?.int ?? 0) Claude tokens in 5 hours · \(Int(u.get("settings")?.get("claude_reserve_percent")?.double ?? 40))% kept for you")
+                    .font(Pixel.mono(9)).foregroundStyle(.secondary)
+            } else {
+                Text("The meters fill in after the first check-in.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixelPanel(color.opacity(0.6))
+    }
+
+    private func meterRow(_ label: String, _ pct: Double?, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack { Text(label).font(.caption); Spacer(); Text(pct.map { "\(Int($0))%" } ?? "?").font(Pixel.mono(11)) }
+            PixelBar(progress: (pct ?? 0) / 100, color: (pct ?? 0) >= 90 ? Theme.bad : (pct ?? 0) >= 70 ? Theme.warn : color)
+        }
+    }
+
+    private var codex: some View {
+        let cx = data?.get("codex")
+        let d = cx?.get("data")
+        let color = Pixel.districtColor["codex-factory"]!
+        return VStack(alignment: .leading, spacing: 8) {
+            NeonSign(icon: "◎", text: "Codex Factory", color: color, sub: cx?.get("linked")?.isTrue == true ? "linked" : "not linked")
+            linkToggle("codex", linked: cx?.get("linked")?.isTrue == true)
+            ForEach(Array((d?.get("sessions")?.list ?? []).prefix(6))) { s in
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack {
+                        Text(s.s("title")).font(.caption.bold()).lineLimit(1)
+                        if s.get("by_agents")?.isTrue == true { Text("agents").font(Pixel.mono(8)).foregroundStyle(color) }
+                        Spacer()
+                        Text(Ago.text(s.s("last_activity_at"))).font(Pixel.mono(9)).foregroundStyle(.secondary)
+                    }
+                    ForEach(Array((s.get("completed_tasks")?.list ?? []).suffix(3)), id: \.self) { t in
+                        Label(t.string ?? "", systemImage: "checkmark.square.fill").font(.caption2).foregroundStyle(Theme.ok).lineLimit(1)
+                    }
+                }
+            }
+            if cx?.get("found_on_server")?.isTrue == false {
+                Text("No Codex data on the server's computer.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixelPanel(color.opacity(0.6))
     }
 
     private var claude: some View {
@@ -412,7 +474,8 @@ struct MoreView: View {
             List {
                 Section {
                     NavigationLink { AppLabView() } label: { Label("App Lab", systemImage: "flask") }
-                    NavigationLink { FactoriesView() } label: { Label("Factories", systemImage: "gearshape.2") }
+                    NavigationLink { FactoriesView() } label: { Label("Factories and plan meters", systemImage: "gearshape.2") }
+                    NavigationLink { KnowledgeView() } label: { Label("Knowledge base", systemImage: "sparkles") }
                     NavigationLink { CompanyView() } label: { Label("Company", systemImage: "person.3") }
                     NavigationLink { ActivityView() } label: { Label("Activity", systemImage: "waveform") }
                 }
@@ -444,5 +507,79 @@ struct AccountSection: View {
         } footer: {
             Text("Sign-in opens Google or GitHub in a secure browser sheet; this app never sees your password. The session is kept in the iOS Keychain.")
         }
+    }
+}
+
+
+// MARK: Knowledge base
+
+/// Phoronomics and Phoronomic Studios docs and skills the agents pull from. Read here; manage them on the web.
+struct KnowledgeView: View {
+    @Environment(AppState.self) private var app
+    @State private var data: JSONValue?
+    @State private var query = ""
+    @State private var company = ""
+    @State private var error: String?
+
+    var body: some View {
+        List {
+            Section {
+                Picker("Company", selection: $company) {
+                    Text("All").tag("")
+                    Text("Phoronomics").tag("phoronomics")
+                    Text("Phoronomic Studios").tag("phoronomic_studios")
+                }
+                .pickerStyle(.segmented)
+            } footer: {
+                Text("\(data?.get("counts")?.get("skill")?.int ?? 0) skills · \(data?.get("counts")?.get("doc")?.int ?? 0) docs. Agents get the entries that fit their task automatically. Add or upload on the web (Knowledge tab).")
+            }
+            ForEach(data?.get("items")?.list ?? []) { it in
+                NavigationLink { KnowledgeDocView(slug: it.s("slug")) } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack {
+                            Text(it.s("kind") == "skill" ? "✦" : "▤").foregroundStyle(it.s("kind") == "skill" ? Theme.gold : Theme.cyan)
+                            Text(it.s("title")).font(.subheadline)
+                        }
+                        if !it.s("description").isEmpty { Text(it.s("description")).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                        Text(it.s("company_name")).font(Pixel.mono(9)).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if let error { Text(error).font(.caption).foregroundStyle(Theme.bad) }
+        }
+        .searchable(text: $query, prompt: "Search docs and skills")
+        .navigationTitle("Knowledge base")
+        .task(id: query + company) { await load() }
+        .refreshable { await load() }
+    }
+
+    private func load() async {
+        guard let api = app.api else { return }
+        do { data = try await api.knowledge(query: query, company: company); error = nil } catch { self.error = error.localizedDescription }
+    }
+}
+
+struct KnowledgeDocView: View {
+    @Environment(AppState.self) private var app
+    let slug: String
+    @State private var doc: JSONValue?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                if let d = doc {
+                    Text(d.s("title")).font(.title3.bold())
+                    Text("\(d.s("kind") == "skill" ? "Skill" : "Doc") · \(d.s("company_name"))").font(Pixel.mono(10)).foregroundStyle(.secondary)
+                    if !d.s("description").isEmpty { Text(d.s("description")).font(.subheadline).foregroundStyle(.secondary) }
+                    Text(d.s("body")).font(Pixel.mono(11)).textSelection(.enabled).padding(.top, 6)
+                } else {
+                    ProgressView()
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .task { doc = try? await app.api?.knowledgeDocument(slug) }
     }
 }

@@ -50,6 +50,7 @@ state = State()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
+    _import_knowledge()
     state.broadcaster = Broadcaster()
     state.publisher = OutboxPublisher(state.broadcaster)
     state.publisher.start()
@@ -67,6 +68,26 @@ async def lifespan(app: FastAPI):
     state.worker.shutdown()
     state.scheduler.join(timeout=5)
     state.publisher.join(timeout=5)
+
+
+def _import_knowledge() -> None:
+    """Skills and docs dropped into ./knowledge (AICIV_KNOWLEDGE_DIR) join the company knowledge base on start."""
+    from pathlib import Path
+
+    from services.core.config import REPO_ROOT
+    from services.knowledge import kb
+    root = Path(os.environ.get("AICIV_KNOWLEDGE_DIR") or REPO_ROOT / "knowledge")
+    try:
+        with db.get_engine().begin() as conn:
+            org = conn.execute(select(db.organizations.c.id)).scalar()
+            if org:
+                for sub, company in (("phoronomics", "phoronomics"), ("phoronomic-studios", "phoronomic_studios")):
+                    kb.import_dir(conn, org, root / sub, company)
+                done = kb.import_dir(conn, org, root / "skills", "shared")
+                if done:
+                    log.info("knowledge base: imported %d skill(s)", len(done))
+    except Exception:  # noqa: BLE001 — a bad file never stops the API; it's logged
+        log.exception("knowledge import failed")
 
 
 _dev = get_settings().dev_auth
@@ -88,6 +109,9 @@ app.include_router(game_router)
 from services.api.overview import router as overview_router  # noqa: E402
 
 app.include_router(overview_router)
+from services.api.knowledge import router as knowledge_router  # noqa: E402
+
+app.include_router(knowledge_router)
 from services.api.factories import router as factories_router  # noqa: E402
 
 app.include_router(factories_router)

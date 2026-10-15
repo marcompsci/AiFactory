@@ -69,6 +69,8 @@ The AI Central Bank has its own threat model with 17 enforced rules and the test
 | Smaller attack surface | `/docs` and `/openapi.json` only in local dev mode; optional `AICIV_ALLOWED_HOSTS` (Host header allow-list); CORS never allows `*` | `test_api_docs_are_off_outside_dev_mode` |
 | Public config is public-only | `/api/public-config` (unauthenticated, for the iPhone app) returns only the Supabase address and a key that must look publishable (`sb_publishable_…`/anon JWT); anything else, or the service-role key, is blanked | `test_public_config_exposes_only_public_values` |
 | iPhone sign-in | OAuth PKCE (S256) in `ASWebAuthenticationSession`; session in the iOS Keychain, refreshed before expiry; App Lab approval needs Face ID then the server step-up | `V51Tests` (iOS CI) |
+| Plan CLIs return text only | Agents' calls to `codex exec` run with `--sandbox read-only` in an empty folder; `claude -p` runs with `--tools ""`, no MCP, one turn, no saved session. The app never reads or stores plan credentials; nothing falls back to a paid key | `test_codex_first_then_claude_then_nothing` |
+| Knowledge base can't widen permissions | Owner/admin write only; entries reach models labeled as owner-curated guidance below the safety rules; agents only read; uploads limited to .md/.txt, 400 KB | `test_knowledge_base_crud_upload_and_agents_pull_skills`, role matrix |
 | Supply chain | `pip-audit` and `npm audit --audit-level=high` block CI (`security` job); a repo scan fails the build if keys, tokens or private keys are committed | `security` job, `test_no_secrets_are_committed` |
 
 ## Known gaps (tracked in PROGRESS.md)

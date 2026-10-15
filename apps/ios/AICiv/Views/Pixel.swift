@@ -14,7 +14,7 @@ enum Pixel {
         "nexus-spire": Color(hex: 0x4C8DFF), "code-forge": Color(hex: 0xFF9A3D), "sentinel-citadel": Color(hex: 0x3FB8FF),
         "vision-quarter": Color(hex: 0xFF4FB0), "data-observatory": Color(hex: 0x5B8CFF), "memory-vault": Color(hex: 0xA66BFF),
         "owners-tower": Color(hex: 0xF4D58D), "central-bank": Color(hex: 0x3DE08A), "claude-code-factory": Color(hex: 0xFF8A5C),
-        "github-factory": Color(hex: 0xB8C4D6),
+        "github-factory": Color(hex: 0xB8C4D6), "codex-factory": Color(hex: 0x5EEAD4),
     ]
 }
 

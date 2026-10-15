@@ -240,3 +240,16 @@ Built in the order the spec gave. The secure fee review workflow came first.
 ### Still open
 - The Swift code is compiled and tested only on CI (macOS); it hasn't run on a physical iPhone here.
 - Supabase needs `aiciv://auth-callback` in its redirect URLs, and the Google/GitHub providers saved, before phone sign-in works.
+
+## V5.2: Codex Factory, plans and the company knowledge base
+
+- Agents run on the owner's Codex plan first and switch to the Claude plan when Codex runs out; while the owner uses
+  Claude, agents on the Claude plan use Haiku. Nyx (Codex) and Coda (Claude) brief every agent each check-in.
+- Codex Factory: sessions, finished plan steps, AGENTS.md shared as memory.
+- Company knowledge base floating over the city (Phoronomics, Phoronomic Studios): docs and skills; agents pull the
+  relevant ones automatically. The owner's 15 skills are in `knowledge/skills` on the Mac and import on start.
+
+### Still open
+- Neither CLI has been run against a real plan from here (the build environment has neither signed in); tests use
+  stand-in CLIs that speak the documented output formats. First real run happens on the Mac.
+- The Claude meter is an estimate; Anthropic publishes no usage figure for subscriptions.

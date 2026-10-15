@@ -127,3 +127,8 @@ and splits each amount equally among the agents who did the work. Simulated play
 **D19. A GitHub sign-in token is accepted for App Lab, with a nudge toward fine-grained tokens.** The `repo` OAuth
 scope reaches every repository the user can, so the UI recommends a single-repository fine-grained token. Either
 way, the owner authorizes one repository at a time, with step-up.
+
+## D20 — Agents on the owner's subscriptions through the official CLIs
+Calls go through `codex exec` and `claude -p` rather than reusing plan credentials in our own HTTP client, so each
+plan's sign-in, limits and terms stay with its own tool. Both run text-only (read-only sandbox / no tools). Codex
+usage comes from Codex's own reports; Claude's is an estimate, labeled as such, plus the hard "limit reached" signal.

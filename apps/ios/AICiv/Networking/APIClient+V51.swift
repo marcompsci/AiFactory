@@ -32,6 +32,15 @@ extension APIClient {
     }
     func factorySync() async throws { _ = try await json("/api/factories/sync", method: "POST") }
     func publicConfig() async throws -> JSONValue { try await json("/api/public-config") }
+    func planUsage() async throws -> JSONValue { try await json("/api/factories/usage") }
+    func knowledge(query: String = "", company: String = "") async throws -> JSONValue {
+        var c = URLComponents()
+        c.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "company", value: company)].filter { !($0.value ?? "").isEmpty }
+        return try await json("/api/knowledge" + (c.percentEncodedQuery.map { "?" + $0 } ?? ""))
+    }
+    func knowledgeDocument(_ slug: String) async throws -> JSONValue {
+        try await json("/api/knowledge/\(slug.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? slug)")
+    }
 }
 
 extension JSONValue {

@@ -296,6 +296,7 @@ def test_backend_graph_matches_client_fixture():
     nodes, segs = build(load_districts())
     assert [n.id for n in nodes] == [n["id"] for n in fx["nodes"]]
     assert [[s.id, s.length] for s in segs] == [[r["id"], r["length"]] for r in fx["routes"]]
+    assert all(s.length > 0 for s in segs), "a district sits on another's spoke (zero-length belt; Postgres refuses it)"
 
 
 def test_model_override_per_agent(monkeypatch):

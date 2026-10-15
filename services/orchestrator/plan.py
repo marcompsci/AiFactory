@@ -182,6 +182,12 @@ FACTORY_SYNC_GRAPH = [
              ["sync_claude_code"], expected_outputs={"count": "int"}),
     TaskSpec("github_sync", "github_foreman", "Check the repositories: commits, pull requests, Actions runs", "github-factory", "gh-dock",
              ["sync_github_activity"], expected_outputs={"count": "int"}),
+    TaskSpec("codex_sync", "codex_liaison", "Check in on Codex: sessions, finished steps, AGENTS.md", "codex-factory", "cx-console",
+             ["sync_codex"], expected_outputs={"count": "int"}),
+    TaskSpec("codex_usage", "codex_liaison", "Read the Codex plan meter and brief the team", "codex-factory", "cx-meter",
+             ["read_plan_usage"], expected_outputs={"count": "int"}),
+    TaskSpec("claude_usage", "claude_liaison", "Read the Claude plan meter and brief the team", "claude-code-factory", "cc-console",
+             ["read_plan_usage"], expected_outputs={"count": "int"}),
 ]
 
 KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release",

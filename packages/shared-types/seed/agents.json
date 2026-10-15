@@ -21,7 +21,9 @@
         "inspect_repository",
         "prepare_pull_request",
         "create_artifact",
-        "submit_release"
+        "submit_release",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.5,
@@ -52,7 +54,10 @@
         "search_code",
         "inspect_diff",
         "create_artifact",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.5,
@@ -92,7 +97,10 @@
         "refine_proposal",
         "draft_patch",
         "publish_lab_change",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 1.0,
@@ -124,7 +132,10 @@
         "create_artifact",
         "stage_bundle",
         "review_sandbox_evidence",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -154,7 +165,10 @@
         "search_code",
         "create_artifact",
         "query_market_source",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -180,7 +194,9 @@
       },
       "tools": [
         "read_file",
-        "create_artifact"
+        "create_artifact",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -206,7 +222,10 @@
       },
       "tools": [
         "create_artifact",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 1.5,
@@ -236,7 +255,10 @@
         "research_cost_alternatives",
         "investigate_alternatives",
         "research_design_insights",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
@@ -264,7 +286,9 @@
         "query_market_source",
         "create_artifact",
         "research_cost_alternatives",
-        "investigate_alternatives"
+        "investigate_alternatives",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.2,
@@ -293,7 +317,9 @@
         "classify_cost",
         "propose_financial_action",
         "record_cost_findings",
-        "create_artifact"
+        "create_artifact",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.5,
@@ -318,7 +344,9 @@
         "model": "claude-haiku-5-5"
       },
       "tools": [
-        "read_ledger_summary"
+        "read_ledger_summary",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.1,
@@ -344,7 +372,9 @@
       },
       "tools": [
         "read_ledger_summary",
-        "classify_cost"
+        "classify_cost",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.1,
@@ -371,7 +401,9 @@
       "tools": [
         "read_ledger_summary",
         "propose_financial_action",
-        "execute_financial_action"
+        "execute_financial_action",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.1,
@@ -396,7 +428,9 @@
         "model": "claude-sonnet-5-5"
       },
       "tools": [
-        "read_ledger_summary"
+        "read_ledger_summary",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -423,7 +457,9 @@
       "tools": [
         "read_ledger_summary",
         "record_cost_findings",
-        "score_alternatives"
+        "score_alternatives",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.3,
@@ -448,7 +484,9 @@
         "model": "claude-haiku-5-5"
       },
       "tools": [
-        "read_ledger_summary"
+        "read_ledger_summary",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.1,
@@ -474,7 +512,10 @@
       },
       "tools": [
         "sync_claude_code",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_plan_usage",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.1,
@@ -500,7 +541,39 @@
       },
       "tools": [
         "sync_github_activity",
-        "read_claude_code_memory"
+        "read_claude_code_memory",
+        "read_codex_memory",
+        "search_knowledge_base",
+        "read_knowledge_document"
+      ],
+      "limits": {
+        "max_usd_per_mission": 0.1,
+        "max_concurrent_tasks": 1
+      },
+      "tier": "specialist",
+      "department": "factories"
+    },
+    {
+      "id": "a1000000-0000-4000-8000-000000000019",
+      "key": "codex_liaison",
+      "name": "Nyx",
+      "role": "Codex Liaison and plan meter",
+      "home_district": "codex-factory",
+      "avatar": {
+        "shape": "cube",
+        "color": "#5EEAD4",
+        "height": 1.6
+      },
+      "model": {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5"
+      },
+      "tools": [
+        "sync_codex",
+        "read_codex_memory",
+        "read_plan_usage",
+        "search_knowledge_base",
+        "read_knowledge_document"
       ],
       "limits": {
         "max_usd_per_mission": 0.1,
@@ -586,6 +659,7 @@
     "savings_strategist": "cfo",
     "forecaster": "cfo",
     "claude_liaison": "architect",
-    "github_foreman": "architect"
+    "github_foreman": "architect",
+    "codex_liaison": "architect"
   }
 }

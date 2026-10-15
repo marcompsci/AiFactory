@@ -188,6 +188,10 @@ class ModelGateway:
                 adapters["anthropic"] = AnthropicAdapter(s.anthropic_api_key, s.anthropic_model)
             if s.openai_api_key:
                 adapters["openai"] = OpenAIAdapter(s.openai_api_key, s.openai_model)
+            from services.model_gateway import plans
+            if plans.enabled():
+                # your Codex / Claude subscriptions take every call; API keys (if any) are not used as a fallback
+                adapters = {"plan": plans.PlanAdapter()}
         self.adapters = adapters
         self.max_retries = max_retries
         self.timeout = timeout
@@ -198,6 +202,8 @@ class ModelGateway:
         return bool(self.adapters)
 
     def route(self, preferred_provider: str) -> Adapter:
+        if "plan" in self.adapters:
+            return self.adapters["plan"]
         if preferred_provider in self.adapters:
             return self.adapters[preferred_provider]
         if self.adapters:
@@ -206,7 +212,7 @@ class ModelGateway:
 
     def complete(self, req: ModelRequest, preferred_provider: str = "anthropic") -> ModelResponse:
         adapter = self.route(preferred_provider)
-        if adapter.provider != preferred_provider:
+        if adapter.provider not in (preferred_provider, "plan"):
             req = ModelRequest(req.system, req.prompt, req.max_tokens, req.temperature, None)  # other provider: its own default model
         key = (adapter.provider, req.model, req.system, req.prompt, req.max_tokens) if req.temperature == 0 else None
         if key and key in self._cache:

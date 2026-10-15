@@ -269,6 +269,33 @@
         1.2,
         12.148105637844747
       ]
+    },
+    {
+      "id": "codex-factory:dispatch",
+      "kind": "dispatch",
+      "position": [
+        5.694660448229157,
+        1.2,
+        45.21006571969758
+      ]
+    },
+    {
+      "id": "codex-factory:receiving",
+      "kind": "receiving",
+      "position": [
+        11.585339551770844,
+        1.2,
+        44.06993428030242
+      ]
+    },
+    {
+      "id": "junction:codex-factory",
+      "kind": "junction",
+      "position": [
+        3.0403505050537745,
+        1.2,
+        15.7084776094445
+      ]
     }
   ],
   "routes": [
@@ -393,6 +420,18 @@
       "length": 24.017
     },
     {
+      "id": "codex-factory:dispatch->junction:codex-factory",
+      "from_node": "codex-factory:dispatch",
+      "to_node": "junction:codex-factory",
+      "length": 29.621
+    },
+    {
+      "id": "junction:codex-factory->codex-factory:receiving",
+      "from_node": "junction:codex-factory",
+      "to_node": "codex-factory:receiving",
+      "length": 29.621
+    },
+    {
       "id": "junction:data-observatory->junction:owners-tower",
       "from_node": "junction:data-observatory",
       "to_node": "junction:owners-tower",
@@ -453,16 +492,28 @@
       "length": 10.624
     },
     {
-      "id": "junction:github-factory->junction:nexus-spire",
+      "id": "junction:github-factory->junction:codex-factory",
       "from_node": "junction:github-factory",
-      "to_node": "junction:nexus-spire",
-      "length": 11.102
+      "to_node": "junction:codex-factory",
+      "length": 8.187
     },
     {
-      "id": "junction:nexus-spire->junction:github-factory",
-      "from_node": "junction:nexus-spire",
+      "id": "junction:codex-factory->junction:github-factory",
+      "from_node": "junction:codex-factory",
       "to_node": "junction:github-factory",
-      "length": 11.102
+      "length": 8.187
+    },
+    {
+      "id": "junction:codex-factory->junction:nexus-spire",
+      "from_node": "junction:codex-factory",
+      "to_node": "junction:nexus-spire",
+      "length": 3.054
+    },
+    {
+      "id": "junction:nexus-spire->junction:codex-factory",
+      "from_node": "junction:nexus-spire",
+      "to_node": "junction:codex-factory",
+      "length": 3.054
     },
     {
       "id": "junction:nexus-spire->junction:claude-code-factory",

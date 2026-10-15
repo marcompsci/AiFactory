@@ -74,3 +74,65 @@ def read_claude_code_memory(ctx: ToolContext, query: str = "") -> dict:
             return {"status": "not_linked", "count": 0, "hits": []}
     hits = CC.search_memory(query[:200])
     return {"status": "ok", "count": len(hits), "hits": hits}
+
+
+# ------------------------------------------------------------------ Codex Factory and the plan meters
+
+from services.model_gateway import plans as PL  # noqa: E402
+
+from . import codex as CX  # noqa: E402
+
+
+@tool("sync_codex", factory=True, description="Read recent Codex sessions, completed plan steps and AGENTS.md memory on this computer (read-only).")
+def sync_codex(ctx: ToolContext) -> dict:
+    with db.get_engine().connect() as conn:
+        if not linked(conn, ctx.org_id, "codex"):
+            raise ToolFailed("Codex is not linked")
+    if not CX.available():
+        raise ToolFailed("no Codex data found on the computer running the API")
+    sess = CX.sessions()
+    mem = CX.memory_files(sess)
+    data = {"sessions": [CX.public(s) for s in sess], "memory": [{k: v for k, v in m.items() if not k.startswith("_")} for m in mem],
+            "completed_recent": sum(len(s["completed_tasks"]) for s in sess), "active": sum(1 for s in sess if s.get("active")),
+            "by_agents": sum(1 for s in sess if s.get("by_agents"))}
+    with transaction() as conn:
+        _save(conn, ctx.org_id, "codex", data, ctx.mission_id)
+        emit(conn, "factory.synced", mission_id=ctx.mission_id, agent_id=ctx.agent_id, execution_mode=ctx.execution_mode,
+             payload={"kind": "codex", "sessions": len(sess), "memory_files": len(mem), "completed_tasks": data["completed_recent"]})
+    return {"status": "synced", "count": len(sess), "memory_files": len(mem), "completed_tasks": data["completed_recent"]}
+
+
+def usage_view(b: "PL.Budget") -> dict:
+    """What the meters show and what every agent is told. Contains no transcript text."""
+    return {"plan": b.plan, "model": b.model, "reason": b.reason, "save": b.save, "owner_active": b.owner_active,
+            "owner": {k: b.owner.get(k) for k in ("active", "reason", "claude_code_recent", "claude_app_open", "last_activity_at")},
+            "codex": {k: b.codex.get(k) for k in ("available", "source", "primary", "secondary", "reported_at", "tokens_5h")},
+            "claude": {k: b.claude.get(k) for k in ("available", "source", "used_percent", "tokens_5h", "owner_tokens_5h",
+                                                     "agent_tokens_5h", "budget_5h", "limit_reported")},
+            "settings": b.settings, "plans_enabled": PL.enabled(), "note": b.note(),
+            "checked_at": db.utcnow()}
+
+
+@tool("read_plan_usage", factory=True, description="Read how much of the Codex and Claude plans is used, and decide which plan and model agents use.")
+def read_plan_usage(ctx: ToolContext, plan: str = "codex") -> dict:
+    with db.get_engine().connect() as conn:
+        b = PL.decide(conn=conn)
+    view = usage_view(b)
+    with transaction() as conn:
+        _save(conn, ctx.org_id, "plan_usage", view, ctx.mission_id)
+        emit(conn, "usage.budget_updated", mission_id=ctx.mission_id, agent_id=ctx.agent_id, execution_mode=ctx.execution_mode,
+             payload={"reported_by": plan, "plan": b.plan, "model": b.model, "owner_active": b.owner_active, "save": b.save,
+                      "codex_5h_percent": (b.codex.get("primary") or {}).get("used_percent"),
+                      "codex_week_percent": (b.codex.get("secondary") or {}).get("used_percent"),
+                      "claude_5h_percent_estimate": b.claude.get("used_percent"), "claude_tokens_5h": b.claude.get("tokens_5h"),
+                      "reserve_percent": b.settings.get("claude_reserve_percent")})
+    return {"status": "ok", "count": 1, **view}
+
+
+@tool("read_codex_memory", description="Search Codex's memory (AGENTS.md files) for project conventions and lessons.")
+def read_codex_memory(ctx: ToolContext, query: str = "") -> dict:
+    with db.get_engine().connect() as conn:
+        if not linked(conn, ctx.org_id, "codex"):
+            return {"status": "not_linked", "count": 0, "hits": []}
+    hits = CX.search_memory(query[:200])
+    return {"status": "ok", "count": len(hits), "hits": hits}

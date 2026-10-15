@@ -356,6 +356,40 @@
           ]
         }
       ]
+    },
+    {
+      "id": "codex-factory",
+      "name": "Codex Factory",
+      "purpose": "Runs the agents on your Codex plan first, shows your Codex sessions and finished steps, and keeps the plan meters every agent works by",
+      "position": [
+        12,
+        0,
+        62
+      ],
+      "color": "#5EEAD4",
+      "architecture": "factory",
+      "towers": 3,
+      "height": 14,
+      "workstations": [
+        {
+          "id": "cx-console",
+          "label": "Session console",
+          "offset": [
+            -3,
+            0,
+            7
+          ]
+        },
+        {
+          "id": "cx-meter",
+          "label": "Plan meter",
+          "offset": [
+            3,
+            0,
+            7
+          ]
+        }
+      ]
     }
   ]
 }

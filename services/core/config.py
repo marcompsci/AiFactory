@@ -67,7 +67,8 @@ class Settings:
 
     @property
     def model_available(self) -> bool:
-        return bool(self.anthropic_api_key or self.openai_api_key)
+        from services.model_gateway import plans
+        return bool(self.anthropic_api_key or self.openai_api_key) or plans.enabled()
 
 
 @lru_cache

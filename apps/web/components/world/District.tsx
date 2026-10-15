@@ -289,6 +289,7 @@ export function District({ d }: { d: D }) {
 const SIGN_ICON: Record<string, string> = {
   "nexus-spire": "◉", "code-forge": "</>", "sentinel-citadel": "⛉", "vision-quarter": "✎", "data-observatory": "◍",
   "memory-vault": "≣", "owners-tower": "♛", "central-bank": "$", "claude-code-factory": "›_", "github-factory": "⑂",
+  "codex-factory": "◎",
 };
 
 const GM_MODEL = (() => {
@@ -323,7 +324,9 @@ const TOOL_TALK: Record<string, string> = {
   review_sandbox_evidence: "Reviewing test evidence", classify_cost: "Analyzing a cost", read_ledger_summary: "Reading the ledger",
   research_design_insights: "Researching app designs", scan_repository: "Reading your repository", propose_improvements: "Drafting improvements",
   publish_lab_change: "Publishing to GitHub", sync_claude_code: "Checking Claude Code's finished tasks", read_claude_code_memory: "Reading Claude Code's memory",
-  sync_github_activity: "Checking pull requests and Actions runs",
+  sync_github_activity: "Checking pull requests and Actions runs", sync_codex: "Checking Codex's finished steps",
+  read_codex_memory: "Reading Codex's AGENTS.md", read_plan_usage: "Reading the plan meters",
+  search_knowledge_base: "Looking it up in the knowledge base", read_knowledge_document: "Reading a skill from the knowledge base",
 };
 
 /** A speech bubble over the district with what is really happening there: a tool in use, or what an agent just said. */
@@ -371,6 +374,21 @@ function FactoryBoard({ d }: { d: D }) {
     title = cc.data ? `${cc.data.active ? `${cc.data.active} active · ` : ""}finished recently` : "waiting for first check-in";
     lines = (cc.data?.sessions ?? []).flatMap((s: Json) => (s.completed_tasks as string[]).slice(-2).map((t) => `✓ ${t}`)).slice(0, 4);
     if (!lines.length && cc.data) lines = (cc.data.sessions ?? []).slice(0, 3).map((s: Json) => `• ${s.title}`);
+  } else if (d.id === "codex-factory") {
+    const u = data.plan_usage?.data;
+    const cx = data.codex;
+    if (!u && !cx?.linked) return null;
+    if (u) {
+      const p = u.codex?.primary?.used_percent;
+      const w = u.codex?.secondary?.used_percent;
+      const cl = u.claude ?? {};
+      title = u.plan ? `agents on ${u.plan === "codex" ? "Codex" : "Claude"}${u.model ? ` · ${u.model}` : ""}` : "no plan usage left";
+      lines.push(`Codex ${p ?? "?"}% of 5h${w != null ? ` · ${w}% week` : ""}`);
+      lines.push(`Claude ${cl.used_percent != null ? `~${cl.used_percent}% of 5h` : `${Math.round((cl.tokens_5h ?? 0) / 1000)}k tokens 5h`} (est.)`);
+      if (u.owner_active) lines.push("You're on Claude → agents on smallest model");
+    } else title = "waiting for first check-in";
+    lines.push(...(cx?.data?.sessions ?? []).filter((s: Json) => !s.by_agents).flatMap((s: Json) => (s.completed_tasks as string[]).slice(-1).map((t) => `✓ ${t}`)));
+    lines = lines.slice(0, 4);
   } else {
     const gh = data.github;
     if (!gh?.linked) return null;
@@ -382,7 +400,7 @@ function FactoryBoard({ d }: { d: D }) {
     lines = lines.slice(0, 4);
   }
   return (
-    <Html position={[d.position[0] < 0 ? 7 : -7, 21, -3]} center zIndexRange={[5, 0]}>
+    <Html position={[d.position[0] < 0 ? 7 : d.position[0] > 0 ? -7 : 9, 21, -3]} center zIndexRange={[5, 0]}>
       <div className="factory-board" style={{ "--c": d.color } as React.CSSProperties} data-testid={`board-${d.id}`}>
         <p className="factory-board-title">{title}</p>
         {lines.length ? lines.map((l, i) => <p key={i} className="truncate">{l}</p>) : <p className="opacity-60">nothing yet</p>}

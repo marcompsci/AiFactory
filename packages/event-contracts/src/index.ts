@@ -90,6 +90,9 @@ export const EVENT_TYPES = [
   "game.score_recorded",
   "game.season_changed",
   "factory.synced",
+  "usage.budget_updated",
+  "knowledge.consulted",
+  "knowledge.updated",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];

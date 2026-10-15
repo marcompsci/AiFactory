@@ -14,7 +14,8 @@ from pathlib import Path
 from sqlalchemy import select
 
 from services.core import db
-from services.core.events import transaction
+from services.core.events import emit, transaction
+from services.knowledge import kb
 from services.memory.store import remember
 from services.model_gateway.gateway import ModelGateway, ModelRequest, ProviderError
 from services.tools.registry import ToolContext, ToolDenied, ToolFailed, execute_tool
@@ -90,8 +91,16 @@ class TaskEnv:
     def ask_model(self, prompt: str, max_tokens: int = 1200) -> str:
         with transaction() as conn:
             ops.check_budget(conn, self.mission.id, self.agent.id, self.ctx.org_id)
+        system = SYSTEM_BASE
+        with db.get_engine().connect() as conn:  # pull the company knowledge (docs and skills) that fits this task
+            knowledge, used = kb.context_for(conn, self.ctx.org_id, prompt)
+        if knowledge:
+            system = f"{SYSTEM_BASE}\n\n{knowledge}"
+            with transaction() as conn:
+                emit(conn, "knowledge.consulted", mission_id=self.mission.id, agent_id=self.agent.id, execution_mode=self.mission.execution_mode,
+                     payload={"titles": used, "automatic": True})
         try:
-            res = self.gateway.complete(ModelRequest(system=SYSTEM_BASE, prompt=prompt, max_tokens=max_tokens, model=self.agent.model_name),
+            res = self.gateway.complete(ModelRequest(system=system, prompt=prompt, max_tokens=max_tokens, model=self.agent.model_name),
                                         preferred_provider=self.agent.model_provider)
         except ProviderError as exc:
             raise TaskError(f"model call failed: {exc}") from exc

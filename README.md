@@ -25,7 +25,7 @@ verifiable mission path from prompt to reviewable commit, rendered as a navigabl
   [docs/APP_LAB.md](docs/APP_LAB.md).
 - **Claude Code Factory and GitHub Factory.** Two new buildings where Coda and Rook check in on your Claude Code
   sessions (finished tasks, memory) and your repositories (pull requests, Actions runs). The rest of the team
-  learns from Claude Code's memory. Read-only and opt-in. See [docs/FACTORIES.md](docs/FACTORIES.md).
+  learns from Claude Code's memory. Read-only and opt-in. See [docs/FACTORIES.md](docs/FACTORIES.md) and [docs/PLANS_AND_KNOWLEDGE.md](docs/PLANS_AND_KNOWLEDGE.md).
 - **Sign in with Google or GitHub** (Supabase Auth). Claude connects through an API key for the agents and the Claude
   Code GitHub Action for code; third-party apps can't offer claude.ai login. See [docs/AUTH.md](docs/AUTH.md).
 - **Free-alternative investigations.** "Research a free alternative" on any paid-tool request. Researchers find up to

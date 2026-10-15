@@ -376,8 +376,8 @@ def _check_investigation(conn, ctx: ToolContext, spec: ToolSpec, mission, args: 
 
 
 LAB_TOOLS = {"research_design_insights", "scan_repository", "propose_improvements", "refine_proposal", "draft_patch", "publish_lab_change",
-             "read_claude_code_memory"}
-FACTORY_SHARED = {"read_claude_code_memory"}
+             "read_claude_code_memory", "read_codex_memory", "search_knowledge_base", "read_knowledge_document"}
+FACTORY_SHARED = {"read_claude_code_memory", "read_codex_memory"}
 LAB_STAGE = {"research_design_insights": ("lab_research", "RESEARCHING"), "scan_repository": ("lab_analyze", "ANALYZING"),
              "propose_improvements": ("lab_analyze", "ANALYZING"), "refine_proposal": ("lab_analyze", "ANALYZING"),
              "draft_patch": ("lab_analyze", "ANALYZING"), "publish_lab_change": ("lab_publish", None)}
@@ -488,7 +488,7 @@ def execute_tool(ctx: ToolContext, name: str, args: dict | None = None) -> dict:
     duration = int((time.monotonic() - started) * 1000)
     excerpt = redact(json.dumps(result, default=str))[:4000] if status == "COMPLETED" else error
     if (spec.factory or name in FACTORY_SHARED) and status == "COMPLETED":  # transcript-derived data stays out of the tool log
-        excerpt = json.dumps({k: v for k, v in result.items() if k in ("status", "count", "memory_files", "completed_tasks")})
+        excerpt = json.dumps({k: v for k, v in result.items() if k in ("status", "count", "memory_files", "completed_tasks", "plan", "model", "save")})
     elif spec.lab and status == "COMPLETED":
         excerpt = json.dumps({k: v for k, v in result.items() if k in ("cycle_id", "proposal_id", "status", "count", "base_sha", "stack",
                                                                          "file_count", "kind", "number", "url", "data_mode", "detail")})
@@ -528,3 +528,4 @@ from services.finance import tools as _finance_tools  # noqa: E402,F401  (regist
 from services.finance import investigation_tools as _investigation_tools  # noqa: E402,F401  (V5.1)
 from services.applab import tools as _applab_tools  # noqa: E402,F401  (App Lab)
 from services.factories import tools as _factory_tools  # noqa: E402,F401  (Claude Code and GitHub factories)
+from services.knowledge import tools as _knowledge_tools  # noqa: E402,F401  (company knowledge base)

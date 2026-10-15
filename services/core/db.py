@@ -1109,6 +1109,37 @@ factory_snapshots = Table(         # what the factories last saw; owner/admin on
     Column("synced_at", String, nullable=False, default=utcnow),
 )
 
+# ---------------------------------------------------------------- plans: run agents on the owner's Codex / Claude subscriptions
+plan_settings = Table(             # owner-edited routing settings (services/model_gateway/plans.py DEFAULTS)
+    "plan_settings", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("data", JSON, nullable=False, default=dict),
+    Column("updated_by", String(36)),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+    UniqueConstraint("organization_id"),
+)
+
+# ---------------------------------------------------------------- company knowledge base (Phoronomics + Phoronomic Studios)
+kb_documents = Table(              # owner/admin write; every member and agent reads
+    "kb_documents", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("company", String, nullable=False),              # phoronomics | phoronomic_studios | shared
+    Column("kind", String, nullable=False),                 # doc | skill
+    Column("slug", String, nullable=False),
+    Column("title", String, nullable=False),
+    Column("description", Text, nullable=False, default=""),
+    Column("body", Text, nullable=False, default=""),
+    Column("tags", JSON, nullable=False, default=list),
+    Column("source", String, nullable=False, default="editor"),  # editor | upload | import
+    Column("content_sha256", String, nullable=False),
+    Column("created_by", String(36)),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+    UniqueConstraint("organization_id", "slug"),
+)
+
 # ---------------------------------------------------------------- the money game: agents compete on *verified* money only
 game_seasons = Table(
     "game_seasons", metadata,

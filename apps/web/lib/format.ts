@@ -31,6 +31,15 @@ export function ago(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/** "in 2h 10m" for a time in the future (e.g. when a usage window resets). */
+export function until(iso: string): string {
+  const s = Math.max(0, (Date.parse(iso) - Date.now()) / 1000);
+  if (s < 60) return "in under a minute";
+  if (s < 3600) return `in ${Math.round(s / 60)}m`;
+  if (s < 86400) return `in ${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
+  return `in ${Math.round(s / 86400)}d`;
+}
+
 export function usd(n: number | null | undefined): string {
   const v = Number(n ?? 0);
   return v < 0.01 && v > 0 ? `$${v.toFixed(4)}` : `$${v.toFixed(2)}`;
@@ -204,7 +213,15 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
     case "game.score_recorded":
       return { who, text: `scored in the money game (${human(s("kind")).toLowerCase()}${p.verified ? ", verified" : ", simulated"})`, tone: "#FFD36B" };
     case "factory.synced":
-      return { who, text: s("kind") === "claude_code" ? `checked Claude Code: ${p.sessions ?? 0} session(s), ${p.completed_tasks ?? 0} finished task(s)` : `checked GitHub: ${p.pulls ?? 0} pull request(s), ${p.runs ?? 0} Actions run(s)`, tone: "#FF8A5C" };
+      return { who, text: s("kind") === "claude_code" ? `checked Claude Code: ${p.sessions ?? 0} session(s), ${p.completed_tasks ?? 0} finished task(s)`
+        : s("kind") === "codex" ? `checked Codex: ${p.sessions ?? 0} session(s), ${p.completed_tasks ?? 0} finished step(s)`
+        : `checked GitHub: ${p.pulls ?? 0} pull request(s), ${p.runs ?? 0} Actions run(s)`, tone: s("kind") === "codex" ? "#5EEAD4" : "#FF8A5C" };
+    case "usage.budget_updated":
+      return { who, text: `updated the plan meters: ${p.plan ? `agents on the ${s("plan")} plan${p.model ? ` (${s("model")})` : ""}` : "no plan has usage left"}${p.owner_active ? ", you're using Claude so agents use the smallest model" : ""}`, tone: "#5EEAD4" };
+    case "knowledge.consulted":
+      return { who, text: `pulled from the knowledge base: ${Array.isArray(p.titles) ? (p.titles as string[]).join(", ") : s("title")}`, tone: "#9BE7FF" };
+    case "knowledge.updated":
+      return { who: "You", text: `${s("action")} "${s("title")}" in the knowledge base`, tone: "#9BE7FF" };
     case "game.season_changed":
       return { who, text: `New money-game season ${s("season")}`, tone: "#FFD36B" };
     case "finance.tax_estimate_updated":
