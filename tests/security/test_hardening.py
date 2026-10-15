@@ -166,3 +166,15 @@ def test_public_config_exposes_only_public_values(client, monkeypatch):
     assert r.json()["supabase_publishable_key"] == "sb_publishable_example"
     monkeypatch.setenv("SUPABASE_PUBLISHABLE_KEY", "sb_secret_should_never_leak")
     assert client.get("/api/public-config").json()["supabase_publishable_key"] == ""
+
+
+def test_lan_origins_only_when_serving_the_phone():
+    import re
+
+    from services.api.main import LAN_ORIGIN_RX
+    rx = re.compile(LAN_ORIGIN_RX)
+    for ok in ("http://192.168.1.20:3000", "http://192.0.0.2:3000", "http://172.20.10.3:3000", "http://10.0.0.5:3000", "http://omaris-mac.local:3000"):
+        assert rx.match(ok), ok
+    for bad in ("http://evil.com:3000", "https://192.168.1.20:3000", "http://192.168.1.20:8000", "http://8.8.8.8:3000",
+                "http://192.168.1.20.evil.com:3000", "http://172.32.0.1:3000"):
+        assert not rx.match(bad), bad

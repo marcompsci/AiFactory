@@ -38,6 +38,13 @@ targets:
         NSLocalNetworkUsageDescription: Connects to your AI Civilization server on your local network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+          # plain HTTP to your own computer on a private network only (Wi-Fi, Personal Hotspot); everything else stays HTTPS
+          NSExceptionDomains:
+            10.0.0.0/8: { NSExceptionAllowsInsecureHTTPLoads: true }
+            172.16.0.0/12: { NSExceptionAllowsInsecureHTTPLoads: true }
+            192.168.0.0/16: { NSExceptionAllowsInsecureHTTPLoads: true }
+            192.0.0.0/24: { NSExceptionAllowsInsecureHTTPLoads: true }
+            169.254.0.0/16: { NSExceptionAllowsInsecureHTTPLoads: true }
   AICivTests:
     type: bundle.unit-test
     platform: iOS

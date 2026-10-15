@@ -29,12 +29,14 @@ set -a; [ -f .env ] && . ./.env; set +a
 
 LAN_IP=""
 if [ "${AICIV_HOST:-127.0.0.1}" = "0.0.0.0" ]; then
+  export AICIV_ALLOW_LAN_ORIGINS=1   # the city page opened from your phone (http://<this Mac>:3000) may call the API
   # the interface that carries the default route (Wi-Fi or Ethernet), then the usual suspects
   IFACE=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}' || true)
   for i in $IFACE en0 en1 en2 en3 en4 en5; do
     LAN_IP=$(ipconfig getifaddr "$i" 2>/dev/null || true)
     [ -n "$LAN_IP" ] && break
   done
+  [ -z "$LAN_IP" ] && LAN_IP=$( (ifconfig 2>/dev/null || true) | awk '/inet / && $2 != "127.0.0.1" {print $2; exit}')
   [ -z "$LAN_IP" ] && LAN_IP=$( (hostname -I 2>/dev/null || true) | awk '{print $1}')
   [ -z "$LAN_IP" ] && echo "!! Couldn't find this Mac's network address. Is Wi-Fi on? The phone needs it." >&2
   if [ -n "$LAN_IP" ]; then
