@@ -6,6 +6,8 @@ on:
   pull_request:
     paths: ["apps/ios/**"]
   workflow_dispatch:
+permissions:
+  contents: write   # only to publish the generated Xcode project to the ios-xcodeproj branch (never main)
 jobs:
   build-and-test:
     runs-on: macos-15
@@ -15,6 +17,15 @@ jobs:
       - name: Generate the Xcode project
         working-directory: apps/ios
         run: brew install xcodegen && xcodegen generate
+      - name: Publish the generated Xcode project (branch ios-xcodeproj, for opening on a Mac without xcodegen)
+        if: github.event_name != 'pull_request'
+        run: |
+          set -e
+          SHA=$(git rev-parse --short HEAD)
+          rm -rf /tmp/xp && mkdir -p /tmp/xp/apps/ios && cp -R apps/ios/AICiv.xcodeproj /tmp/xp/apps/ios/
+          cd /tmp/xp && git init -q -b ios-xcodeproj && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Xcode project generated from ${SHA}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-xcodeproj
       - name: Pick a simulator
         id: sim
         run: |
