@@ -4,7 +4,6 @@ path as any other (charter caps, emergency stop and approvals all still apply)."
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
 
 from services.api.finance import owner
 from services.core import db
@@ -36,15 +35,23 @@ def list_plans(status: str | None = None, p: Principal = Depends(member)) -> dic
 
 @router.post("/{plan_id}/approve")
 def approve(plan_id: str, p: Principal = Depends(owner)) -> dict:
+    """Claim the plan first (only one approve or decline can win), then start the mission; if the mission can't be
+    created (emergency stop, charter cap), the plan goes back to waiting."""
     from services.api import main
-    with db.get_engine().connect() as conn:
-        plan = _pending(conn, plan_id, p)
-    params = plan["params"]
-    m = main.create_mission(main.MissionIn(prompt=params["prompt"], title=params.get("title"), budget_usd=params.get("budget_usd"),
-                                           repository_id=params.get("repository_id"), idempotency_key=f"recovery:{plan_id}"), p)
     with transaction() as conn:
-        _pending(conn, plan_id, p)
-        recovery.decide(conn, plan_id, user_id=p.user_id, approve=True, new_mission_id=m["id"])
+        plan = _pending(conn, plan_id, p)
+        if not recovery.claim(conn, plan_id, user_id=p.user_id, approve=True):
+            raise HTTPException(409, "this plan was already decided")
+    params = plan["params"]
+    try:
+        m = main.create_mission(main.MissionIn(prompt=params["prompt"], title=params.get("title"), budget_usd=params.get("budget_usd"),
+                                               repository_id=params.get("repository_id"), idempotency_key=f"recovery:{plan_id}"), p)
+    except Exception:
+        with transaction() as conn:
+            recovery.release(conn, plan_id)
+        raise
+    with transaction() as conn:
+        recovery.announce(conn, plan_id, m["id"])
         return {"plan": recovery.plan(conn, plan_id), "mission": m}
 
 
@@ -52,5 +59,7 @@ def approve(plan_id: str, p: Principal = Depends(owner)) -> dict:
 def decline(plan_id: str, p: Principal = Depends(owner)) -> dict:
     with transaction() as conn:
         _pending(conn, plan_id, p)
-        recovery.decide(conn, plan_id, user_id=p.user_id, approve=False)
+        if not recovery.claim(conn, plan_id, user_id=p.user_id, approve=False):
+            raise HTTPException(409, "this plan was already decided")
+        recovery.announce(conn, plan_id)
         return {"plan": recovery.plan(conn, plan_id)}

@@ -12,6 +12,7 @@ struct CharterView: View {
     @State private var quietOn = false
     @State private var quietStart = CharterView.clock("22:00")
     @State private var quietEnd = CharterView.clock("07:00")
+    @State private var quietTz = TimeZone.current.identifier  // the saved zone is kept; only a new window uses this phone's
     @State private var note = ""
     @State private var needsCode = false
     @State private var code = ""
@@ -43,7 +44,10 @@ struct CharterView: View {
                     if quietOn {
                         DatePicker("From", selection: $quietStart, displayedComponents: .hourAndMinute)
                         DatePicker("Until", selection: $quietEnd, displayedComponents: .hourAndMinute)
-                        Text("Time zone: \(TimeZone.current.identifier)").font(.caption).foregroundStyle(.secondary)
+                        Text("Time zone: \(quietTz)").font(.caption).foregroundStyle(.secondary)
+                        if quietTz != TimeZone.current.identifier {
+                            Button("Use this phone's time zone (\(TimeZone.current.identifier))") { quietTz = TimeZone.current.identifier }.font(.caption)
+                        }
                     }
                 } footer: { Text("Scheduled research, finance, App Lab and factory check-ins wait. Missions you start still run.") }
                 Section {
@@ -95,7 +99,8 @@ struct CharterView: View {
             quietOn = true
             quietStart = Self.clock(q.s("start"))
             quietEnd = Self.clock(q.s("end"))
-        } else { quietOn = false }
+            quietTz = q.s("tz").isEmpty ? "UTC" : q.s("tz")
+        } else { quietOn = false; quietTz = TimeZone.current.identifier }
     }
 
     private func save() async {
@@ -107,7 +112,7 @@ struct CharterView: View {
         if capOn { body["mission_budget_cap_usd"] = .number(cap) }
         if quietOn {
             body["quiet_hours"] = .object(["start": .string(Self.hhmm(quietStart)), "end": .string(Self.hhmm(quietEnd)),
-                                           "tz": .string(TimeZone.current.identifier)])
+                                           "tz": .string(quietTz)])
         }
         var stepUp: String?
         if needsCode {

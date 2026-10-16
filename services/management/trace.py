@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.engine import Connection
 
 from services.core import db
 
 MAX_ITEMS = 1500
+PER_SOURCE = 1000  # newest first from each source; totals below come from SQL sums, not from the capped lists
 
 
 def _ms(a: str | None, b: str | None) -> int | None:
@@ -48,18 +49,22 @@ def mission_trace(conn: Connection, mission_id: str) -> dict:
 
     ids = list(tasks)
     if ids:
-        for r in conn.execute(select(db.task_runs).where(db.task_runs.c.task_id.in_(ids))).fetchall():
+        for r in conn.execute(select(db.task_runs).where(db.task_runs.c.task_id.in_(ids))
+                              .order_by(db.task_runs.c.started_at.desc()).limit(PER_SOURCE)).fetchall():
             t = tasks[r.task_id]
             add(r.started_at, "step", f"{t.title} (attempt {r.attempt})", agent_id=t.agent_id, task_id=t.id, detail=r.error or "",
                 status=r.status, duration_ms=_ms(r.started_at, r.finished_at), ref=f"task_run:{r.id}")
-    for x in conn.execute(select(db.tool_executions).where(db.tool_executions.c.mission_id == mission_id)).fetchall():
+    for x in conn.execute(select(db.tool_executions).where(db.tool_executions.c.mission_id == mission_id)
+                          .order_by(db.tool_executions.c.started_at.desc()).limit(PER_SOURCE)).fetchall():
         add(x.started_at, "tool", x.tool_name, agent_id=x.agent_id, task_id=x.task_id, detail=x.output_excerpt or "",
             status=x.status, duration_ms=x.duration_ms, ref=f"tool_execution:{x.id}")
-    for u in conn.execute(select(db.usage_records).where(db.usage_records.c.mission_id == mission_id)).fetchall():
+    for u in conn.execute(select(db.usage_records).where(db.usage_records.c.mission_id == mission_id)
+                          .order_by(db.usage_records.c.created_at.desc()).limit(PER_SOURCE)).fetchall():
         add(u.created_at, "model", f"AI call · {u.model}", agent_id=u.agent_id, detail=u.provider,
             cost_usd=round(float(u.estimated_cost_usd or 0), 6), tokens=int(u.input_tokens or 0) + int(u.output_tokens or 0),
             ref=f"usage:{u.id}")
-    for msg in conn.execute(select(db.agent_messages).where(db.agent_messages.c.mission_id == mission_id)).fetchall():
+    for msg in conn.execute(select(db.agent_messages).where(db.agent_messages.c.mission_id == mission_id)
+                            .order_by(db.agent_messages.c.created_at.desc()).limit(PER_SOURCE)).fetchall():
         to = f" → {name(msg.to_agent_id)}" if msg.to_agent_id else ""
         add(msg.created_at, "message", f"{msg.kind.replace('_', ' ').capitalize()}{to}", agent_id=msg.from_agent_id, detail=msg.body,
             ref=f"message:{msg.id}")
@@ -101,9 +106,17 @@ def mission_trace(conn: Connection, mission_id: str) -> dict:
             a["tokens"] += i["tokens"] or 0
             a["cost_usd"] = round(a["cost_usd"] + (i["cost_usd"] or 0), 6)
     end = m.updated_at if m.status in ("COMPLETED", "FAILED", "CANCELLED") else (items[-1]["at"] if items else m.updated_at)
-    totals = {"items": len(items), "wall_ms": _ms(m.created_at, end), "cost_usd": round(sum(a["cost_usd"] for a in per.values()), 6),
-              "tokens": sum(a["tokens"] for a in per.values()), "tool_calls": sum(a["tool_calls"] for a in per.values()),
-              "model_calls": sum(a["model_calls"] for a in per.values()), "failed_steps": sum(a["failed_steps"] for a in per.values())}
+    u = conn.execute(select(func.count(), func.coalesce(func.sum(db.usage_records.c.estimated_cost_usd), 0.0),
+                            func.coalesce(func.sum(db.usage_records.c.input_tokens + db.usage_records.c.output_tokens), 0))
+                     .where(db.usage_records.c.mission_id == mission_id)).first()
+    tools = conn.execute(select(func.count()).select_from(db.tool_executions).where(db.tool_executions.c.mission_id == mission_id)).scalar()
+    failed = conn.execute(select(func.count()).select_from(db.task_runs).where(db.task_runs.c.task_id.in_(ids),
+                                                                               db.task_runs.c.status == "FAILED")).scalar() if ids else 0
+    totals = {"items": len(items), "wall_ms": _ms(m.created_at, end), "cost_usd": round(float(u[1]), 6), "tokens": int(u[2]),
+              "tool_calls": int(tools or 0), "model_calls": int(u[0]), "failed_steps": int(failed or 0)}
+    truncated = len(items) > MAX_ITEMS
+    if truncated:  # keep the start (mission created) and the newest entries, where a failure usually is
+        items = items[:1] + items[-(MAX_ITEMS - 1):]
     return {"mission": {"id": m.id, "title": m.title, "status": m.status, "execution_mode": m.execution_mode, "budget_usd": m.budget_usd},
-            "items": items[:MAX_ITEMS], "truncated": len(items) > MAX_ITEMS,
+            "items": items, "truncated": truncated,
             "by_agent": sorted(per.values(), key=lambda a: -a["busy_ms"]), "totals": totals, "cost_is_estimate": True}

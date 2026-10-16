@@ -192,7 +192,10 @@ struct MissionTraceView: View {
                         }
                     }
                     let items = (d.get("items")?.list ?? []).filter { only == nil || $0.s("kind") == only }
-                    ForEach(Array(items.prefix(400).enumerated()), id: \.offset) { _, i in row(i) }
+                    ForEach(Array(items.suffix(400).enumerated()), id: \.offset) { _, i in row(i) }
+                    if items.count > 400 || d.get("truncated")?.bool == true {
+                        Text("Showing the most recent entries; the web trace has the full list.").font(.caption2).foregroundStyle(.secondary)
+                    }
                 } header: { Text("Timeline") } footer: { Text("AI costs are the gateway's estimates.") }
             } else if failed {
                 Text(app.connection == .live ? "Couldn't load the trace." : "Connect to your Mac and sign in to see the trace.").foregroundStyle(.secondary)
@@ -271,14 +274,14 @@ struct RecoveryPlansSection: View {
 
     var body: some View {
         let pending = plans.filter { $0.s("status") == "PENDING" }
-        Group {
-            if !pending.isEmpty {
-                Section {
-                    ForEach(pending) { p in RecoveryPlanRow(plan: p) { await load() } }
-                } header: { Text("Recovery plans") } footer: {
-                    Text("Atlas drafted these after missions failed. Approving starts a new mission with the same safety rules; a plan lapses after a week.")
-                }
+        Section {
+            if pending.isEmpty {
+                Text(app.connection == .live ? "No recovery plans waiting." : "Connect to see recovery plans.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
+            ForEach(pending) { p in RecoveryPlanRow(plan: p) { await load() } }
+        } header: { Text("Recovery plans") } footer: {
+            Text("Atlas drafts one when a mission fails. Approving starts a new mission with the same safety rules; a plan lapses after a week.")
         }
         .task(id: app.connection == .live) { await load() }
     }

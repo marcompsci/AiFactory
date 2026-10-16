@@ -42,10 +42,14 @@ def _failure(conn: Connection, m) -> tuple[str, str, str]:
     return reliability._mode_for(reason), "", reliability._short(reason)
 
 
-def _depth(conn: Connection, mission_id: str) -> int:
-    """How many recoveries led to this mission (0 for a mission you started yourself)."""
-    parent = conn.execute(select(db.recovery_plans.c.params).where(db.recovery_plans.c.new_mission_id == mission_id)).first()
-    return int((parent.params or {}).get("recovery_depth") or 0) if parent else 0
+def _depth(conn: Connection, m) -> int:
+    """How many recoveries led to this mission (0 for a mission you started yourself). A recovery mission's
+    idempotency key names its plan, so this holds even if the plan row was never updated."""
+    key = m.idempotency_key or ""
+    if not key.startswith("recovery:"):
+        return 0
+    parent = conn.execute(select(db.recovery_plans.c.params).where(db.recovery_plans.c.id == key.split(":", 1)[1])).first()
+    return int((parent.params or {}).get("recovery_depth") or 1) if parent else 1
 
 
 def propose(conn: Connection, mission_id: str) -> dict | None:
@@ -56,7 +60,7 @@ def propose(conn: Connection, mission_id: str) -> dict | None:
     if conn.execute(select(db.recovery_plans.c.id).where(db.recovery_plans.c.mission_id == mission_id)).first():
         return None
     mode, step, err = _failure(conn, m)
-    depth = _depth(conn, m.id) + 1
+    depth = _depth(conn, m) + 1
     lessons = []
     for t in conn.execute(select(db.tasks.c.agent_id, db.tasks.c.key).where(db.tasks.c.mission_id == mission_id,
                                                                              db.tasks.c.status == "FAILED")).fetchall():
@@ -74,8 +78,11 @@ def propose(conn: Connection, mission_id: str) -> dict | None:
         strategy, summary = "none", "Two recoveries in a row have failed. Read the trace before trying again."
         rationale, prompt = f"Stopping here so a failing mission doesn't loop: this would be recovery {depth}.", None
     elif mode == "INFRA":
-        strategy, summary = "retry_later", "Run the same mission again once the AI provider is answering."
+        strategy, summary = "retry_later", "Run the same mission again (it failed because the AI provider was unavailable; check it's back first)."
         rationale, prompt = f"It failed{where} because a model or tool was unavailable ({err}), not because of the plan.", base
+    elif mode == "RES" and "mission budget" not in err.lower() and "mission cap" not in err.lower():
+        strategy, summary = "none", "A daily cap stopped it, not the mission's budget. It can run again tomorrow or after you raise that cap."
+        rationale, prompt = f"It hit a spending limit{where}: {err}.", None
     elif mode == "RES":
         new = round(min(budget * 2, cap if cap is not None else MAX_USD, MAX_USD), 2)
         if new <= budget:
@@ -139,13 +146,27 @@ def plans(conn: Connection, org_id: str, status: str | None = None, mission_id: 
     return [plan(conn, r.id) for r in conn.execute(q.order_by(db.recovery_plans.c.created_at.desc()).limit(50)).fetchall()]
 
 
-def decide(conn: Connection, plan_id: str, *, user_id: str, approve: bool, new_mission_id: str | None = None) -> None:
+def claim(conn: Connection, plan_id: str, *, user_id: str, approve: bool) -> bool:
+    """Move a PENDING plan to APPROVED or DECLINED. Only one caller can win; False if it wasn't pending any more."""
     status = "APPROVED" if approve else "DECLINED"
-    conn.execute(update(db.recovery_plans).where(db.recovery_plans.c.id == plan_id)
-                 .values(status=status, decided_by=user_id, decided_at=db.utcnow(), new_mission_id=new_mission_id))
+    res = conn.execute(update(db.recovery_plans).where(db.recovery_plans.c.id == plan_id, db.recovery_plans.c.status == "PENDING")
+                       .values(status=status, decided_by=user_id, decided_at=db.utcnow()))
+    return (res.rowcount or 0) == 1
+
+
+def release(conn: Connection, plan_id: str) -> None:
+    """Undo a claim when the approved mission couldn't be created (emergency stop, charter cap): the plan waits again."""
+    conn.execute(update(db.recovery_plans).where(db.recovery_plans.c.id == plan_id, db.recovery_plans.c.status == "APPROVED",
+                                                 db.recovery_plans.c.new_mission_id.is_(None))
+                 .values(status="PENDING", decided_by=None, decided_at=None))
+
+
+def announce(conn: Connection, plan_id: str, new_mission_id: str | None = None) -> None:
+    if new_mission_id:
+        conn.execute(update(db.recovery_plans).where(db.recovery_plans.c.id == plan_id).values(new_mission_id=new_mission_id))
     p = plan(conn, plan_id)
     emit(conn, "recovery.decided", mission_id=p["mission_id"], org_id=p["organization_id"],
-         payload={"plan_id": plan_id, "status": status, "new_mission_id": new_mission_id})
+         payload={"plan_id": plan_id, "status": p["status"], "new_mission_id": new_mission_id})
 
 
 def expire(conn: Connection) -> int:

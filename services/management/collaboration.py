@@ -41,6 +41,7 @@ def network(conn: Connection, org_id: str, days: int = 30) -> dict:
         f["weight"] += 1
         f["last_at"] = max(f["last_at"], at or "")
 
+    counted = [0, 0, 0]
     up = db.tasks.alias("up")
     down = db.tasks.alias("down")
     for r in conn.execute(select(up.c.agent_id.label("a"), up.c.district.label("da"), down.c.agent_id.label("b"),
@@ -49,17 +50,21 @@ def network(conn: Connection, org_id: str, days: int = 30) -> dict:
                                        .join(up, up.c.id == db.task_dependencies.c.depends_on_task_id))
                           .where(down.c.organization_id == org_id, up.c.status.in_(["COMPLETED", "SKIPPED"]),
                                  down.c.status.notin_(["PENDING", "CANCELLED"]), down.c.updated_at >= since)
-                          .limit(MAX_ROWS)).fetchall():
+                          .order_by(down.c.updated_at.desc()).limit(MAX_ROWS)).fetchall():
+        counted[0] += 1
         edge(r.a, r.b, "handoffs", r.at)
         flow(r.da, r.db, "handoffs", r.at)
     for m in conn.execute(select(db.agent_messages.c.from_agent_id, db.agent_messages.c.to_agent_id, db.agent_messages.c.created_at)
                           .where(db.agent_messages.c.organization_id == org_id, db.agent_messages.c.to_agent_id.isnot(None),
-                                 db.agent_messages.c.created_at >= since).limit(MAX_ROWS)).fetchall():
+                                 db.agent_messages.c.created_at >= since)
+                          .order_by(db.agent_messages.c.created_at.desc()).limit(MAX_ROWS)).fetchall():
+        counted[1] += 1
         edge(m.from_agent_id, m.to_agent_id, "messages", m.created_at)
     for p in conn.execute(select(db.logistics_packages.c.origin_district, db.logistics_packages.c.destination_district,
                                  db.logistics_packages.c.created_at)
                           .where(db.logistics_packages.c.organization_id == org_id, db.logistics_packages.c.created_at >= since)
-                          .limit(MAX_ROWS)).fetchall():
+                          .order_by(db.logistics_packages.c.created_at.desc()).limit(MAX_ROWS)).fetchall():
+        counted[2] += 1
         flow(p.origin_district, p.destination_district, "packages", p.created_at)
 
     partners: dict[str, list[dict]] = {}
@@ -76,4 +81,5 @@ def network(conn: Connection, org_id: str, days: int = 30) -> dict:
         "partners": {k: v[:5] for k, v in partners.items()},
         "agents": [{"id": a.id, "name": a.name, "role": a.role, "home_district": a.home_district} for a in agents.values()],
         "method": "records",
+        "truncated": any(n >= MAX_ROWS for n in counted),  # only the newest MAX_ROWS of each kind were read
     }

@@ -72,3 +72,20 @@ def test_plans_lapse_after_a_week_and_only_failed_fix_missions_get_one(client):
                      summary="s", rationale="r", params={"prompt": "x" * 20}, status="PENDING", created_at="2020-01-01T00:00:00+00:00"))
         assert recovery.expire(conn) == 1
         assert conn.execute(select(db.recovery_plans.c.status).where(db.recovery_plans.c.mission_id == mid)).scalar() == "EXPIRED"
+
+
+def test_a_plan_that_cannot_start_goes_back_to_waiting_and_decided_plans_stay_decided(monkeypatch):
+    with live_client(monkeypatch, FakeGateway(fail=True)) as client:
+        mid = start(client)
+        wait_for(lambda: mission_status(client, mid)["status"] == "FAILED")
+        plan = _plan(client, mid)
+        client.post("/api/emergency-stop", json={"engaged": True})
+        assert client.post(f"/api/recovery/{plan['id']}/approve").status_code == 409  # emergency stop refuses the mission
+        again = client.get(f"/api/missions/{mid}").json()["recovery"][0]
+        assert again["status"] == "PENDING" and again["new_mission_id"] is None  # nothing started, still your call
+        client.post("/api/emergency-stop", json={"engaged": False})
+        with transaction() as conn:  # only one decision can win
+            assert recovery.claim(conn, plan["id"], user_id="u", approve=False) is True
+            assert recovery.claim(conn, plan["id"], user_id="u", approve=True) is False
+        assert client.post(f"/api/recovery/{plan['id']}/approve").status_code == 409
+        assert len(client.get("/api/missions").json()["missions"]) == 1

@@ -117,7 +117,7 @@ def _mode_for(error: str | None) -> str:
         return "FM-1.5"
     if "did not return json" in e or "invalid json" in e:
         return "FM-2.6"
-    if "budget" in e:
+    if "budget" in e or ("cap" in e and "reached" in e):
         return "RES"
     if "model call failed" in e or "provider" in e or "connection" in e or "unavailable" in e:
         return "INFRA"

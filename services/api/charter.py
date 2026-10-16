@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 
 from services.api.finance import _require_step_up, owner
 from services.core import db
@@ -48,5 +49,7 @@ def amend(body: CharterIn, p: Principal = Depends(owner), x_step_up: str | None 
                                  step_up_method=method)
     except charter.CharterError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except IntegrityError as exc:  # someone else amended it at the same moment
+        raise HTTPException(409, "the charter just changed; reload and try again") from exc
     except PermissionError as exc:  # loosening without a step-up: ask for one
         raise HTTPException(401, {"code": "step_up_required", "message": str(exc), "purpose": PURPOSE}) from exc

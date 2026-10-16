@@ -76,6 +76,8 @@ class Scheduler(threading.Thread):
         with db.get_engine().connect() as conn:
             rows = {r.key: r for r in conn.execute(select(db.scheduled_jobs))}
         results = {}
+        with db.get_engine().connect() as conn:
+            quiet = charter.quiet_now(charter.rules(conn, ORG_ID))
         for key, fn in self.jobs.items():
             row = rows.get(key)
             if row is None:
@@ -84,9 +86,7 @@ class Scheduler(threading.Thread):
             if not (due or (force and key != "supervisor")):
                 continue
             try:
-                with db.get_engine().connect() as conn:
-                    waits = charter.job_waits(conn, key, ORG_ID)
-                res = {"waiting": "quiet hours (your charter)"} if waits else fn()
+                res = {"waiting": "quiet hours (your charter)"} if quiet and key in charter.QUIET_JOBS else fn()
             except Exception as exc:  # recorded on the job row; the next run retries
                 log.exception("job %s failed", key)
                 res = {"error": str(exc)[:300]}

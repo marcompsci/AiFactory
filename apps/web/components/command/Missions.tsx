@@ -129,6 +129,10 @@ function MissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
     onSettled: () => qc.invalidateQueries({ queryKey: ["mission", id] }),
   });
   const agents = useStore((s) => s.world.agents);
+  const recover = useMutation({
+    mutationFn: ({ plan, approve }: { plan: string; approve: boolean }) => api.recoveryDecide(plan, approve),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["mission", id] }),
+  });
 
   if (q.isLoading) return <Skeleton lines={6} />;
   if (q.error) return <ErrorNote error={q.error} />;
@@ -165,10 +169,11 @@ function MissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
             <p className="text-xs text-ink-2">{r.rationale}</p>
             {r.status === "PENDING" && r.actionable ? (
               <div className="flex gap-2">
-                <Button onClick={() => api.recoveryDecide(r.id, true).then(() => qc.invalidateQueries({ queryKey: ["mission", id] }))}>Approve</Button>
-                <Button onClick={() => api.recoveryDecide(r.id, false).then(() => qc.invalidateQueries({ queryKey: ["mission", id] }))}>Decline</Button>
+                <Button disabled={recover.isPending} onClick={() => recover.mutate({ plan: r.id, approve: true })}>Approve</Button>
+                <Button disabled={recover.isPending} onClick={() => recover.mutate({ plan: r.id, approve: false })}>Decline</Button>
               </div>
             ) : null}
+            {recover.error ? <p className="text-xs text-bad">{(recover.error as Error).message}</p> : null}
           </div>
         ))}
         <a href={`/trace?m=${m.id}`} className="text-xs text-cyan">
