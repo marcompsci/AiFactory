@@ -5,10 +5,52 @@ import WebKit
 struct CityView: View {
     @Environment(AppState.self) private var app
 
+    private var needsSignIn: Bool {
+        if case .failed(let why) = app.connection { return why.contains("Sign in") }
+        return false
+    }
+
+    private var unreachable: Bool {
+        switch app.connection {
+        case .reconnecting(let n): return n >= 3
+        case .failed(let why): return !why.contains("Sign in")
+        default: return false
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             if AppState.isLocalhost(app.webURL) {
                 FindMacView()
+            } else if needsSignIn {
+                // the city page can't sign in by itself (Google blocks sign-in inside embedded browsers): sign in here first
+                VStack(spacing: 14) {
+                    Spacer()
+                    Text("Connected to your Mac").font(.headline).foregroundStyle(Theme.ok)
+                    SignInCard()
+                    Text("After you sign in, the city opens here.").font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Pixel.sky.ignoresSafeArea())
+            } else if unreachable {
+                VStack(spacing: 14) {
+                    Spacer()
+                    Image(systemName: "wifi.exclamationmark").font(.largeTitle).foregroundStyle(Theme.warn)
+                    Text("Can't reach your Mac").font(.title3.bold())
+                    Text("On the Mac, double-click start-for-iphone.command. Keep the Mac on the same Wi-Fi as this phone, or on this phone's hotspot.")
+                        .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    ForEach(app.finder.found) { f in
+                        Button { app.use(f) } label: { Label("Connect to \(f.name)", systemImage: "desktopcomputer") }.buttonStyle(.borderedProminent)
+                    }
+                    Button("Try again") { app.connect() }.buttonStyle(.bordered)
+                    Spacer()
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Pixel.sky.ignoresSafeArea())
+                .onAppear { app.startFinding() }
             } else if let url = URL(string: app.webURL) {
                 let token = Keychain.load() ?? ""
                 CityWebView(url: url, apiURL: app.serverURL, token: token).ignoresSafeArea()

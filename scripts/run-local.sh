@@ -4,6 +4,9 @@
 # Reads .env (API) and apps/web/.env.local (web). Ctrl-C stops both.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+mkdir -p .data
+# everything shown here is also kept in .data/server.log (the last run), for troubleshooting
+exec > >(tee .data/server.log) 2>&1
 
 PY=""
 for c in python3.13 python3.12 /opt/homebrew/bin/python3.13 /opt/homebrew/bin/python3.12 "$HOME/.homebrew/bin/python3.13" "$HOME/.homebrew/bin/python3.12" python3; do
