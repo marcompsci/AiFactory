@@ -109,6 +109,19 @@ final class AppState {
         connect()
     }
 
+    /// Refreshes the session now (the server said the token expired).
+    func forceRefresh() async {
+        guard let s = session, let auth else { return }
+        if let fresh = try? await auth.refresh(s) {
+            session = fresh
+            SupabaseAuth.save(fresh)
+        } else {
+            session = nil
+            SupabaseAuth.save(nil)
+            tokenSet = false
+        }
+    }
+
     /// Refreshes the Supabase access token a minute before it expires.
     func ensureFreshToken() async {
         guard let s = session, s.expiresAt.timeIntervalSinceNow < 300, let auth else { return }
@@ -212,6 +225,7 @@ final class AppState {
 
     private func run() async {
         var attempt = 0
+        var triedRefresh = false
         while !Task.isCancelled {
             await ensureFreshToken()
             guard let api = self.api else { connection = .failed("Server address is not a valid URL"); return }
@@ -239,8 +253,24 @@ final class AppState {
                         line.append(byte)
                     }
                 }
+            } catch let e as APIError where e.status == 401 && e.detail.contains("expired") && session != nil && !triedRefresh {
+                // an hour-old session: refresh it once and carry on
+                triedRefresh = true
+                await forceRefresh()
+                continue
             } catch let e as APIError where e.status == 401 || e.status == 403 {
+                if e.status == 401 && session == nil && tokenSet {
+                    // a token saved by hand earlier that the server no longer accepts: drop it so the app stops sending it
+                    Keychain.save("")
+                    tokenSet = false
+                }
                 connection = .failed("Sign in to connect")
+                return
+            } catch let e as APIError where e.status == 429 {
+                connection = .failed("Too many attempts. Wait a few minutes, then sign in again.")
+                return
+            } catch let e as APIError where e.status == 503 {
+                connection = .failed("Your Mac can't reach Supabase to check your sign-in. Check its internet connection.")
                 return
             } catch {
                 if Task.isCancelled { return }

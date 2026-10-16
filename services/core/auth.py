@@ -52,9 +52,74 @@ def _token_from(request: Request) -> str | None:
 _jwks: dict[str, "jwt.PyJWKClient"] = {}
 
 
-def verify_supabase_token(token: str, secret: str, jwks_url: str, issuer: str | None = None) -> dict:
+def _publishable_key() -> str:
+    import os
+
+    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY", "") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+    return key if key.startswith(("sb_publishable_", "eyJ")) else ""
+
+
+_confirmed: dict[str, tuple[float, dict]] = {}   # sha256(token) -> (valid until, claims)
+_confirmed_lock = threading.Lock()
+
+
+def confirm_with_supabase(token: str, supabase_url: str, issuer: str | None) -> dict:
+    """For tokens this server can't check itself (projects that sign with the legacy shared secret, when
+    SUPABASE_JWT_SECRET isn't set here): ask Supabase Auth who the token belongs to (GET /auth/v1/user). Supabase checks
+    the signature; we use its answer, including app_metadata, which only the service key can write. Answers are
+    cached for a few minutes per token (by hash), never past the token's expiry."""
+    import hashlib
+    import json
+    import urllib.error
+    import urllib.request
+
+    key = _publishable_key()
+    if not (supabase_url and key):
+        raise HTTPException(status_code=401, detail="invalid token")
+    try:
+        payload = jwt.decode(token, options={"verify_signature": False})
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail="invalid token") from exc
+    now = time.time()
+    if float(payload.get("exp", 0)) < now - 30:
+        raise HTTPException(status_code=401, detail="token expired")
+    if payload.get("aud") != "authenticated" or (issuer and payload.get("iss") != issuer) or not payload.get("sub"):
+        log.info("token refused: wrong audience or issuer")
+        raise HTTPException(status_code=401, detail="invalid token")
+    h = hashlib.sha256(token.encode()).hexdigest()
+    with _confirmed_lock:
+        hit = _confirmed.get(h)
+        if hit and hit[0] > now:
+            return hit[1]
+    req = urllib.request.Request(supabase_url.rstrip("/") + "/auth/v1/user",
+                                 headers={"apikey": key, "Authorization": f"Bearer {token}", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:  # noqa: S310 (fixed https Supabase address from config)
+            user = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            log.info("token refused by Supabase (%s)", exc.code)
+            raise HTTPException(status_code=401, detail="invalid token") from exc
+        raise HTTPException(status_code=503, detail="can't check sign-in with Supabase right now") from exc
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        log.warning("can't reach Supabase to check a sign-in: %s", exc)
+        raise HTTPException(status_code=503, detail="can't check sign-in with Supabase right now") from exc
+    if user.get("id") != payload.get("sub"):
+        raise HTTPException(status_code=401, detail="invalid token")
+    claims = {**payload, "email": user.get("email") or payload.get("email"),
+              "app_metadata": user.get("app_metadata") or {}, "user_metadata": user.get("user_metadata") or {}}
+    with _confirmed_lock:
+        if len(_confirmed) > 500:
+            _confirmed.clear()
+        _confirmed[h] = (min(float(payload["exp"]), now + 300), claims)
+    return claims
+
+
+def verify_supabase_token(token: str, secret: str, jwks_url: str, issuer: str | None = None, supabase_url: str = "") -> dict:
     """HS256 with the legacy shared secret, or ES256/RS256 against the project's published signing keys. Tokens must
-    carry `exp` and `sub`, be for `aud=authenticated`, and (when SUPABASE_URL is set) come from this project's issuer."""
+    carry `exp` and `sub`, be for `aud=authenticated`, and (when SUPABASE_URL is set) come from this project's issuer.
+    A token this server can't check locally (HS256 without the secret here, or a key it doesn't have) is confirmed
+    with Supabase Auth instead."""
     opts = {"require": ["exp", "sub"]}
     kw = {"audience": "authenticated", "options": opts, "leeway": 30}
     if issuer:
@@ -65,17 +130,21 @@ def verify_supabase_token(token: str, secret: str, jwks_url: str, issuer: str | 
         alg = jwt.get_unverified_header(token).get("alg")
         if alg == "HS256":
             if not secret:
-                raise jwt.InvalidTokenError("HS256 tokens need SUPABASE_JWT_SECRET")
+                return confirm_with_supabase(token, supabase_url, issuer)
             return jwt.decode(token, secret, algorithms=["HS256"], **kw)
         if alg not in ("ES256", "RS256") or not jwks_url:
             raise jwt.InvalidTokenError("unsupported token algorithm")
         client = _jwks.setdefault(jwks_url, jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=600))
-        key = client.get_signing_key_from_jwt(token).key
+        try:
+            key = client.get_signing_key_from_jwt(token).key
+        except jwt.PyJWKClientError:
+            return confirm_with_supabase(token, supabase_url, issuer)  # signing keys unreachable or rotated
         return jwt.decode(token, key, algorithms=[alg], **kw)
     except jwt.ExpiredSignatureError as exc:
         # correctly signed but old: a stale session, not an attack (never counts toward the lockout)
         raise HTTPException(status_code=401, detail="token expired") from exc
     except jwt.PyJWTError as exc:
+        log.info("token refused: %s", type(exc).__name__)
         raise HTTPException(status_code=401, detail="invalid token") from exc
 
 
@@ -106,9 +175,11 @@ def authenticate(request: Request) -> Principal:
         return Principal(user_id="00000000-0000-4000-8000-000000000001", organization_id=org, role="owner", mode="token")
     if s.supabase_jwt_secret or s.supabase_jwks_url:
         try:
-            claims = verify_supabase_token(token, s.supabase_jwt_secret, s.supabase_jwks_url, issuer=_issuer(s.supabase_url))
+            claims = verify_supabase_token(token, s.supabase_jwt_secret, s.supabase_jwks_url, issuer=_issuer(s.supabase_url),
+                                           supabase_url=s.supabase_url)
         except HTTPException as exc:
-            if exc.detail != "token expired" and _counts(client) and auth_failures.fail(client):
+            # only a refused token counts toward the lockout (not an expired one, and not Supabase being unreachable)
+            if exc.detail == "invalid token" and _counts(client) and auth_failures.fail(client):
                 log.warning("auth lockout for client %s after repeated invalid tokens", client)
             raise
         auth_failures.succeed(client)
@@ -123,11 +194,21 @@ def authenticate(request: Request) -> Principal:
 
 
 def _counts(client: str) -> bool:
-    """Bad tokens count toward the lockout, except from this computer itself when running locally
-    (AICIV_LOCAL_MODE=1, set by scripts/run-local.sh): a stale tab on your own Mac must not lock you out."""
+    """Bad tokens count toward the lockout, except when running locally (AICIV_LOCAL_MODE=1, set by
+    scripts/run-local.sh) and the request comes from this computer or your own network (Wi-Fi, the phone's hotspot):
+    a phone with a stale sign-in must not lock itself out at home. Tokens are signed, so guessing one is hopeless anyway."""
+    import ipaddress
     import os
 
-    return not (os.environ.get("AICIV_LOCAL_MODE") == "1" and client in ("127.0.0.1", "::1"))
+    if os.environ.get("AICIV_LOCAL_MODE") != "1":
+        return True
+    try:
+        ip = ipaddress.ip_address(client.split("%")[0])
+    except ValueError:
+        return True
+    if getattr(ip, "ipv4_mapped", None):
+        ip = ip.ipv4_mapped
+    return not (ip.is_loopback or ip.is_private or ip.is_link_local)
 
 
 def _issuer(supabase_url: str) -> str | None:

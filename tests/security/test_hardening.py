@@ -189,6 +189,6 @@ def test_expired_sessions_and_your_own_computer_never_trigger_the_lockout(jwt_mo
         assert c.get("/api/snapshot", headers={"authorization": f"Bearer {token()}"}).status_code == 200
     monkeypatch.setenv("AICIV_LOCAL_MODE", "1")  # run-local.sh: the test client counts as this computer
     from services.core import auth
-    assert auth._counts("127.0.0.1") is False and auth._counts("192.0.0.1") is True
+    assert auth._counts("127.0.0.1") is False and auth._counts("192.0.0.1") is False and auth._counts("8.8.8.8") is True
     monkeypatch.delenv("AICIV_LOCAL_MODE")
     assert auth._counts("127.0.0.1") is True
