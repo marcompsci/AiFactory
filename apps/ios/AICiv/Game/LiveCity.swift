@@ -514,12 +514,11 @@ final class CityScene {
             let p0 = SCNVector3(Float(a.x), Float(Self.buildingHeight(a) * 0.6), Float(a.z))
             let p2 = SCNVector3(Float(b.x), Float(Self.buildingHeight(b) * 0.6), Float(b.z))
             let span = Float(hypot(b.x - a.x, b.z - a.z))
-            let p1 = SCNVector3((p0.x + p2.x) / 2, max(p0.y, p2.y) + span * 0.35, (p0.z + p2.z) / 2)
-            let pts = (0...16).map { i -> SCNVector3 in
-                let t = Float(i) / 16, u = 1 - t
-                return SCNVector3(u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x, u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
-                                  u * u * p0.z + 2 * u * t * p1.z + t * t * p2.z)
-            }
+            let midX: Float = (p0.x + p2.x) / 2
+            let midZ: Float = (p0.z + p2.z) / 2
+            let lift: Float = max(p0.y, p2.y) + span * 0.35
+            let p1 = SCNVector3(midX, lift, midZ)
+            let pts = (0...16).map { i in Self.bezier(p0, p1, p2, Float(i) / 16) }
             let arc = SCNNode()
             arc.name = "flow"
             let color = Self.color(a).withAlphaComponent(CGFloat(0.35 + 0.5 * strength))
@@ -536,9 +535,22 @@ final class CityScene {
         }
     }
 
+    /// A point on the quadratic curve p0 → p2 bent toward p1.
+    static func bezier(_ p0: SCNVector3, _ p1: SCNVector3, _ p2: SCNVector3, _ t: Float) -> SCNVector3 {
+        let u: Float = 1 - t
+        let a: Float = u * u
+        let b: Float = 2 * u * t
+        let c: Float = t * t
+        let x: Float = a * p0.x + b * p1.x + c * p2.x
+        let y: Float = a * p0.y + b * p1.y + c * p2.y
+        let z: Float = a * p0.z + b * p1.z + c * p2.z
+        return SCNVector3(x, y, z)
+    }
+
     static func segment(_ a: SCNVector3, _ b: SCNVector3, radius: CGFloat, color: UIColor) -> SCNNode {
         let d = SCNVector3(b.x - a.x, b.y - a.y, b.z - a.z)
-        let len = CGFloat(sqrtf(d.x * d.x + d.y * d.y + d.z * d.z))
+        let sq: Float = d.x * d.x + d.y * d.y + d.z * d.z
+        let len = CGFloat(sqrtf(sq))
         let c = SCNCylinder(radius: radius, height: len)
         c.radialSegmentCount = 6
         let m = glow(color)
@@ -546,7 +558,10 @@ final class CityScene {
         m.blendMode = .add
         c.firstMaterial = m
         let n = SCNNode(geometry: c)
-        n.position = SCNVector3((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2)
+        let mx: Float = (a.x + b.x) / 2
+        let my: Float = (a.y + b.y) / 2
+        let mz: Float = (a.z + b.z) / 2
+        n.position = SCNVector3(mx, my, mz)
         n.look(at: b, up: SCNVector3(0, 1, 0), localFront: SCNVector3(0, 1, 0))
         return n
     }
@@ -557,7 +572,10 @@ final class CityScene {
             let f = (phase * p.speed).truncatingRemainder(dividingBy: 1) * Double(p.points.count - 1)
             let i = min(p.points.count - 2, Int(f)), t = Float(f - Double(i))
             let a = p.points[i], b = p.points[i + 1]
-            p.node.position = SCNVector3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t)
+            let x: Float = a.x + (b.x - a.x) * t
+            let y: Float = a.y + (b.y - a.y) * t
+            let z: Float = a.z + (b.z - a.z) * t
+            p.node.position = SCNVector3(x, y, z)
         }
         for b in belts {
             guard let m = b.node.geometry?.firstMaterial else { continue }
