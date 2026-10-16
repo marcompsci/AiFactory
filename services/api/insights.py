@@ -44,3 +44,11 @@ def mission_trace(mission_id: str, p: Principal = Depends(member)) -> dict:
         if m is None or m.organization_id != p.organization_id:
             raise HTTPException(404, "mission not found")
         return build(conn, mission_id)
+
+
+@router.get("/collaboration")
+def collaboration(days: int = Query(30, ge=1, le=365), p: Principal = Depends(member)) -> dict:
+    """Who works with whom (handoffs and messages) and which districts send each other work (handoffs and packages)."""
+    from services.management.collaboration import network
+    with db.get_engine().connect() as conn:
+        return network(conn, p.organization_id, days)

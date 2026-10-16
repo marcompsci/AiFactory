@@ -152,3 +152,21 @@ def test_mission_trace_orders_everything_with_totals(client):
     assert tr["by_agent"] and all(x["agent"] for x in tr["by_agent"])
     assert any(i["kind"] == "approval" and i["status"] != "PENDING" for i in tr["items"])  # the grant is on the timeline
     assert client.get("/api/insights/missions/00000000-0000-4000-8000-000000000999/trace").status_code == 404
+
+
+def test_collaboration_network_comes_from_real_handoffs(client):
+    assert client.get("/api/insights/collaboration").json()["edges"] == []
+    mid = start(client)
+    a = pending_approval(client, mid)
+    client.post(f"/api/approvals/{a['id']}/grant")
+    wait_for(lambda: mission_status(client, mid)["status"] == "COMPLETED")
+    net = client.get("/api/insights/collaboration").json()
+    assert net["method"] == "records" and net["edges"]
+    top = net["edges"][0]
+    assert top["handoffs"] >= 1 and top["weight"] >= 2 and top["a"] != top["b"]
+    assert all(f["from"] != f["to"] for f in net["flows"])
+    # the developer works with whoever handed them the reproduction and whoever verified their fix
+    detail = client.get(f"/api/missions/{mid}").json()
+    impl = next(t for t in detail["tasks"] if t["key"] == "implement")
+    partners = net["partners"][impl["agent_id"]]
+    assert partners and all(p["agent_id"] != impl["agent_id"] for p in partners)

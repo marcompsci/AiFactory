@@ -19,6 +19,7 @@ struct LiveCityView: View {
                 .onChange(of: app.agents) { sync(districts) }
                 .onChange(of: app.packages) { sync(districts) }
                 .onChange(of: app.districts) { sync(districts) }
+                .task(id: app.connection == .live) { await loadFlows() }
             HStack {
                 PixelHeader(text: "The city")
                 Spacer()
@@ -58,11 +59,32 @@ struct LiveCityView: View {
         city.sync(districts: districts, agents: agents, live: !app.agents.isEmpty, packages: app.packages, serverOffset: app.serverOffset)
     }
 
+    /// Who sends whom work (GET /api/insights/collaboration), drawn as glowing arcs; refreshed every minute while live.
+    private func loadFlows() async {
+        while !Task.isCancelled {
+            if app.connection == .live, let api = app.api, let net = try? await api.json("/api/insights/collaboration?days=7") {
+                let flows = (net.get("flows")?.list ?? []).prefix(12).map {
+                    CityFlow(from: $0.s("from"), to: $0.s("to"), weight: $0.get("weight")?.int ?? 1)
+                }
+                city.setFlows(Array(flows))
+            } else if app.connection != .live {
+                city.setFlows([])
+            }
+            try? await Task.sleep(for: .seconds(60))
+        }
+    }
+
     private func step(_ d: Int, _ districts: [District]) {
         guard !districts.isEmpty else { return }
         focus = (focus + d + districts.count) % districts.count
         city.fly(to: districts[focus].id)
     }
+}
+
+struct CityFlow: Equatable {
+    let from: String
+    let to: String
+    let weight: Int
 }
 
 enum CitySelection: Identifiable {
@@ -171,6 +193,9 @@ final class CityScene {
     private var phase: Double = 0
     private var builtFor: [String] = []
     private var agentStates: [String: String] = [:]
+    private var flowNodes: [SCNNode] = []
+    private var flowKey = ""
+    private var pulses: [(node: SCNNode, points: [SCNVector3], speed: Double)] = []
     private var belts: [(node: SCNNode, scale: Float)] = []
 
     var zoom: Double {
@@ -474,8 +499,66 @@ final class CityScene {
         if let id = n.name { agentStates[id] = state }
     }
 
+    /// Arcs between districts that sent each other work this week: thicker and brighter for more traffic.
+    func setFlows(_ flows: [CityFlow]) {
+        let key = flows.map { "\($0.from)>\($0.to):\($0.weight)" }.joined(separator: ",")
+        guard key != flowKey else { return }
+        flowKey = key
+        flowNodes.forEach { $0.removeFromParentNode() }
+        flowNodes = []
+        pulses = []
+        let top = Double(flows.map(\.weight).max() ?? 1)
+        for f in flows {
+            guard let a = districts[f.from], let b = districts[f.to] else { continue }
+            let strength = max(0.25, Double(f.weight) / top)
+            let p0 = SCNVector3(Float(a.x), Float(Self.buildingHeight(a) * 0.6), Float(a.z))
+            let p2 = SCNVector3(Float(b.x), Float(Self.buildingHeight(b) * 0.6), Float(b.z))
+            let span = Float(hypot(b.x - a.x, b.z - a.z))
+            let p1 = SCNVector3((p0.x + p2.x) / 2, max(p0.y, p2.y) + span * 0.35, (p0.z + p2.z) / 2)
+            let pts = (0...16).map { i -> SCNVector3 in
+                let t = Float(i) / 16, u = 1 - t
+                return SCNVector3(u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x, u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y,
+                                  u * u * p0.z + 2 * u * t * p1.z + t * t * p2.z)
+            }
+            let arc = SCNNode()
+            arc.name = "flow"
+            let color = Self.color(a).withAlphaComponent(CGFloat(0.35 + 0.5 * strength))
+            for i in 0..<(pts.count - 1) {
+                arc.addChildNode(Self.segment(pts[i], pts[i + 1], radius: CGFloat(0.12 + 0.28 * strength), color: color))
+            }
+            scene.rootNode.addChildNode(arc)
+            flowNodes.append(arc)
+            let dot = SCNNode(geometry: SCNSphere(radius: CGFloat(0.5 + 0.4 * strength)))
+            dot.geometry?.firstMaterial = Self.glow(Self.color(a))
+            scene.rootNode.addChildNode(dot)
+            flowNodes.append(dot)
+            pulses.append((dot, pts, 0.15 + 0.25 * strength))
+        }
+    }
+
+    static func segment(_ a: SCNVector3, _ b: SCNVector3, radius: CGFloat, color: UIColor) -> SCNNode {
+        let d = SCNVector3(b.x - a.x, b.y - a.y, b.z - a.z)
+        let len = CGFloat(sqrtf(d.x * d.x + d.y * d.y + d.z * d.z))
+        let c = SCNCylinder(radius: radius, height: len)
+        c.radialSegmentCount = 6
+        let m = glow(color)
+        m.transparencyMode = .aOne
+        m.blendMode = .add
+        c.firstMaterial = m
+        let n = SCNNode(geometry: c)
+        n.position = SCNVector3((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2)
+        n.look(at: b, up: SCNVector3(0, 1, 0), localFront: SCNVector3(0, 1, 0))
+        return n
+    }
+
     private func tick() {
         phase += 1.0 / 15
+        for p in pulses {  // a bead of light travels each arc, from sender to receiver
+            let f = (phase * p.speed).truncatingRemainder(dividingBy: 1) * Double(p.points.count - 1)
+            let i = min(p.points.count - 2, Int(f)), t = Float(f - Double(i))
+            let a = p.points[i], b = p.points[i + 1]
+            p.node.position = SCNVector3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t)
+        }
         for b in belts {
             guard let m = b.node.geometry?.firstMaterial else { continue }
             let t = SCNMatrix4Translate(SCNMatrix4MakeScale(b.scale, 1, 1), Float(-phase * 0.8), 0, 0)
@@ -746,6 +829,7 @@ struct AgentStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
     let agentId: String
     @State private var data: JSONValue?
+    @State private var net: JSONValue?
 
     var body: some View {
         let a = app.agents[agentId] ?? Roster.bundled.first { $0.id == agentId }
@@ -789,6 +873,19 @@ struct AgentStatusSheet: View {
                             Text("Written from my own task runs; each cites the run it came from. Hints, not facts.")
                         }
                     }
+                    let partners = net?.get("partners")?.get(agentId)?.list ?? []
+                    if !partners.isEmpty {
+                        Section("Works most with") {
+                            ForEach(partners) { p in
+                                HStack {
+                                    Text(p.s("name")).bold()
+                                    Text(p.s("role")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    Spacer()
+                                    Text("\(p.get("handoffs")?.int ?? 0) handoffs · \(p.get("messages")?.int ?? 0) msgs").font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
                     let msgs = (d.get("messages")?.list ?? []).prefix(3)
                     if !msgs.isEmpty {
                         Section("Said lately") { ForEach(Array(msgs)) { m in Text(m.s("body")).font(.caption).lineLimit(3) } }
@@ -805,7 +902,10 @@ struct AgentStatusSheet: View {
                 }
             }
             .navigationTitle("Agent").navigationBarTitleDisplayMode(.inline)
-            .task { data = try? await app.api?.json("/api/agents/\(agentId)") }
+            .task {
+                data = try? await app.api?.json("/api/agents/\(agentId)")
+                net = try? await app.api?.json("/api/insights/collaboration")
+            }
         }
     }
 }
