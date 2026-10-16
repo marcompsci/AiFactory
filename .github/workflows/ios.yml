@@ -54,6 +54,17 @@ jobs:
             sleep 14
             xcrun simctl io "$UDID" screenshot "shots/$spot.png"
           done
+      - name: Publish the screenshots (branch ios-screenshots, never main)
+        if: always() && github.event_name != 'pull_request'
+        working-directory: apps/ios
+        run: |
+          set -e
+          [ -d shots ] || exit 0
+          SHA=$(git rev-parse --short HEAD)
+          rm -rf /tmp/shots && mkdir -p /tmp/shots && cp shots/*.png /tmp/shots/ 2>/dev/null || exit 0
+          cd /tmp/shots && git init -q -b ios-screenshots && git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -qm "Town screenshots from ${SHA}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ios-screenshots
       - name: Upload the screenshots
         if: always()
         uses: actions/upload-artifact@v4
