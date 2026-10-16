@@ -158,6 +158,19 @@ function MissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
             {!d.objective.met ? `: ${(d.objective.findings as string[]).join("; ")}` : ""}
           </p>
         ) : null}
+        {(d.recovery ?? []).map((r: Json) => (
+          <div key={r.id} className="space-y-1 rounded border border-line p-2 text-sm">
+            <p className="text-xs text-ink-3">Recovery plan · {r.failure_mode} · {String(r.status).toLowerCase()}</p>
+            <p className="font-semibold">{r.summary}</p>
+            <p className="text-xs text-ink-2">{r.rationale}</p>
+            {r.status === "PENDING" && r.actionable ? (
+              <div className="flex gap-2">
+                <Button onClick={() => api.recoveryDecide(r.id, true).then(() => qc.invalidateQueries({ queryKey: ["mission", id] }))}>Approve</Button>
+                <Button onClick={() => api.recoveryDecide(r.id, false).then(() => qc.invalidateQueries({ queryKey: ["mission", id] }))}>Decline</Button>
+              </div>
+            ) : null}
+          </div>
+        ))}
         <a href={`/trace?m=${m.id}`} className="text-xs text-cyan">
           Full trace: every step, tool and AI call →
         </a>

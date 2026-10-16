@@ -457,6 +457,8 @@ class MissionRunner:
             else:
                 ops.set_mission_status(conn, self.mission_id, "FAILED", failure_reason=reason)
             reliability.learn_from_mission(conn, self.mission_id)
+            from services.management import recovery
+            recovery.propose(conn, self.mission_id)  # a proposal for you; nothing runs until you approve it
             self._send_agents_home(conn, m.execution_mode)
 
     def _wind_down(self, reason: str) -> None:

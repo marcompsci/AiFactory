@@ -11,6 +11,7 @@ struct OwnerTowerView: View {
         NavigationStack {
             List {
                 MissionApprovalsSection()
+                RecoveryPlansSection()
                 FinanceDecisionsSection()
                 Section("Reliability") {
                     NavigationLink { FailureClinicView() } label: {

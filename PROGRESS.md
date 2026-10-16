@@ -294,3 +294,40 @@ stuck in action loops). See services/management/reliability.py.
 ### Still open
 - Plans allow at most 2 attempts per task, so stopping a loop mostly changes the label and the lesson rather than
   saving a retry. The web dashboard doesn't have a clinic page yet (feed lines only).
+
+## V6.2: Mission trace
+
+- `GET /api/insights/missions/{id}/trace`: one ordered timeline per mission (steps, tool calls, AI calls with tokens
+  and estimated cost, messages, approvals, manager decisions, checks, lessons) with totals per agent and overall.
+  iPhone: mission page → Full trace (filter by kind). Web: `/trace?m=<id>`, linked from the mission panel.
+- Web failure clinic at `/clinic` (the iPhone has had it since V6.1).
+
+## V6.3: Who works with whom
+
+- `GET /api/insights/collaboration`: links between agents from real handoffs (a task that waited on another agent's
+  finished task) and messages, and district-to-district flows from handoffs and conveyor packages.
+- The home city draws a glowing arc for each district pair that sent work this week (brighter and thicker for more
+  traffic), with a bead of light travelling sender → receiver. The agent card shows who they work with most.
+
+## V6.4: Your charter
+
+- Rules only the owner amends (`GET/PUT /api/charter`): a daily AI-spend cap per agent (reaching it pauses the
+  mission, like any budget stop), a cap on each mission's budget, and quiet hours when scheduled work (research,
+  finance, App Lab and factory check-ins) waits. Missions you start still run.
+- Tightening saves at once; loosening (raising or removing a cap, changing quiet hours) needs a fresh step-up. Every
+  amendment is kept with who made it, what changed and whether it loosened a rule (append-only in Postgres).
+- The safety rules (approvals for publishing, spending and releases, no pushes to the default branch, read-only
+  integrations, emergency stop) are not in the charter, so no amendment can touch them. iPhone: Owner → Your charter.
+
+## V6.5: Recovery plans
+
+- When a software-change mission fails, Atlas drafts a recovery plan chosen by its MAST label: retry later (outage),
+  retry with an explicit rule (worked outside its role, e.g. edited tests), try a different fix from QA's report
+  (didn't meet requirements or looped), narrow the change (timed out), insist on the answer format, or more budget
+  within your charter. The new mission's instructions carry the agent's cited lesson.
+- Nothing runs on its own: plans wait in the Owner tab (and on the mission page, iPhone and web) for Approve or
+  Decline, lapse after a week, and stop after two recoveries in a row (kept as a note instead).
+
+### Still open
+- Recovery plans cover software-change missions only; research, finance and factory missions are restarted by
+  their own pipelines. Quiet hours hold scheduled jobs for the whole organization (one time zone per charter).

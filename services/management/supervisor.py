@@ -92,6 +92,9 @@ def supervise(conn: Connection) -> dict:
                 found["reassigned"] += 1
                 break
 
+    from .recovery import expire
+    found["recovery_expired"] = expire(conn)  # a plan nobody decided on in a week lapses; it never runs by default
+
     # release integrity: approvals stay valid only while the approved bytes are unchanged
     for auth in conn.execute(select(db.release_authorizations)).fetchall():
         if conn.execute(select(db.release_invalidations.c.id).where(db.release_invalidations.c.authorization_id == auth.id)).first():

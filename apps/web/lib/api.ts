@@ -138,6 +138,8 @@ export const api = {
   failures: (days = 30) => call<Json>(`/api/insights/failures?days=${days}`),
   lessons: () => call<Json>("/api/insights/lessons"),
   trace: (id: string) => call<Json>(`/api/insights/missions/${id}/trace`),
+  recoveryDecide: (id: string, approve: boolean) => call<Json>(`/api/recovery/${id}/${approve ? "approve" : "decline"}`, { method: "POST" }),
+  charter: () => call<Json>("/api/charter"),
   emergencyStop: (engaged: boolean) => call<Json>("/api/emergency-stop", { method: "POST", body: JSON.stringify({ engaged }) }),
 };
 

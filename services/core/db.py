@@ -1213,7 +1213,7 @@ recovery_plans = Table(
     Column("summary", Text, nullable=False),
     Column("rationale", Text, nullable=False),
     Column("params", JSON, nullable=False, default=dict),    # what the new mission would be
-    Column("status", String, nullable=False, default="PENDING"),  # PENDING | APPROVED | DECLINED | EXPIRED | SUPERSEDED
+    Column("status", String, nullable=False, default="PENDING"),  # PENDING | APPROVED | DECLINED | EXPIRED | INFO (nothing to run)
     Column("new_mission_id", String(36)),
     Column("decided_by", String(36)),
     Column("decided_at", String),

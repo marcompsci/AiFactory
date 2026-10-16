@@ -263,3 +263,73 @@ extension ISO8601DateFormatter {
         return f.date(from: s)
     }
 }
+
+/// The General Manager's recovery plans for failed missions (GET /api/recovery). Nothing runs until you approve one.
+struct RecoveryPlansSection: View {
+    @Environment(AppState.self) private var app
+    @State private var plans: [JSONValue] = []
+
+    var body: some View {
+        let pending = plans.filter { $0.s("status") == "PENDING" }
+        Group {
+            if !pending.isEmpty {
+                Section {
+                    ForEach(pending) { p in RecoveryPlanRow(plan: p) { await load() } }
+                } header: { Text("Recovery plans") } footer: {
+                    Text("Atlas drafted these after missions failed. Approving starts a new mission with the same safety rules; a plan lapses after a week.")
+                }
+            }
+        }
+        .task(id: app.connection == .live) { await load() }
+    }
+
+    private func load() async {
+        guard app.connection == .live, let api = app.api else { plans = []; return }
+        plans = (try? await api.json("/api/recovery"))?.get("plans")?.list ?? []
+    }
+}
+
+struct RecoveryPlanRow: View {
+    @Environment(AppState.self) private var app
+    let plan: JSONValue
+    var onChange: () async -> Void = {}
+    @State private var busy = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(plan.s("mission_title")).font(.caption).foregroundStyle(.secondary)
+            Text(plan.s("summary")).font(.subheadline.bold())
+            Text(plan.s("rationale")).font(.caption)
+            HStack(spacing: 6) {
+                Text(plan.s("failure_mode")).font(Pixel.mono(10)).padding(.horizontal, 5).padding(.vertical, 2)
+                    .background(Theme.warn.opacity(0.25), in: Capsule())
+                Text(plan.s("mode_name")).font(.caption2).foregroundStyle(.secondary)
+            }
+            if plan.s("status") == "PENDING" && plan.get("actionable")?.bool == true {
+                HStack {
+                    Button("Approve") { Task { await decide(true) } }.buttonStyle(.borderedProminent).tint(Theme.ok)
+                    Button("Decline", role: .destructive) { Task { await decide(false) } }.buttonStyle(.bordered)
+                }.disabled(busy)
+            } else {
+                Text(plan.s("status") == "INFO" ? "Nothing to run: this is a note." : "This plan is \(plan.s("status").lowercased()).")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            if let message { Text(message).font(.caption) }
+        }
+    }
+
+    private func decide(_ approve: Bool) async {
+        guard let api = app.api else { return }
+        busy = true
+        defer { busy = false }
+        if approve {
+            guard await ReleaseReviewView.authenticate(reason: "Start the recovery mission") else { message = "Face ID didn't confirm it's you."; return }
+        }
+        do {
+            _ = try await api.json("/api/recovery/\(plan.s("id"))/\(approve ? "approve" : "decline")", method: "POST")
+            message = approve ? "Started. It's in your missions." : "Declined."
+            await onChange()
+        } catch { message = error.localizedDescription }
+    }
+}

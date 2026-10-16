@@ -140,6 +140,12 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: "Sent work back for revision", tone: "#FFBD69" };
     case "manager.escalation_created":
       return { who, text: `Escalated: ${s("rationale") || s("reason")}`, tone: "#FFBD69" };
+    case "recovery.proposed":
+      return { who, text: `Recovery plan drafted: ${s("summary")}`, tone: "#FFBD69" };
+    case "recovery.decided":
+      return { who, text: `Recovery plan ${s("status").toLowerCase()}`, tone: "#9CC8FF" };
+    case "charter.amended":
+      return { who, text: `Charter amended (version ${s("version")})`, tone: "#F4D58D" };
     case "manager.loop_detected":
       return { who, text: `Loop caught: ${s("rationale")}`, tone: "#FF6178" };
     case "mission.objective_checked":

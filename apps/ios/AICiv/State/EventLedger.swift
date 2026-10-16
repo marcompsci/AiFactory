@@ -83,6 +83,9 @@ enum FeedText {
         case "release.invalidated": return (who, "Approval cancelled: \(s("reason"))")
         case "release.executed": return (who, "Released to the local release channel")
         case "approval.requested": return (who, "Asks for approval: \(s("summary"))")
+        case "recovery.proposed": return (who, "Recovery plan drafted: \(s("summary"))")
+        case "recovery.decided": return (who, "Recovery plan \(s("status").lowercased())")
+        case "charter.amended": return (who, "Charter amended (version \(s("version")))")
         case "manager.loop_detected": return (who, "Loop caught: \(s("rationale"))")
         case "mission.objective_checked":
             return (who, p.get("met")?.bool == true ? "Objective check: met" : "Objective check: not met")

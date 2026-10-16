@@ -241,6 +241,12 @@ struct MissionDetailView: View {
                 if let f = mission.failureReason { Text(f).font(.caption).foregroundStyle(Theme.bad) }
                 if let o = detail?.get("objective") { ObjectiveRow(objective: o) }
             }
+            let plans = detail?.get("recovery")?.list ?? []
+            if !plans.isEmpty {
+                Section("Recovery plan") {
+                    ForEach(plans) { p in RecoveryPlanRow(plan: p) { detail = try? await app.api?.missionDetail(mission.id) } }
+                }
+            }
             Section {
                 NavigationLink { MissionTraceView(missionId: mission.id) } label: {
                     Label("Full trace: every step, tool and AI call", systemImage: "list.bullet.rectangle")
