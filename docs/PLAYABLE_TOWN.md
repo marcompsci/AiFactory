@@ -1,5 +1,12 @@
 # V6.0 Playable town (first milestone)
 
+> **V6.1: native on iPhone.** The iPhone's City tab is now the town as a native SpriteKit game
+> (`apps/ios/AICiv/Game/`): a Swift port of the same map, rules, pixel art and characters, with native controls
+> (joystick, Talk/Use, RPG dialogue, journal, character editor) and approvals in the Owner's Tower screen.
+> It always shows: with the bundled cast (`packages/shared-types/seed/agents.json`) before you connect, labeled
+> OFFLINE, and your live team once signed in. CI takes simulator screenshots and publishes them to the
+> `ios-screenshots` branch. The web version below is still at `/play` for desktop.
+
 A top-down pixel-art town you walk around as your own character. Your agents live and work in it, and talking to them
 does real work through the same backend as the rest of the app. It runs in the browser at `/play` and is the iPhone
 app's City tab. The 3D city is still at `/`, one tap away from the town's top bar.
