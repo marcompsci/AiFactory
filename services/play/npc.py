@@ -248,7 +248,7 @@ def _build(conn: Connection, org: str, user: str, agent, raw: str) -> Reply:
     if agent.key not in BUILDERS | MANAGERS:
         return Reply("Software changes happen at the Code Forge. Kade or Orin there can take that on.")
     prompt = raw.strip()
-    if len(prompt) < 8 or len(_content_words(_BUILD_VERB.sub("", prompt.lower(), count=1))) < 2:
+    if len(prompt) < 8 or not _content_words(_BUILD_VERB.sub("", prompt.lower(), count=1)):
         return Reply("Before I start: which part should change, and what should it do afterwards? For example: \"fix the median "
                      "function so even-length lists average the middle pair\". I'd rather ask than build the wrong thing.",
                      suggestions=["Fix the median function so even-length lists average the middle pair"])

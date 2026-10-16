@@ -23,47 +23,61 @@ def test_error_normalisation_and_labels():
     assert reliability._mode_for("something odd") == "UNK"
 
 
-def test_failures_are_labeled_and_become_cited_lessons(monkeypatch):
+EVIL = {"path": "tests/test_stats.py", "old": "== 2.5", "new": "== 3", "explanation": "adjust expectation"}
+
+
+def test_outages_are_labeled_but_not_blamed_on_the_agent(monkeypatch):
     with live_client(monkeypatch, FakeGateway(fail=True)) as client:
         mid = start(client)
-        m = wait_for(lambda: (s := mission_status(client, mid))["status"] in ("FAILED", "COMPLETED") and s)
-        assert m["status"] == "FAILED"
-        detail = client.get(f"/api/missions/{mid}").json()
-        impl = next(t for t in detail["tasks"] if t["status"] == "FAILED")
+        assert wait_for(lambda: (s := mission_status(client, mid))["status"] in ("FAILED", "COMPLETED") and s)["status"] == "FAILED"
+        clinic = client.get("/api/insights/failures").json()
+        mine = [l for l in clinic["labels"] if l["mission_id"] == mid]
+        assert clinic["method"] == "rules" and mine and all(l["mode"] == "INFRA" for l in mine)
+        assert clinic["by_category"][0]["category"] == "infrastructure" and clinic["incidents"] <= clinic["total"]
+        failed = next(t for t in client.get(f"/api/missions/{mid}").json()["tasks"] if t["status"] == "FAILED")
         with db.get_engine().connect() as conn:
-            assert "provider down" in (reliability.repeating_failure(conn, impl["id"]) or "")
+            assert reliability.repeating_failure(conn, failed["id"]) is None  # an outage is not a loop
+        assert client.get(f"/api/agents/{failed['agent_id']}").json()["lessons"] == []  # nor a lesson
+
+
+def test_a_repeated_mistake_is_stopped_labeled_and_learned(monkeypatch):
+    with live_client(monkeypatch, FakeGateway(patch=EVIL)) as client:
+        mid = start(client)
+        assert wait_for(lambda: (s := mission_status(client, mid))["status"] in ("FAILED", "COMPLETED") and s)["status"] == "FAILED"
+        impl = next(t for t in client.get(f"/api/missions/{mid}").json()["tasks"] if t["key"] == "implement")
+        with db.get_engine().connect() as conn:
+            d = conn.execute(select(db.manager_decisions).where(db.manager_decisions.c.subject_id == impl["id"],
+                                                                db.manager_decisions.c.outcome == "loop_stopped")).first()
+        assert d is not None and "refusing to edit tests" in d.rationale
+        types = [e["event_type"] for e in client.get("/api/events?after=0").json()["events"]]
+        assert "manager.loop_detected" in types and "agent.lesson_learned" in types
 
         clinic = client.get("/api/insights/failures").json()
-        assert clinic["method"] == "rules" and clinic["total"] >= 2
-        mine = [l for l in clinic["labels"] if l["mission_id"] == mid]
-        assert mine and all(l["mode"] == "INFRA" for l in mine)  # an outage is not blamed on the agent's reasoning
-        assert all(l["source"].startswith(("task_run:", "task:")) for l in mine)
-        assert clinic["by_category"][0]["category"] == "infrastructure" and clinic["advice"]
+        modes = {l["mode"] for l in clinic["labels"] if l["task_id"] == impl["id"]}
+        assert modes == {"FM-1.2"}  # editing tests to pass is outside the developer's role
+        assert clinic["incidents"] == 1 and clinic["total"] == 2  # one problem, two failed attempts
 
-        # the developer learned a lesson that cites the run it came from, stored as a hypothesis
-        dev = client.get(f"/api/agents/{impl['agent_id']}").json()
-        assert dev["lessons"] and dev["lessons"][0]["source"].startswith("task_run:") and dev["lessons"][0]["trust"] == "hypothesis"
-        assert f"({impl['key']})" in dev["lessons"][0]["lesson"]
+        lessons = client.get(f"/api/agents/{impl['agent_id']}").json()["lessons"]
+        assert lessons and lessons[0]["source"].startswith("task_run:") and lessons[0]["trust"] == "hypothesis"
+        assert "(implement)" in lessons[0]["lesson"] and "Change the approach" in lessons[0]["lesson"]
         assert any(a["agent_id"] == impl["agent_id"] for a in client.get("/api/insights/lessons").json()["agents"])
-        types = [e["event_type"] for e in client.get("/api/events?after=0").json()["events"]]
-        assert "agent.lesson_learned" in types
-
-        # lessons are not re-learned twice for the same run
-        with transaction() as conn:
+        with transaction() as conn:  # not re-learned for the same run
             assert reliability.learn_from_mission(conn, mid) == 0
 
 
 def test_lessons_reach_the_agents_next_prompt(monkeypatch):
-    gw = FakeGateway(fail=True)
+    gw = FakeGateway(patch=EVIL)
     with live_client(monkeypatch, gw) as client:
         first = start(client)
         wait_for(lambda: mission_status(client, first)["status"] == "FAILED")
-        gw.fail, gw.calls = False, []
+        gw.patch = FakeGateway().patch
+        gw.calls = []
         second = start(client)
         pending_approval(client, second)
         prompts = [c.system for c in gw.calls]
         assert any("Lessons from your own earlier runs" in s and "[task_run:" in s for s in prompts)
-        assert "agent.lessons_recalled" in [e["event_type"] for e in client.get("/api/events?after=0").json()["events"]]
+        recalled = [e for e in client.get("/api/events?after=0").json()["events"] if e["event_type"] == "agent.lessons_recalled"]
+        assert len(recalled) == 1  # announced once per attempt, not per model call
 
 
 def test_completed_missions_get_an_objective_check(client):
@@ -72,7 +86,7 @@ def test_completed_missions_get_an_objective_check(client):
     client.post(f"/api/approvals/{a['id']}/grant")
     wait_for(lambda: mission_status(client, mid)["status"] == "COMPLETED")
     obj = client.get(f"/api/missions/{mid}").json()["objective"]
-    assert obj["met"] is True and obj["findings"]
+    assert obj["met"] is True and obj["status"] == "objective_met" and obj["findings"]
     with transaction() as conn:  # a finished step that lacks a promised output fails the check
         t = conn.execute(select(db.tasks).where(db.tasks.c.mission_id == mid, db.tasks.c.key == "verify")).first()
         conn.execute(update(db.tasks).where(db.tasks.c.id == t.id).values(outputs={"passed": 5}))
@@ -80,6 +94,16 @@ def test_completed_missions_get_an_objective_check(client):
     assert res["met"] is False and "failed" in res["findings"][0]
     assert client.get(f"/api/missions/{mid}").json()["objective"]["met"] is False
     assert any(l["mode"] == "FM-3.1" for l in client.get("/api/insights/failures").json()["labels"])
+
+
+def test_a_rejected_publish_is_partly_met_not_met(client):
+    mid = start(client)
+    a = pending_approval(client, mid)
+    client.post(f"/api/approvals/{a['id']}/reject")
+    wait_for(lambda: mission_status(client, mid)["status"] == "COMPLETED")
+    obj = client.get(f"/api/missions/{mid}").json()["objective"]
+    assert obj["status"] == "objective_partly_met" and "rejected" in obj["findings"][0]
+    assert not [l for l in client.get("/api/insights/failures").json()["labels"] if l["mission_id"] == mid]  # your call, not a failure
 
 
 def test_supervisor_catches_a_task_repeating_the_same_tool_call(client):
@@ -108,5 +132,6 @@ def test_vague_requests_get_a_question_not_a_proposal(client):
     r = say(client, ATLAS, "research candles")
     assert r["proposal"] is None and "Etsy" in r["reply"] and len(r["suggestions"]) == 2
     assert say(client, ATLAS, r["suggestions"][1])["proposal"]["params"]["source"] == "etsy"
-    # a clear request still becomes a proposal
+    # a clear request still becomes a proposal, even a short one
+    assert say(client, KADE, "fix the login bug")["proposal"]["kind"] == "create_mission"
     assert say(client, KADE, "fix the median function so even-length lists average the middle pair")["proposal"]["kind"] == "create_mission"

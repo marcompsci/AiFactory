@@ -25,7 +25,10 @@ struct FailureClinicView: View {
                         Label("No failures in this period.", systemImage: "checkmark.seal.fill").foregroundStyle(Theme.ok)
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(total) failure\(total == 1 ? "" : "s")").font(.title2.bold())
+                            let incidents = d.get("incidents")?.int ?? total
+                            Text("\(incidents) problem\(incidents == 1 ? "" : "s")").font(.title2.bold())
+                            Text("Counting every failed attempt: \(total)")
+                                .font(.caption).foregroundStyle(.secondary)
                             Text(d.s("advice")).font(.subheadline)
                         }
                     }
@@ -121,10 +124,13 @@ struct FailureClinicView: View {
 struct ObjectiveRow: View {
     let objective: JSONValue
     var body: some View {
+        let status = objective.s("status")
         let met = objective.get("met")?.bool ?? false
+        let partly = status == "objective_partly_met"
         VStack(alignment: .leading, spacing: 4) {
-            Label(met ? "Objective met" : "Objective not met", systemImage: met ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
-                .foregroundStyle(met ? Theme.ok : Theme.warn).font(.subheadline.bold())
+            Label(met ? "Objective met" : partly ? "Objective partly met" : "Objective not met",
+                  systemImage: met ? "checkmark.seal.fill" : partly ? "circle.lefthalf.filled" : "exclamationmark.triangle.fill")
+                .foregroundStyle(met ? Theme.ok : partly ? Theme.gold : Theme.warn).font(.subheadline.bold())
             ForEach(Array((objective.get("findings")?.list ?? []).enumerated()), id: \.offset) { _, f in
                 Text(f.str).font(.caption).foregroundStyle(.secondary)
             }

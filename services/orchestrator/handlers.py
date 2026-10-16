@@ -98,6 +98,8 @@ class TaskEnv:
             lessons = reliability.lessons_for(conn, self.agent.id, self.task.key)
         if lessons:  # the agent's own cited lessons from earlier runs (services/management/reliability.py)
             system = f"{system}\n\n{reliability.lessons_prompt(lessons)}"
+        if lessons and (self.task.id, self.task.attempt) not in _RECALLED:  # announce once per attempt, not per model call
+            _RECALLED.add((self.task.id, self.task.attempt))
             with transaction() as conn:
                 emit(conn, "agent.lessons_recalled", mission_id=self.mission.id, agent_id=self.agent.id,
                      execution_mode=self.mission.execution_mode, payload={"memory_ids": [l["id"] for l in lessons]})
@@ -116,6 +118,9 @@ class TaskEnv:
                              provider=res.provider, model=res.model, input_tokens=res.input_tokens,
                              output_tokens=res.output_tokens, estimated_cost_usd=res.estimated_cost_usd)
         return res.text.strip()
+
+
+_RECALLED: set[tuple[str, int]] = set()
 
 
 def _json_from(text: str) -> dict:

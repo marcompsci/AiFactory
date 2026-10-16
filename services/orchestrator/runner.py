@@ -365,19 +365,24 @@ class MissionRunner:
                 else:
                     # Reporting a failure is information for the supervisor, never a penalty for the agent.
                     submit_report(conn, kind="blocker" if outcome == "FAILED" else "quality_concern", body=f"{task.title}: {(error or '')[:300]}", **rep)
-                    conn.execute(update(db.task_runs).where(db.task_runs.c.id == run_id).values(status="FAILED", error=error, finished_at=now))
+                    run_error = reliability.VERIFY_PREFIX + (error or "") if outcome == "VERIFY_FAILED" else error
+                    conn.execute(update(db.task_runs).where(db.task_runs.c.id == run_id).values(status="FAILED", error=run_error, finished_at=now))
                     self._retry_or_fail(conn, task, error or "failed", outcome == "VERIFY_FAILED", agent.id, mode)
         finally:
             lock.release()
 
     def _retry_or_fail(self, conn, task, error: str, verify_failed: bool, agent_id: str, mode: str) -> None:
         cur = conn.execute(select(db.tasks).where(db.tasks.c.id == task.id)).first()
-        impl = conn.execute(select(db.tasks).where(db.tasks.c.mission_id == self.mission_id, db.tasks.c.key == "implement")).first()
-        gate = impl if verify_failed and impl else cur
-        repeated = reliability.repeating_failure(conn, task.id) if gate.attempt < gate.max_attempts else None
+        repeated = reliability.repeating_failure(conn, task.id)
         if repeated:  # stall counter: the same failure twice in a row, so another identical retry would only burn budget
             from services.management.manager import record_decision
-            ops.set_task_status(conn, task.id, "FAILED",
+            loop_out = None
+            if verify_failed:
+                try:
+                    loop_out = json.loads(error)
+                except json.JSONDecodeError:
+                    loop_out = {"output": error}
+            ops.set_task_status(conn, task.id, "FAILED", outputs=loop_out,
                                 error=f"{reliability.LOOP_PREFIX} {reliability.STALL_LIMIT} times: {reliability._short(repeated)}")
             ops.set_agent_state(conn, agent_id, "FAILED", self.mission_id, mode)
             record_decision(conn, decision_type="escalation", subject_type="task", subject_id=task.id, outcome="loop_stopped",

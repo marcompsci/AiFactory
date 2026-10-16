@@ -276,20 +276,21 @@ failures by type; verify the goal, not just that code ran), Microsoft Magentic-O
 Stanford's Generative Agents (reflection, whose known flaw is invented memories) and Altera's Project Sid (agents
 stuck in action loops). See services/management/reliability.py.
 
-- Loops: the supervisor flags a running task that makes the same tool call with the same arguments 3 times; a task
-  whose last two runs failed identically stops retrying (when a retry would otherwise happen). Both are recorded as
-  manager escalations (`manager.loop_detected`).
+- Loops: the supervisor flags a run that makes the same tool call with the same arguments 3 times; a task whose last
+  two runs failed identically for a reason of its own is stopped and labelled a loop. Both are recorded as manager
+  escalations (`manager.loop_detected`). Outages and budget pauses never count as loops or lessons.
 - Failure clinic: `GET /api/insights/failures` sorts every failed run, timeout, drifted build and missed objective
   into MAST categories by plain rules (no model), with counts by kind and agent and the matching fix. Owner tab →
   Reliability → Failure clinic on the iPhone.
 - Lessons: when a mission ends, each task that struggled leaves its agent one lesson, written by rules from the real
   runs, citing the run (`task_run:<id>`), stored as hypothesis memory for 90 days. The agent's next model call gets
   its top 3 lessons as hints (`agent.lessons_recalled`). Shown on the agent card and in the clinic.
-- Objective check: every completed mission is checked for each finished step's promised outputs and validation
-  (`mission.objective_checked`), shown on the mission page.
+- Objective check: every completed mission is checked: each step finished, produced its promised outputs and passed
+  its validation (`mission.objective_checked`). Met, partly met (a step skipped by your decision, such as rejecting
+  publishing) or not met, shown on the mission page.
 - Ask, don't guess: in the City, vague requests ("fix it", "research stuff") get a clarifying question instead of a
   proposal, and managers ask whether to research on the App Store or Etsy.
 
 ### Still open
-- Plans allow at most 2 attempts per task, so the identical-failure rule rarely changes an outcome today; the
-  repeated-tool-call check is the main loop guard. The web dashboard doesn't have a clinic page yet (feed lines only).
+- Plans allow at most 2 attempts per task, so stopping a loop mostly changes the label and the lesson rather than
+  saving a retry. The web dashboard doesn't have a clinic page yet (feed lines only).
