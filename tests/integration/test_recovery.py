@@ -85,7 +85,7 @@ def test_a_plan_that_cannot_start_goes_back_to_waiting_and_decided_plans_stay_de
         assert again["status"] == "PENDING" and again["new_mission_id"] is None  # nothing started, still your call
         client.post("/api/emergency-stop", json={"engaged": False})
         with transaction() as conn:  # only one decision can win
-            assert recovery.claim(conn, plan["id"], user_id="u", approve=False) is True
-            assert recovery.claim(conn, plan["id"], user_id="u", approve=True) is False
+            assert recovery.claim(conn, plan["id"], user_id="00000000-0000-4000-8000-000000000000", approve=False) is True
+            assert recovery.claim(conn, plan["id"], user_id="00000000-0000-4000-8000-000000000000", approve=True) is False
         assert client.post(f"/api/recovery/{plan['id']}/approve").status_code == 409
         assert len(client.get("/api/missions").json()["missions"]) == 1
