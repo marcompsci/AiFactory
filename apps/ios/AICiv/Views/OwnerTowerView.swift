@@ -12,6 +12,11 @@ struct OwnerTowerView: View {
             List {
                 MissionApprovalsSection()
                 FinanceDecisionsSection()
+                Section("Reliability") {
+                    NavigationLink { FailureClinicView() } label: {
+                        Label("Failure clinic: why agents failed, and what they learned", systemImage: "stethoscope")
+                    }
+                }
                 Section("App Lab") {
                     NavigationLink { AppLabView() } label: {
                         Label("Improvement proposals for your apps", systemImage: "flask")

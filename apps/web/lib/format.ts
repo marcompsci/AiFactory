@@ -140,6 +140,12 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
       return { who, text: "Sent work back for revision", tone: "#FFBD69" };
     case "manager.escalation_created":
       return { who, text: `Escalated: ${s("rationale") || s("reason")}`, tone: "#FFBD69" };
+    case "manager.loop_detected":
+      return { who, text: `Loop caught: ${s("rationale")}`, tone: "#FF6178" };
+    case "mission.objective_checked":
+      return { who, text: p.met ? "Objective check: met" : `Objective check: not met (${((p.findings as string[]) || []).join("; ")})`, tone: p.met ? "#5BF2A5" : "#FFBD69" };
+    case "agent.lesson_learned":
+      return { who, text: `Learned: ${s("lesson").replace(/^Lesson: /, "")}`, tone: "#9CC8FF" };
     case "release.manager_approved":
       return { who, text: "Release approved by the manager; heading to your tower", tone: "#F4D58D" };
     case "release.owner_approval_requested":

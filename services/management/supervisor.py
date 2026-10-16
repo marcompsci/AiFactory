@@ -13,6 +13,7 @@ from sqlalchemy.engine import Connection
 from services.core import db
 from services.core.events import emit
 
+from . import reliability
 from .manager import record_decision
 from .release import check_authorization, ReleaseDenied
 
@@ -25,7 +26,7 @@ def _once(conn: Connection, subject_id: str, decision_type: str, outcome: str) -
 
 def supervise(conn: Connection) -> dict:
     now = datetime.now(timezone.utc)
-    found = {"stalled": 0, "suspended": 0, "drift": 0, "reassigned": 0, "invalidated": 0}
+    found = {"stalled": 0, "looping": 0, "suspended": 0, "drift": 0, "reassigned": 0, "invalidated": 0}
 
     for t in conn.execute(select(db.tasks).where(db.tasks.c.status == "RUNNING")).fetchall():
         if datetime.fromisoformat(t.updated_at) < now - timedelta(seconds=t.timeout_seconds * 1.5) and _once(conn, t.id, "escalation", "stalled"):
@@ -33,6 +34,15 @@ def supervise(conn: Connection) -> dict:
                             rationale=f"'{t.title}' has been running {int((now - datetime.fromisoformat(t.updated_at)).total_seconds())}s, past 1.5× its timeout.",
                             event="manager.escalation_created")
             found["stalled"] += 1
+
+    # loops: one running task making the same tool call with the same arguments again and again
+    for t in conn.execute(select(db.tasks).where(db.tasks.c.status == "RUNNING")).fetchall():
+        rep = reliability.repeated_tool_call(conn, t.id)
+        if rep and _once(conn, t.id, "escalation", "looping"):
+            record_decision(conn, decision_type="escalation", subject_type="task", subject_id=t.id, outcome="looping",
+                            rationale=f"'{t.title}' has called {rep[0]} with the same arguments {rep[1]} times. It may be stuck in a loop.",
+                            event="manager.loop_detected", org_id=t.organization_id)
+            found["looping"] += 1
 
     for m in conn.execute(select(db.missions).where(db.missions.c.paused == 1)).fetchall():
         if m.pause_reason and "budget" in m.pause_reason.lower() and _once(conn, m.id, "budget_enforcement", "suspended"):
@@ -46,7 +56,8 @@ def supervise(conn: Connection) -> dict:
                         .join(db.opportunities, db.opportunities.c.id == db.missions.c.opportunity_id)
                         .where(db.tasks.c.key == "scaffold", db.tasks.c.status == "COMPLETED")).fetchall()
     for r in rows:
-        if conn.execute(select(db.goal_checkpoints.c.id).where(db.goal_checkpoints.c.mission_id == r.mission_id)).first():
+        if conn.execute(select(db.goal_checkpoints.c.id).where(db.goal_checkpoints.c.mission_id == r.mission_id,
+                                                           db.goal_checkpoints.c.status.in_(["drift", "on_track"]))).first():
             continue
         spec, out = r.spec or {}, r.outputs or {}
         issues = []

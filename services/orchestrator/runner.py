@@ -24,6 +24,7 @@ from services.model_gateway.gateway import ModelGateway, ModelRequest, ProviderE
 from services.tools.registry import ToolContext
 
 from services.management.hierarchy import submit_report
+from services.management import reliability
 
 from . import ops
 from .handlers import HANDLERS, NeedsApproval, SkipTask, TaskEnv, TaskError, VerificationFailed
@@ -371,6 +372,19 @@ class MissionRunner:
 
     def _retry_or_fail(self, conn, task, error: str, verify_failed: bool, agent_id: str, mode: str) -> None:
         cur = conn.execute(select(db.tasks).where(db.tasks.c.id == task.id)).first()
+        impl = conn.execute(select(db.tasks).where(db.tasks.c.mission_id == self.mission_id, db.tasks.c.key == "implement")).first()
+        gate = impl if verify_failed and impl else cur
+        repeated = reliability.repeating_failure(conn, task.id) if gate.attempt < gate.max_attempts else None
+        if repeated:  # stall counter: the same failure twice in a row, so another identical retry would only burn budget
+            from services.management.manager import record_decision
+            ops.set_task_status(conn, task.id, "FAILED",
+                                error=f"{reliability.LOOP_PREFIX} {reliability.STALL_LIMIT} times: {reliability._short(repeated)}")
+            ops.set_agent_state(conn, agent_id, "FAILED", self.mission_id, mode)
+            record_decision(conn, decision_type="escalation", subject_type="task", subject_id=task.id, outcome="loop_stopped",
+                            rationale=f"'{task.title}' failed the same way {reliability.STALL_LIMIT} times in a row "
+                                      f"(\"{reliability._short(repeated)}\"). Retries stopped; it needs a different approach.",
+                            event="manager.loop_detected", org_id=cur.organization_id)
+            return
         if verify_failed:
             impl = conn.execute(select(db.tasks).where(db.tasks.c.mission_id == self.mission_id, db.tasks.c.key == "implement")).first()
             try:
@@ -419,6 +433,8 @@ class MissionRunner:
         with transaction() as conn:
             mode = ops.mission_row(conn, self.mission_id).execution_mode
             ops.set_mission_status(conn, self.mission_id, "COMPLETED", outcome=outcome)
+            reliability.check_objective(conn, self.mission_id)
+            reliability.learn_from_mission(conn, self.mission_id)
             self._send_agents_home(conn, mode)
 
     def _fail(self, reason: str) -> None:
@@ -435,6 +451,7 @@ class MissionRunner:
                 ops.set_mission_status(conn, self.mission_id, "CANCELLED", failure_reason=reason)
             else:
                 ops.set_mission_status(conn, self.mission_id, "FAILED", failure_reason=reason)
+            reliability.learn_from_mission(conn, self.mission_id)
             self._send_agents_home(conn, m.execution_mode)
 
     def _wind_down(self, reason: str) -> None:

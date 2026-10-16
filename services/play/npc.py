@@ -184,6 +184,23 @@ _RESEARCH = re.compile(_LEAD + r"(?:research|investigate|look\s+into|find\s+out\
 _BUILD = re.compile(_LEAD + r"(?:build|fix|add|change|implement|create|make|update|refactor|write|improve|repair)\b")
 
 
+# Asking beats guessing: proceeding on a wrong assumption is about 12% of multi-agent failures (MAST FM-2.2). A request
+# too vague to act on gets a question back, never a proposal built on a guess.
+_VAGUE = {"it", "this", "that", "these", "those", "thing", "things", "stuff", "something", "anything", "everything", "some",
+          "the", "a", "an", "my", "our", "bug", "bugs", "issue", "issues", "problem", "problems", "app", "apps", "code", "better",
+          "faster", "nicer", "good", "work", "working", "ideas", "idea", "market", "markets", "products", "product", "trends",
+          "money", "more", "up", "again", "now", "please", "me", "for", "of", "to", "and", "all", "whole", "there", "here"}
+_BUILD_VERB = re.compile(_LEAD + r"(?:build|fix|add|change|implement|create|make|update|refactor|write|improve|repair)\b\s*")
+
+
+def _content_words(text: str) -> list[str]:
+    return [w for w in re.findall(r"[a-z0-9][a-z0-9'+-]*", text.lower()) if w not in _VAGUE]
+
+
+def _names_source(text: str) -> bool:
+    return bool(re.search(r"app\s*store|apple|etsy|depop", text))
+
+
 def _source(text: str, agent_key: str) -> str:
     if "depop" in text:
         return "depop"
@@ -211,9 +228,13 @@ def _research(conn: Connection, org: str, user: str, agent, text: str, q: str) -
     if agent.key not in RESEARCHERS | MANAGERS:
         return Reply("Research is the Observatory's job. Lumen, Pip or Wren at the Research Observatory can take it.")
     query = _clean_query(q)
-    if len(query) < 2:
-        return Reply("What should I research? For example: \"research budgeting apps\" or \"research handmade candles on Etsy\".",
-                     suggestions=["Research budgeting apps"])
+    if len(query) < 2 or not _content_words(query):
+        return Reply("What should I research, exactly? Name a kind of app or product, for example \"budgeting apps\" or "
+                     "\"handmade candles on Etsy\". I'd rather ask than guess.",
+                     suggestions=["Research budgeting apps", "Research handmade candles on Etsy"])
+    if agent.key in MANAGERS and not _names_source(text):
+        return Reply(f"Where should the team look for \"{query}\": the App Store charts (apps) or Etsy (handmade products)?",
+                     suggestions=[f"Research {query} on the App Store", f"Research {query} on Etsy"])
     source = _source(text, agent.key)
     where = {"apple_charts": "the App Store charts", "etsy": "Etsy", "depop": "Depop"}[source]
     summary = f"Start market research on \"{query}\" using {where} (US)."
@@ -227,8 +248,10 @@ def _build(conn: Connection, org: str, user: str, agent, raw: str) -> Reply:
     if agent.key not in BUILDERS | MANAGERS:
         return Reply("Software changes happen at the Code Forge. Kade or Orin there can take that on.")
     prompt = raw.strip()
-    if len(prompt) < 8:
-        return Reply("Tell me a bit more: what should change, and where?")
+    if len(prompt) < 8 or len(_content_words(_BUILD_VERB.sub("", prompt.lower(), count=1))) < 2:
+        return Reply("Before I start: which part should change, and what should it do afterwards? For example: \"fix the median "
+                     "function so even-length lists average the middle pair\". I'd rather ask than build the wrong thing.",
+                     suggestions=["Fix the median function so even-length lists average the middle pair"])
     summary = f"Create a software-change mission: \"{prompt[:160]}{'…' if len(prompt) > 160 else ''}\""
     prop = _propose(conn, org=org, user=user, agent=agent, kind="create_mission", params={"prompt": prompt[:4000]}, summary=summary)
     return Reply("I can take that on as a mission: the architect inspects the repository, QA reproduces the problem, I make the change "

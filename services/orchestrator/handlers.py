@@ -16,6 +16,7 @@ from sqlalchemy import select
 from services.core import db
 from services.core.events import emit, transaction
 from services.knowledge import kb
+from services.management import reliability
 from services.memory.store import remember
 from services.model_gateway.gateway import ModelGateway, ModelRequest, ProviderError
 from services.tools.registry import ToolContext, ToolDenied, ToolFailed, execute_tool
@@ -94,8 +95,14 @@ class TaskEnv:
         system = SYSTEM_BASE
         with db.get_engine().connect() as conn:  # pull the company knowledge (docs and skills) that fits this task
             knowledge, used = kb.context_for(conn, self.ctx.org_id, prompt)
+            lessons = reliability.lessons_for(conn, self.agent.id, self.task.key)
+        if lessons:  # the agent's own cited lessons from earlier runs (services/management/reliability.py)
+            system = f"{system}\n\n{reliability.lessons_prompt(lessons)}"
+            with transaction() as conn:
+                emit(conn, "agent.lessons_recalled", mission_id=self.mission.id, agent_id=self.agent.id,
+                     execution_mode=self.mission.execution_mode, payload={"memory_ids": [l["id"] for l in lessons]})
         if knowledge:
-            system = f"{SYSTEM_BASE}\n\n{knowledge}"
+            system = f"{system}\n\n{knowledge}"
             with transaction() as conn:
                 emit(conn, "knowledge.consulted", mission_id=self.mission.id, agent_id=self.agent.id, execution_mode=self.mission.execution_mode,
                      payload={"titles": used, "automatic": True})

@@ -239,6 +239,7 @@ struct MissionDetailView: View {
                 Text(mission.executionMode == "simulation" ? "Simulation: no AI model connected, so this run is a rehearsal." : "Live run")
                     .font(.caption).foregroundStyle(.secondary)
                 if let f = mission.failureReason { Text(f).font(.caption).foregroundStyle(Theme.bad) }
+                if let o = detail?.get("objective") { ObjectiveRow(objective: o) }
             }
             Section("Steps") {
                 ForEach(detail?.get("tasks")?.list ?? []) { t in

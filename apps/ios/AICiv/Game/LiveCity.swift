@@ -781,6 +781,14 @@ struct AgentStatusSheet: View {
                     if !done.isEmpty {
                         Section("Recently") { ForEach(Array(done)) { t in Text("\(t.s("title")) · \(t.s("status").lowercased())").font(.caption) } }
                     }
+                    let lessons = d.get("lessons")?.list ?? []
+                    if !lessons.isEmpty {
+                        Section {
+                            ForEach(lessons) { l in Text(l.s("lesson")).font(.caption) }
+                        } header: { Text("What I've learned") } footer: {
+                            Text("Written from my own task runs; each cites the run it came from. Hints, not facts.")
+                        }
+                    }
                     let msgs = (d.get("messages")?.list ?? []).prefix(3)
                     if !msgs.isEmpty {
                         Section("Said lately") { ForEach(Array(msgs)) { m in Text(m.s("body")).font(.caption).lineLimit(3) } }

@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, insert, select, update
 
+from services.management import reliability
 from services.core import db
 from services.core.auth import Principal, authenticate, mutation_limiter
 from services.core.config import get_settings, load_districts, load_seed
@@ -118,6 +119,9 @@ app.include_router(factories_router)
 from services.api.play import router as play_router  # noqa: E402
 
 app.include_router(play_router)
+from services.api.insights import router as insights_router  # noqa: E402
+
+app.include_router(insights_router)
 # AICIV_ALLOW_LAN_ORIGINS=1 (set by scripts/run-local.sh when serving your phone): also accept the city page served from
 # this computer's private-network address on port 3000 (Wi-Fi, Personal Hotspot 172.20.10.x / 192.0.0.x, .local names).
 LAN_ORIGIN_RX = (r"^http://(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.0\.0\.\d{1,3}"
@@ -355,8 +359,9 @@ def get_mission(mission_id: str, p: Principal = Depends(principal)):
                                          db.artifacts.c.created_at).where(db.artifacts.c.mission_id == mission_id)))
         approvals = _rows(conn.execute(select(db.approvals).where(db.approvals.c.mission_id == mission_id)))
         usage = _rows(conn.execute(select(db.usage_records).where(db.usage_records.c.mission_id == mission_id)))
+        objective = reliability.objective_for(conn, mission_id)
     return {"mission": dict(m._mapping), "tasks": tasks, "dependencies": deps, "task_runs": runs, "messages": msgs,
-            "tool_executions": tools, "artifacts": arts, "approvals": approvals, "usage": usage}
+            "tool_executions": tools, "artifacts": arts, "approvals": approvals, "usage": usage, "objective": objective}
 
 
 @app.post("/api/missions/{mission_id}/cancel")
@@ -471,8 +476,9 @@ def get_agent(agent_id: str, p: Principal = Depends(principal)):
         audit = _rows(conn.execute(select(db.events.c.sequence, db.events.c.event_type, db.events.c.occurred_at, db.events.c.payload,
                                           db.events.c.execution_mode).where(db.events.c.agent_id == agent_id)
                                    .order_by(db.events.c.sequence.desc()).limit(50)))
+        lessons = reliability.lessons_for(conn, agent_id, limit=5)
     return {"agent": {**dict(a._mapping), "tools": sorted(caps), "position": dict(pos._mapping) if pos else None},
-            "tasks": tasks, "tool_executions": tools, "messages": msgs, "audit": audit,
+            "tasks": tasks, "tool_executions": tools, "messages": msgs, "audit": audit, "lessons": lessons,
             "usage": {"estimated_cost_usd": round(float(usage[0]), 6), "input_tokens": int(usage[1]), "output_tokens": int(usage[2]),
                       "is_estimate": True}}
 

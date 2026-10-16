@@ -83,6 +83,10 @@ enum FeedText {
         case "release.invalidated": return (who, "Approval cancelled: \(s("reason"))")
         case "release.executed": return (who, "Released to the local release channel")
         case "approval.requested": return (who, "Asks for approval: \(s("summary"))")
+        case "manager.loop_detected": return (who, "Loop caught: \(s("rationale"))")
+        case "mission.objective_checked":
+            return (who, p.get("met")?.bool == true ? "Objective check: met" : "Objective check: not met")
+        case "agent.lesson_learned": return (who, "Learned: " + s("lesson").replacingOccurrences(of: "Lesson: ", with: ""))
         default: return (who, Format.human(e.eventType.replacingOccurrences(of: ".", with: " ")))
         }
     }
