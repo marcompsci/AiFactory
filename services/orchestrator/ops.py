@@ -133,6 +133,11 @@ def check_budget(conn: Connection, mission_id: str, agent_id: str, org_id: str) 
                                   .where(db.agents.c.department_id == dept.id, db.usage_records.c.created_at >= day)).scalar() or 0.0
         if dept_spent >= dept.daily_budget_usd:
             raise BudgetExceeded(f"{dept.name} daily budget ${dept.daily_budget_usd:.2f} reached (estimated)")
+    from services.management import charter  # the owner's stricter rules (services/management/charter.py)
+    broken = charter.budget_violation(conn, org_id=org_id, agent_id=agent_id, agent_name=agent.name,
+                                      mission_budget=m.budget_usd, mission_spent=m.spent_usd_estimated)
+    if broken:
+        raise BudgetExceeded(broken)
 
 
 def record_usage(conn: Connection, *, org_id: str, mission_id: str, agent_id: str, provider: str, model: str,

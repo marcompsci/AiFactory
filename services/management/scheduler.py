@@ -15,9 +15,10 @@ from typing import Callable
 from sqlalchemy import select, update
 
 from services.core import db
-from services.core.events import transaction
+from services.core.events import ORG_ID, transaction
 from services.logistics import service as logistics
 
+from . import charter
 from .pipeline import Pipeline
 from .supervisor import supervise
 
@@ -83,7 +84,9 @@ class Scheduler(threading.Thread):
             if not (due or (force and key != "supervisor")):
                 continue
             try:
-                res = fn()
+                with db.get_engine().connect() as conn:
+                    waits = charter.job_waits(conn, key, ORG_ID)
+                res = {"waiting": "quiet hours (your charter)"} if waits else fn()
             except Exception as exc:  # recorded on the job row; the next run retries
                 log.exception("job %s failed", key)
                 res = {"error": str(exc)[:300]}

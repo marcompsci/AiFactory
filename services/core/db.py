@@ -1179,6 +1179,47 @@ play_proposals = Table(            # an actionable request turned into a structu
     Column("decided_at", String),
 )
 
+# ---------------------------------------------------------------- V6.4 the owner's charter (only the owner amends it)
+charters = Table(                  # one per organization: rules that can only make the built-in safety stricter
+    "charters", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("rules", JSON, nullable=False, default=dict),   # agent_daily_usd, mission_budget_cap_usd, quiet_hours
+    Column("version", Integer, nullable=False, default=0),
+    Column("updated_by", String(36)),
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+charter_amendments = Table(        # append-only history of every change, who made it, and whether it loosened a rule
+    "charter_amendments", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("version", Integer, nullable=False),
+    Column("changed_by", String(36), nullable=False),
+    Column("changes", JSON, nullable=False, default=dict),  # {rule: {"from": old, "to": new}}
+    Column("note", Text, nullable=False, default=""),
+    Column("loosened", Integer, nullable=False, default=0),
+    Column("step_up_method", String),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+# ---------------------------------------------------------------- V6.5 recovery plans (run only on the owner's approval)
+recovery_plans = Table(
+    "recovery_plans", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("mission_id", String(36), nullable=False),        # the mission that failed or stalled
+    Column("failure_mode", String, nullable=False),          # MAST label the plan answers
+    Column("strategy", String, nullable=False),              # retry_later | retry_with_guidance | raise_budget | narrow_scope | none
+    Column("summary", Text, nullable=False),
+    Column("rationale", Text, nullable=False),
+    Column("params", JSON, nullable=False, default=dict),    # what the new mission would be
+    Column("status", String, nullable=False, default="PENDING"),  # PENDING | APPROVED | DECLINED | EXPIRED | SUPERSEDED
+    Column("new_mission_id", String(36)),
+    Column("decided_by", String(36)),
+    Column("decided_at", String),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
 # ---------------------------------------------------------------- the money game: agents compete on *verified* money only
 game_seasons = Table(
     "game_seasons", metadata,

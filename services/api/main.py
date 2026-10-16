@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, insert, select, update
 
-from services.management import reliability
+from services.management import charter, reliability
 from services.core import db
 from services.core.auth import Principal, authenticate, mutation_limiter
 from services.core.config import get_settings, load_districts, load_seed
@@ -122,6 +122,9 @@ app.include_router(play_router)
 from services.api.insights import router as insights_router  # noqa: E402
 
 app.include_router(insights_router)
+from services.api.charter import router as charter_router  # noqa: E402
+
+app.include_router(charter_router)
 # AICIV_ALLOW_LAN_ORIGINS=1 (set by scripts/run-local.sh when serving your phone): also accept the city page served from
 # this computer's private-network address on port 3000 (Wi-Fi, Personal Hotspot 172.20.10.x / 192.0.0.x, .local names).
 LAN_ORIGIN_RX = (r"^http://(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.0\.0\.\d{1,3}"
@@ -317,11 +320,17 @@ def create_mission(body: MissionIn, p: Principal = Depends(operator)):
             raise HTTPException(409, "emergency stop is engaged")
         repo_id = body.repository_id or conn.execute(select(db.repositories.c.id).where(
             db.repositories.c.organization_id == p.organization_id)).scalar()
+        budget = body.budget_usd or s.default_mission_budget_usd
+        cap = charter.rules(conn, p.organization_id).get("mission_budget_cap_usd")
+        if cap is not None and budget > cap:
+            if body.budget_usd:
+                raise HTTPException(422, f"your charter caps a mission's budget at ${cap:.2f}")
+            budget = cap  # the default budget is held to the charter's cap
         mid = db.new_id()
         mode = "live" if s.model_available else "simulation"
         row = dict(id=mid, organization_id=p.organization_id, project_id=seed["project_id"], repository_id=repo_id,
                    title=(body.title or prompt.split(".")[0])[:120], prompt=prompt, status="CREATED", execution_mode=mode,
-                   budget_usd=body.budget_usd or s.default_mission_budget_usd, spent_usd_estimated=0.0,
+                   budget_usd=budget, spent_usd_estimated=0.0,
                    idempotency_key=body.idempotency_key, created_by=p.user_id, paused=0)
         conn.execute(insert(db.missions).values(**row))
         emit(conn, "mission.created", mission_id=mid, execution_mode=mode,
@@ -415,6 +424,10 @@ class BudgetIn(BaseModel):
 def set_budget(mission_id: str, body: BudgetIn, p: Principal = Depends(admin)):
     with transaction() as conn:
         _mission_or_404(conn, mission_id, p)
+        try:
+            charter.check_mission_budget(conn, p.organization_id, body.budget_usd)
+        except charter.CharterError as exc:
+            raise HTTPException(422, str(exc)) from exc
         conn.execute(update(db.missions).where(db.missions.c.id == mission_id).values(budget_usd=body.budget_usd))
     return {"ok": True}
 
