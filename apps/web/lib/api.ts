@@ -135,6 +135,9 @@ export const api = {
     return r.blob();
   },
   overview: () => call<Json>("/api/overview"),
+  failures: (days = 30) => call<Json>(`/api/insights/failures?days=${days}`),
+  lessons: () => call<Json>("/api/insights/lessons"),
+  trace: (id: string) => call<Json>(`/api/insights/missions/${id}/trace`),
   emergencyStop: (engaged: boolean) => call<Json>("/api/emergency-stop", { method: "POST", body: JSON.stringify({ engaged }) }),
 };
 

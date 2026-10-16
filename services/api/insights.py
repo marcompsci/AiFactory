@@ -30,3 +30,17 @@ def lessons(p: Principal = Depends(member)) -> dict:
                               .where(db.agents.c.organization_id == p.organization_id).order_by(db.agents.c.name)).fetchall()
         out = [{"agent_id": a.id, "agent": a.name, "role": a.role, "lessons": reliability.lessons_for(conn, a.id, limit=5)} for a in agents]
     return {"agents": [a for a in out if a["lessons"]], "trust": "hypothesis"}
+
+
+@router.get("/missions/{mission_id}/trace")
+def mission_trace(mission_id: str, p: Principal = Depends(member)) -> dict:
+    """Everything that happened in one mission, in order, with totals per agent (services/management/trace.py)."""
+    from fastapi import HTTPException
+    from sqlalchemy import select
+
+    from services.management.trace import mission_trace as build
+    with db.get_engine().connect() as conn:
+        m = conn.execute(select(db.missions.c.organization_id).where(db.missions.c.id == mission_id)).first()
+        if m is None or m.organization_id != p.organization_id:
+            raise HTTPException(404, "mission not found")
+        return build(conn, mission_id)

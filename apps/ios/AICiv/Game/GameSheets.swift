@@ -241,6 +241,11 @@ struct MissionDetailView: View {
                 if let f = mission.failureReason { Text(f).font(.caption).foregroundStyle(Theme.bad) }
                 if let o = detail?.get("objective") { ObjectiveRow(objective: o) }
             }
+            Section {
+                NavigationLink { MissionTraceView(missionId: mission.id) } label: {
+                    Label("Full trace: every step, tool and AI call", systemImage: "list.bullet.rectangle")
+                }
+            }
             Section("Steps") {
                 ForEach(detail?.get("tasks")?.list ?? []) { t in
                     HStack {

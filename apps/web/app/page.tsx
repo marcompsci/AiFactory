@@ -51,6 +51,12 @@ function App() {
       >
         Play the town
       </a>
+      <a
+        href="/clinic"
+        className="fixed bottom-[calc(var(--sheet-peek)+56px)] right-3 z-30 rounded-full border-2 border-[#f3e9d2] bg-[#191430]/90 px-3 py-1.5 font-pixel text-sm text-[#f3e9d2] lg:bottom-16"
+      >
+        Failure clinic
+      </a>
     </main>
   );
 }

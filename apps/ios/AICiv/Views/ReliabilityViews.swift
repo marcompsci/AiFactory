@@ -137,3 +137,129 @@ struct ObjectiveRow: View {
         }
     }
 }
+
+/// Everything that happened in one mission, in order (GET /api/insights/missions/{id}/trace).
+struct MissionTraceView: View {
+    @Environment(AppState.self) private var app
+    let missionId: String
+    @State private var data: JSONValue?
+    @State private var only: String?
+    @State private var failed = false
+
+    struct Kind: Identifiable {
+        let id: String
+        let label: String
+        let color: Color
+    }
+
+    static let kinds: [Kind] = [
+        Kind(id: "step", label: "Steps", color: Theme.cyan), Kind(id: "tool", label: "Tools", color: Color(hex: 0x8FA8FF)),
+        Kind(id: "model", label: "AI calls", color: Color(hex: 0xA66BFF)), Kind(id: "message", label: "Messages", color: Color(hex: 0x9CC8FF)),
+        Kind(id: "approval", label: "Approvals", color: Theme.gold), Kind(id: "decision", label: "Manager", color: Theme.warn),
+        Kind(id: "check", label: "Checks", color: Theme.ok), Kind(id: "lesson", label: "Lessons", color: Color(hex: 0x9CC8FF)),
+        Kind(id: "mission", label: "Mission", color: Theme.ink),
+    ]
+
+    var body: some View {
+        List {
+            if let d = data {
+                let t = d.get("totals")
+                Section {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 10) {
+                        stat("Time", Self.duration(t?.get("wall_ms")?.int))
+                        stat("AI cost (est.)", String(format: "$%.4f", t?.get("cost_usd")?.double ?? 0))
+                        stat("Tool calls", "\(t?.get("tool_calls")?.int ?? 0)")
+                        stat("Failed steps", "\(t?.get("failed_steps")?.int ?? 0)")
+                    }
+                }
+                let per = d.get("by_agent")?.list ?? []
+                if !per.isEmpty {
+                    Section("By agent") {
+                        ForEach(Array(per.enumerated()), id: \.offset) { _, a in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(a.s("agent")).bold()
+                                Text("\(a.get("steps")?.int ?? 0) steps · \(a.get("tool_calls")?.int ?? 0) tools · \(a.get("model_calls")?.int ?? 0) AI calls · busy \(Self.duration(a.get("busy_ms")?.int))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Section {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            chip(nil, "All")
+                            ForEach(Self.kinds) { k in chip(k.id, k.label) }
+                        }
+                    }
+                    let items = (d.get("items")?.list ?? []).filter { only == nil || $0.s("kind") == only }
+                    ForEach(Array(items.prefix(400).enumerated()), id: \.offset) { _, i in row(i) }
+                } header: { Text("Timeline") } footer: { Text("AI costs are the gateway's estimates.") }
+            } else if failed {
+                Text(app.connection == .live ? "Couldn't load the trace." : "Connect to your Mac and sign in to see the trace.").foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+            }
+        }
+        .navigationTitle("Trace")
+        .task {
+            do { data = try await app.api?.json("/api/insights/missions/\(missionId)/trace"); failed = data == nil } catch { failed = true }
+        }
+    }
+
+    private func stat(_ k: String, _ v: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(k).font(.caption2).foregroundStyle(.secondary)
+            Text(v).font(Pixel.mono(14))
+        }
+    }
+
+    private func chip(_ kind: String?, _ label: String) -> some View {
+        Button { only = kind } label: {
+            Text(label).font(.caption).padding(.horizontal, 8).padding(.vertical, 4)
+                .background(only == kind ? Theme.cyan : Color(hex: 0x141B33), in: Capsule())
+                .foregroundStyle(only == kind ? Theme.ground : Theme.ink)
+        }.buttonStyle(.plain)
+    }
+
+    private func row(_ i: JSONValue) -> some View {
+        let kind = Self.kinds.first { $0.id == i.s("kind") }
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Circle().fill(kind?.color ?? .gray).frame(width: 7, height: 7)
+                Text(i.s("title")).font(.subheadline.bold()).lineLimit(2)
+                Spacer()
+                if !i.s("status").isEmpty {
+                    Text(i.s("status").lowercased()).font(.caption2).foregroundStyle(i.s("status") == "FAILED" ? Theme.bad : .secondary)
+                }
+            }
+            let meta = [Self.time(i.s("at")), i.s("agent"), Self.duration(i.get("duration_ms")?.int),
+                        i.get("cost_usd")?.double.map { String(format: "$%.4f", $0) } ?? ""].filter { !$0.isEmpty }
+            Text(meta.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary)
+            if !i.s("detail").isEmpty { Text(i.s("detail")).font(Pixel.mono(10)).foregroundStyle(.secondary).lineLimit(4) }
+        }
+    }
+
+    static func duration(_ ms: Int?) -> String {
+        guard let ms else { return "" }
+        if ms < 1000 { return "\(ms) ms" }
+        if ms < 60_000 { return String(format: "%.1f s", Double(ms) / 1000) }
+        return "\(ms / 60_000) min \((ms % 60_000) / 1000) s"
+    }
+
+    static func time(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter.flexible(iso) else { return "" }
+        return d.formatted(date: .omitted, time: .standard)
+    }
+}
+
+extension ISO8601DateFormatter {
+    /// Server timestamps carry microseconds; the formatter reads at most milliseconds.
+    static func flexible(_ raw: String) -> Date? {
+        let s = raw.replacingOccurrences(of: #"(\.\d{3})\d+"#, with: "$1", options: .regularExpression)
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: s)
+    }
+}

@@ -152,6 +152,15 @@ function MissionDetail({ id, onBack }: { id: string; onBack: () => void }) {
         </div>
         {m.failure_reason ? <p className="text-sm text-bad">{m.failure_reason}</p> : null}
         {m.outcome ? <p className="text-sm text-ink-2">Outcome: {human(m.outcome)}</p> : null}
+        {d.objective ? (
+          <p className={`text-sm ${d.objective.met ? "text-ok" : "text-warn"}`}>
+            {d.objective.met ? "Objective met" : d.objective.status === "objective_partly_met" ? "Objective partly met" : "Objective not met"}
+            {!d.objective.met ? `: ${(d.objective.findings as string[]).join("; ")}` : ""}
+          </p>
+        ) : null}
+        <a href={`/trace?m=${m.id}`} className="text-xs text-cyan">
+          Full trace: every step, tool and AI call →
+        </a>
         {!terminal ? (
           <div className="flex gap-2">
             {m.paused ? (

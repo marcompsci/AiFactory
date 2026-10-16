@@ -135,3 +135,20 @@ def test_vague_requests_get_a_question_not_a_proposal(client):
     # a clear request still becomes a proposal, even a short one
     assert say(client, KADE, "fix the login bug")["proposal"]["kind"] == "create_mission"
     assert say(client, KADE, "fix the median function so even-length lists average the middle pair")["proposal"]["kind"] == "create_mission"
+
+
+def test_mission_trace_orders_everything_with_totals(client):
+    mid = start(client)
+    a = pending_approval(client, mid)
+    client.post(f"/api/approvals/{a['id']}/grant")
+    wait_for(lambda: mission_status(client, mid)["status"] == "COMPLETED")
+    tr = client.get(f"/api/insights/missions/{mid}/trace").json()
+    kinds = {i["kind"] for i in tr["items"]}
+    assert {"mission", "step", "tool", "message", "approval", "check"} <= kinds
+    ats = [i["at"] for i in tr["items"]]
+    assert ats == sorted(ats) and tr["items"][0]["title"].startswith("Mission created")
+    assert tr["totals"]["tool_calls"] == len([i for i in tr["items"] if i["kind"] == "tool"]) > 0
+    assert tr["totals"]["wall_ms"] is not None and tr["cost_is_estimate"] is True
+    assert tr["by_agent"] and all(x["agent"] for x in tr["by_agent"])
+    assert any(i["kind"] == "approval" and i["status"] != "PENDING" for i in tr["items"])  # the grant is on the timeline
+    assert client.get("/api/insights/missions/00000000-0000-4000-8000-000000000999/trace").status_code == 404
