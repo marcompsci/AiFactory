@@ -206,3 +206,41 @@ def decline(pid: str, p: Principal = Depends(operator)):
         conn.execute(update(db.play_proposals).where(db.play_proposals.c.id == pid).values(status="DECLINED", decided_at=db.utcnow()))
         _say(conn, p, pr.agent_id, "npc", "Okay, I won't do that.", pid)
     return {"status": "DECLINED"}
+
+
+@router.get("/districts/{district}")
+def district_activity(district: str, p: Principal = Depends(member)):
+    """What's happening in one building right now, from the records: tasks in progress there, who's inside, and
+    packages coming and going. Read-only."""
+    from services.core.config import load_districts
+
+    if district not in {d["id"] for d in load_districts()}:
+        raise HTTPException(404, "unknown district")
+    org = p.organization_id
+    with db.get_engine().connect() as conn:
+        tasks = [dict(r._mapping) for r in conn.execute(
+            select(db.tasks.c.id, db.tasks.c.title, db.tasks.c.status, db.tasks.c.updated_at, db.tasks.c.agent_id,
+                   db.missions.c.id.label("mission_id"), db.missions.c.title.label("mission"), db.missions.c.execution_mode,
+                   db.agents.c.name.label("agent"))
+            .join(db.missions, db.missions.c.id == db.tasks.c.mission_id)
+            .join(db.agents, db.agents.c.id == db.tasks.c.agent_id)
+            .where(db.tasks.c.organization_id == org, db.tasks.c.district == district,
+                   db.tasks.c.status.in_(("PENDING", "RUNNING", "WAITING_FOR_APPROVAL")),
+                   db.missions.c.status.notin_(("COMPLETED", "FAILED", "CANCELLED")))
+            .order_by(db.tasks.c.updated_at.desc()).limit(20))]
+        recent = [dict(r._mapping) for r in conn.execute(
+            select(db.tasks.c.title, db.tasks.c.status, db.tasks.c.updated_at, db.agents.c.name.label("agent"))
+            .join(db.agents, db.agents.c.id == db.tasks.c.agent_id)
+            .where(db.tasks.c.organization_id == org, db.tasks.c.district == district, db.tasks.c.status.in_(("COMPLETED", "FAILED")))
+            .order_by(db.tasks.c.updated_at.desc()).limit(5))]
+        present = [dict(r._mapping) for r in conn.execute(
+            select(db.agents.c.id, db.agents.c.name, db.agents.c.role, db.agents.c.execution_state)
+            .join(db.agent_positions, db.agent_positions.c.agent_id == db.agents.c.id)
+            .where(db.agents.c.organization_id == org, db.agent_positions.c.district == district).order_by(db.agents.c.name))]
+        pk = db.logistics_packages.c
+        packages = [dict(r._mapping) for r in conn.execute(
+            select(pk.id, pk.package_type, pk.status, pk.origin_district, pk.destination_district, pk.eta)
+            .where(pk.organization_id == org, pk.status.in_(("QUEUED", "IN_TRANSIT", "ARRIVED", "DELIVERY_FAILED")),
+                   (pk.origin_district == district) | (pk.destination_district == district))
+            .order_by(pk.created_at.desc()).limit(10))]
+    return {"district": district, "tasks": tasks, "recent": recent, "agents": present, "packages": packages}

@@ -54,6 +54,10 @@ jobs:
             sleep 14
             xcrun simctl io "$UDID" screenshot "shots/$spot.png"
           done
+          xcrun simctl terminate "$UDID" ai.civilization.app || true
+          xcrun simctl launch "$UDID" ai.civilization.app -screenshots YES -startTab home
+          sleep 14
+          xcrun simctl io "$UDID" screenshot "shots/home-city.png"
       - name: Publish the screenshots (branch ios-screenshots, never main)
         if: always() && github.event_name != 'pull_request'
         working-directory: apps/ios

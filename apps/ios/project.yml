@@ -21,6 +21,9 @@ targets:
       # the agents' looks ship with the app, so the town has its cast before you connect
       - path: ../../packages/shared-types/seed/agents.json
         buildPhase: resources
+      # the city's districts too, so the home screen's 3D city draws before you connect
+      - path: ../../packages/world-engine/src/districts.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.civilization.app

@@ -83,3 +83,12 @@ def test_expired_offers_cannot_be_confirmed(client):
         conn.execute(update(db.play_proposals).values(expires_at="2000-01-01T00:00:00+00:00"))
     assert client.post(f"/api/play/proposals/{prop['id']}/confirm").status_code == 409
     assert client.get("/api/missions").json()["missions"] == []
+
+
+def test_district_activity_shows_work_in_progress(client):
+    m = client.post("/api/missions", json={"prompt": "Fix the failing test in the sample repo"}).json()
+    wait_for(lambda: client.get(f"/api/missions/{m['id']}").json()["tasks"])
+    forge = client.get("/api/play/districts/code-forge").json()
+    assert {a["name"] for a in forge["agents"]} >= {"Kade", "Orin"}
+    assert all(t["mission_id"] == m["id"] for t in forge["tasks"])
+    assert client.get("/api/play/districts/moon").status_code == 404

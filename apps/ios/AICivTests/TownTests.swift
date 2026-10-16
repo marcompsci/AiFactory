@@ -117,6 +117,16 @@ final class TownTests: XCTestCase {
         XCTAssertTrue(Roster.bundled.contains { $0.name == "Lumen" && $0.avatar.look != nil })
     }
 
+    func testBundledDistrictsBuildTheHomeCity() {
+        XCTAssertEqual(Roster.districts.count, 11)
+        XCTAssertTrue(Roster.districts.contains { $0.id == "nexus-spire" && $0.architecture == "spire" })
+        let city = CityScene()
+        city.sync(districts: Roster.districts, agents: Roster.bundled, live: false, packages: [], serverOffset: 0)
+        for d in Roster.districts { XCTAssertNotNil(city.scene.rootNode.childNode(withName: "district:\(d.id)", recursively: false), d.id) }
+        XCTAssertEqual(city.scene.rootNode.childNodes.filter { $0.name?.hasPrefix("agent:") == true }.count, Roster.bundled.count)
+        XCTAssertEqual(city.scene.rootNode.childNodes.filter { $0.name == "belt" }.count, 10)
+    }
+
     func testShadeMatchesTheWebFormula() {
         XCTAssertEqual(shade("#808080", -0.5), "#404040")
         XCTAssertEqual(shade("#000000", 0.5), "#808080")

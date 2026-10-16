@@ -17,7 +17,7 @@ struct HomeView: View {
                         if why.contains("Sign in") { SignInCard() } else { RetryCard(message: why) }
                     }
                     stats
-                    TownPreview()
+                    LiveCityView()
                         .pixelPanel()
                     activity
                     conveyor
