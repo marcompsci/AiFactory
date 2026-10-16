@@ -52,6 +52,8 @@ struct Agent: Codable, Identifiable, Hashable {
     let tier: String?
     let district: String?
     let supervisorAgentId: String?
+    /// STATIONARY | MOVING (from agent_positions); visual only, never a sign of work.
+    var movementState: String? = nil
 }
 
 struct MissionRow: Codable, Identifiable, Hashable {
@@ -96,6 +98,45 @@ struct Snapshot: Codable {
     let opportunities: [OpportunitySummary]?
     let emergencyStopped: Bool
     let executionMode: String
+    var approvals: [ApprovalRow]? = nil
+    var logistics: SnapshotLogistics? = nil
+}
+
+/// A mission step waiting for the owner (approvals table).
+struct ApprovalRow: Codable, Identifiable, Hashable {
+    let id: String
+    let missionId: String
+    let action: String
+    let summary: String
+    let status: String
+}
+
+/// Conveyor packages and the server clock they move by.
+struct SnapshotLogistics: Codable {
+    struct Package: Codable, Hashable {
+        let id: String
+        let packageType: String
+        let status: String
+        let originDistrict: String
+        let destinationDistrict: String
+        let routeStartedAt: String?
+        let eta: String?
+    }
+    let packages: [Package]?
+    let serverTime: String?
+}
+
+enum ISODate {
+    private static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let plain = ISO8601DateFormatter()
+    static func parse(_ s: String?) -> Date? {
+        guard let s else { return nil }
+        return fractional.date(from: s) ?? plain.date(from: s)
+    }
 }
 
 struct OpportunityList: Codable { let opportunities: [OpportunitySummary] }

@@ -14,6 +14,12 @@ final class AppState {
     var districts: [District] = []
     var missions: [MissionRow] = []
     var opportunities: [OpportunitySummary] = []
+    /// Mission steps waiting for the owner, and packages on the conveyor (the town draws both).
+    var approvals: [ApprovalRow] = []
+    var packages: [TownPackage] = []
+    /// server time minus device time, so packages move by the backend's clock
+    var serverOffset: TimeInterval = 0
+    var executionMode: String = ""
     var health: Health?
     var ledger = EventLedger()
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"
@@ -168,11 +174,40 @@ final class AppState {
 
     private func apply(snapshot snap: Snapshot) {
         agents = Dictionary(uniqueKeysWithValues: snap.agents.map { ($0.id, $0) })
+        applyWorld(snap)
         if let d = snap.districts { districts = d }
         missions = snap.missions
         if let opps = snap.opportunities { opportunities = opps }
         ledger.reset(lastSequence: snap.sequence,
                      ownerQueue: (snap.opportunities ?? []).filter { $0.status == "OWNER_APPROVAL" }.map(\.id))
+    }
+
+    private func applyWorld(_ snap: Snapshot) {
+        executionMode = snap.executionMode
+        approvals = (snap.approvals ?? []).filter { $0.status == "PENDING" }
+        if let lg = snap.logistics {
+            if let t = ISODate.parse(lg.serverTime) { serverOffset = t.timeIntervalSinceNow }
+            packages = (lg.packages ?? []).map {
+                TownPackage(id: $0.id, type: $0.packageType, status: $0.status, origin: $0.originDistrict, destination: $0.destinationDistrict,
+                            routeStartedAt: ISODate.parse($0.routeStartedAt), eta: ISODate.parse($0.eta))
+            }
+        }
+    }
+
+    private var worldRefresh: Task<Void, Never>?
+
+    /// Agent states, packages and approvals change with task, package and approval events; re-read them (at most every second).
+    private func refreshWorldSoon(api: APIClient) {
+        guard worldRefresh == nil else { return }
+        worldRefresh = Task {
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            if let snap = try? await api.snapshot() {
+                agents = Dictionary(uniqueKeysWithValues: snap.agents.map { ($0.id, $0) })
+                missions = snap.missions
+                applyWorld(snap)
+            }
+            worldRefresh = nil
+        }
     }
 
     private func run() async {
@@ -223,6 +258,9 @@ final class AppState {
             result = ledger.ingest(missing)
         }
         let types = Set(result.applied.map(\.eventType))
+        if types.contains(where: { $0.hasPrefix("task.") || $0.hasPrefix("package.") || $0.hasPrefix("approval.") || $0.hasPrefix("agent.") || $0.hasPrefix("mission.") }) {
+            refreshWorldSoon(api: api)
+        }
         if !types.isDisjoint(with: ["opportunity.status_changed", "release.owner_approval_requested", "release.authorized", "mission.completed", "mission.created"]) {
             if let list = try? await api.opportunities() { opportunities = list }
             if let snap = try? await api.snapshot() { missions = snap.missions; agents = Dictionary(uniqueKeysWithValues: snap.agents.map { ($0.id, $0) }) }

@@ -10,6 +10,7 @@ struct OwnerTowerView: View {
     var body: some View {
         NavigationStack {
             List {
+                MissionApprovalsSection()
                 FinanceDecisionsSection()
                 Section("App Lab") {
                     NavigationLink { AppLabView() } label: {
@@ -46,6 +47,55 @@ struct OwnerTowerView: View {
             .navigationDestination(for: FinanceRoute.self) { r in FinanceDecisionView(packetId: r.packetId) }
             .refreshable { await app.refresh() }
         }
+    }
+}
+
+/// Mission steps waiting for you (for example, publishing a reviewed change). Only these buttons approve anything.
+struct MissionApprovalsSection: View {
+    @Environment(AppState.self) private var app
+    @State private var busy: String?
+    @State private var error: String?
+    @State private var confirming: ApprovalRow?
+
+    var body: some View {
+        Section {
+            if app.approvals.isEmpty {
+                Text("No mission step is waiting for you.").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(app.approvals) { a in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(a.summary).font(.callout)
+                    Text(a.action).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Approve") { confirming = a }.buttonStyle(.borderedProminent).tint(Theme.ok)
+                        Button("Reject", role: .destructive) { Task { await decide(a, grant: false) } }.buttonStyle(.bordered)
+                    }
+                    .disabled(busy != nil)
+                }
+                .padding(.vertical, 4)
+            }
+            if let error { Text(error).font(.caption).foregroundStyle(Theme.bad) }
+        } header: {
+            Text("Mission steps")
+        } footer: {
+            Text("Closing this screen, walking away from an agent or closing the app never counts as approval.")
+        }
+        .confirmationDialog("Approve this step?", isPresented: Binding(get: { confirming != nil }, set: { if !$0 { confirming = nil } }), titleVisibility: .visible) {
+            if let a = confirming { Button("Approve") { Task { await decide(a, grant: true) } } }
+        } message: {
+            Text(confirming?.summary ?? "")
+        }
+    }
+
+    private func decide(_ a: ApprovalRow, grant: Bool) async {
+        guard let api = app.api else { return }
+        busy = a.id
+        defer { busy = nil }
+        do {
+            try await api.decideApproval(a.id, grant: grant)
+            error = nil
+            await app.refresh()
+        } catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
     }
 }
 

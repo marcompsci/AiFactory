@@ -478,6 +478,9 @@ struct MoreView: View {
                     NavigationLink { KnowledgeView() } label: { Label("Knowledge base", systemImage: "sparkles") }
                     NavigationLink { CompanyView() } label: { Label("Company", systemImage: "person.3") }
                     NavigationLink { ActivityView() } label: { Label("Activity", systemImage: "waveform") }
+                    NavigationLink { CityView().navigationTitle("3D city").navigationBarTitleDisplayMode(.inline) } label: {
+                        Label("3D city (from your Mac)", systemImage: "building.2")
+                    }
                 }
                 Section {
                     NavigationLink { SettingsView() } label: { Label("Settings and sign-in", systemImage: "gear") }

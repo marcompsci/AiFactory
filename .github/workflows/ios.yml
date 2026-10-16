@@ -37,6 +37,30 @@ jobs:
           set -o pipefail
           xcodebuild -project AICiv.xcodeproj -scheme AICiv -destination "id=${{ steps.sim.outputs.udid }}" \
             -derivedDataPath build CODE_SIGNING_ALLOWED=NO test 2>&1 | tee xcodebuild.log
+      - name: Screenshots of the town in the simulator
+        if: always()
+        working-directory: apps/ios
+        run: |
+          set -x
+          UDID="${{ steps.sim.outputs.udid }}"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
+          APP=$(find build/Build/Products -name "AICiv.app" -path "*iphonesimulator*" | head -1)
+          xcrun simctl install "$UDID" "$APP"
+          mkdir -p shots
+          for spot in town plaza nexus-spire data-observatory code-forge; do
+            xcrun simctl terminate "$UDID" ai.civilization.app || true
+            xcrun simctl launch "$UDID" ai.civilization.app -screenshots YES -startTab city -townStart "$spot"
+            sleep 14
+            xcrun simctl io "$UDID" screenshot "shots/$spot.png"
+          done
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: town-screenshots
+          path: apps/ios/shots
+          if-no-files-found: ignore
       - name: Build for device (unsigned)
         working-directory: apps/ios
         run: |

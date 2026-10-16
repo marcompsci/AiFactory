@@ -17,9 +17,11 @@ struct AICivApp: App {
                 .preferredColorScheme(.dark)
                 .tint(Theme.cyan)
                 .task {
-                    Notifier.requestPermission()
+                    // CI screenshot runs (-screenshots YES) skip the permission prompts so the town is visible
+                    let shots = UserDefaults.standard.bool(forKey: "screenshots")
+                    if !shots { Notifier.requestPermission() }
                     app.connect()
-                    app.startFinding()
+                    if !shots { app.startFinding() }
                 }
         }
         .onChange(of: phase) { _, newPhase in
@@ -31,16 +33,18 @@ struct AICivApp: App {
 
 struct RootView: View {
     @Environment(AppState.self) private var app
+    @State private var tab = UserDefaults.standard.string(forKey: "startTab") ?? "home"
 
     var body: some View {
-        TabView {
-            HomeView().tabItem { Label("Home", systemImage: "square.grid.2x2") }
-            CityView().tabItem { Label("City", systemImage: "building.2") }
-            ArenaView().tabItem { Label("Arena", systemImage: "trophy") }
+        TabView(selection: $tab) {
+            HomeView().tabItem { Label("Home", systemImage: "square.grid.2x2") }.tag("home")
+            CityGameView().tabItem { Label("City", systemImage: "gamecontroller.fill") }.tag("city")
+            ArenaView().tabItem { Label("Arena", systemImage: "trophy") }.tag("arena")
             OwnerTowerView()
                 .tabItem { Label("Owner", systemImage: "building.columns") }
-                .badge(app.ownerWaiting)
-            MoreView().tabItem { Label("More", systemImage: "ellipsis.circle") }
+                .badge(app.ownerWaiting + app.approvals.count)
+                .tag("owner")
+            MoreView().tabItem { Label("More", systemImage: "ellipsis.circle") }.tag("more")
         }
     }
 }
