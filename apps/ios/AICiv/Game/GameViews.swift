@@ -180,6 +180,7 @@ struct ConnectBanner: View {
     var body: some View {
         let state: (String, String?, (() -> Void)?)? = {
             if case .failed(let why) = app.connection, why.contains("Sign in") { return ("Your Mac is connected", "Sign in", signIn) }
+            if case .failed(let why) = app.connection { return (why, "Try again", { app.connect() }) }
             if app.connection == .live { return nil }
             if AppState.isLocalhost(app.serverURL) {
                 if let f = app.finder.found.first { return ("Found \(f.name)", "Connect", { app.use(f) }) }

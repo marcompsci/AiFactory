@@ -13,12 +13,11 @@ struct HomeView: View {
             ScrollView {
                 VStack(spacing: 12) {
                     header
-                    if case .failed(let why) = app.connection, why.contains("Sign in") {
-                        SignInCard()
+                    if case .failed(let why) = app.connection {
+                        if why.contains("Sign in") { SignInCard() } else { RetryCard(message: why) }
                     }
                     stats
-                    MiniCityView(selected: $selected)
-                        .frame(height: 300)
+                    TownPreview()
                         .pixelPanel()
                     activity
                     conveyor
@@ -281,6 +280,25 @@ struct DistrictSheet: View {
 }
 
 /// Shown on Home when the server needs a signed-in user.
+/// The connection stopped (for example after too many refused sign-ins): say why and offer the way forward.
+struct RetryCard: View {
+    @Environment(AppState.self) private var app
+    let message: String
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            PixelHeader(text: "Not connected", color: Theme.warn)
+            Text(message).font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Button("Try again") { app.connect() }.buttonStyle(.borderedProminent)
+                Button("Sign in again") { Task { await app.signIn(provider: "google") } }.buttonStyle(.bordered)
+            }
+            if let e = app.authError { Text(e).font(.caption).foregroundStyle(Theme.bad) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixelPanel(Theme.warn.opacity(0.6))
+    }
+}
+
 struct SignInCard: View {
     @Environment(AppState.self) private var app
     var body: some View {

@@ -46,6 +46,7 @@ struct RootView: View {
                 .tag("owner")
             MoreView().tabItem { Label("More", systemImage: "ellipsis.circle") }.tag("more")
         }
+        .onChange(of: app.openTab) { _, t in if let t { tab = t; app.openTab = nil } }
     }
 }
 

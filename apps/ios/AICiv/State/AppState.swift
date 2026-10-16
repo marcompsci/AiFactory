@@ -20,6 +20,8 @@ final class AppState {
     /// server time minus device time, so packages move by the backend's clock
     var serverOffset: TimeInterval = 0
     var executionMode: String = ""
+    /// Set to switch tabs from inside a screen (e.g. the home screen's town preview opens the City tab).
+    var openTab: String?
     var health: Health?
     var ledger = EventLedger()
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"
