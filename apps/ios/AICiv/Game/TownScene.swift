@@ -324,7 +324,7 @@ final class TownScene: SKScene {
         let T = CGFloat(Town.tile)
         // integer device pixels per map pixel, about 15 tiles tall in portrait
         let native = view.contentScaleFactor
-        let tilesTall: CGFloat = size.height > size.width ? 15 : 17
+        let tilesTall: CGFloat = size.height > size.width ? 21 : 13
         let dev = max(2, (size.height * native / (T * tilesTall)).rounded())
         scale = dev / native
         world.setScale(scale)
