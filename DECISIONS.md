@@ -132,3 +132,11 @@ way, the owner authorizes one repository at a time, with step-up.
 Calls go through `codex exec` and `claude -p` rather than reusing plan credentials in our own HTTP client, so each
 plan's sign-in, limits and terms stay with its own tool. Both run text-only (read-only sandbox / no tools). Codex
 usage comes from Codex's own reports; Claude's is an estimate, labeled as such, plus the hard "limit reached" signal.
+
+## D21 — The playable town talks through proposals, not direct actions
+Dialogue is where mistakes are easiest (a stray tap, an ambiguous sentence, a closed tab), so nothing said to an NPC
+acts by itself. A request becomes a stored proposal, and only an explicit Confirm runs it, through the same API
+functions as the rest of the app (same roles, validation, emergency stop, idempotency). NPC understanding is
+keyword-based so replies are predictable and grounded in records; a language model can be added later behind the same
+gate. The town is a 2D canvas inside the web app, so the iPhone gets it through the existing City web view and the
+desktop gets the same build.

@@ -51,7 +51,8 @@ struct CityView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Pixel.sky.ignoresSafeArea())
                 .onAppear { app.startFinding() }
-            } else if let url = URL(string: app.webURL) {
+            } else if let url = URL(string: app.webURL.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/play") {
+                // V6: the City tab is the playable pixel-art town (the 3D city is one tap away in its top bar)
                 let token = Keychain.load() ?? ""
                 CityWebView(url: url, apiURL: app.serverURL, token: token).ignoresSafeArea()
                     .id("\(app.serverURL)|\(app.webURL)|\(app.session?.accessToken.suffix(12) ?? "")")  // reload with a new session

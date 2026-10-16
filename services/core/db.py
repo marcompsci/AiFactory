@@ -1140,6 +1140,45 @@ kb_documents = Table(              # owner/admin write; every member and agent r
     UniqueConstraint("organization_id", "slug"),
 )
 
+# ---------------------------------------------------------------- V6 playable town: the owner's avatar, NPC conversations, proposals
+play_players = Table(              # one row per signed-in user: avatar look and where they stood
+    "play_players", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("user_id", String(36), nullable=False),
+    Column("data", JSON, nullable=False, default=dict),
+    Column("updated_at", String, nullable=False, default=utcnow, onupdate=utcnow),
+    UniqueConstraint("organization_id", "user_id"),
+)
+
+play_messages = Table(             # conversation history with an agent NPC (append-only)
+    "play_messages", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("user_id", String(36), nullable=False),
+    Column("agent_id", String(36), nullable=False, index=True),
+    Column("speaker", String, nullable=False),              # owner | npc
+    Column("text", Text, nullable=False),
+    Column("proposal_id", String(36)),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+play_proposals = Table(            # an actionable request turned into a structured action; runs only on an explicit confirm
+    "play_proposals", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("user_id", String(36), nullable=False),
+    Column("agent_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission
+    Column("params", JSON, nullable=False, default=dict),
+    Column("summary", Text, nullable=False),
+    Column("status", String, nullable=False, default="PENDING"),  # PENDING | CONFIRMED | DECLINED | EXPIRED | FAILED
+    Column("result", JSON),
+    Column("expires_at", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("decided_at", String),
+)
+
 # ---------------------------------------------------------------- the money game: agents compete on *verified* money only
 game_seasons = Table(
     "game_seasons", metadata,

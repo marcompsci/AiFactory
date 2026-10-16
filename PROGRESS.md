@@ -253,3 +253,18 @@ Built in the order the spec gave. The secure fee review workflow came first.
 - Neither CLI has been run against a real plan from here (the build environment has neither signed in); tests use
   stand-in CLIs that speak the documented output formats. First real run happens on the Mac.
 - The Claude meter is an estimate; Anthropic publishes no usage figure for subscriptions.
+
+## V6.0: Playable pixel-art town (first milestone)
+
+- `/play` (and the iPhone City tab): walk your own character around a pixel-art town with WASD, a joystick or tap
+  to walk. Three enterable buildings (Research Observatory, Nexus Spire, Code Forge) with your agents at their desks.
+- Talk to agents in RPG dialogue. Answers come from backend records; requests become proposals that run only on
+  Confirm (research missions, software-change missions, cancel).
+- Agent animations follow backend execution state; packages ride the conveyor by their server route clock; the bell
+  and the Owner's Tower open the approval screen. Your look and position persist.
+- Verified locally end to end in simulation: talk → confirm → research mission → research brief rode the belt to the
+  Nexus Spire; Kade's fix mission → approval on the approval screen → completed.
+- See docs/PLAYABLE_TOWN.md.
+
+### Still open
+- Not yet run on the physical iPhone; other building interiors; Claude Code / Codex session management (see doc).

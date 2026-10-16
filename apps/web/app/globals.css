@@ -203,3 +203,19 @@ body {
   color: var(--c);
   margin-bottom: 2px;
 }
+
+/* V6 playable town: RPG panels with a chunky cream frame, readable over pixel art. */
+.px-panel {
+  background: #191430;
+  border: 3px solid #f3e9d2;
+  box-shadow: 0 0 0 3px #1d1626, 0 10px 30px rgb(0 0 0 / 0.45);
+  border-radius: 10px;
+}
+.px-btn {
+  font-family: var(--font-pixel);
+  border: 2px solid #1d1626;
+  box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.25), 0 2px 0 #1d1626;
+  transition: transform 60ms ease;
+}
+.px-btn:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.25); }
+.font-pixel { font-family: var(--font-pixel); }

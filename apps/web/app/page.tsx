@@ -45,6 +45,12 @@ function App() {
       <DistrictCard />
       <PackageCard />
       <Dock onReconnect={() => setReconnectKey((k) => k + 1)} />
+      <a
+        href="/play"
+        className="fixed bottom-[calc(var(--sheet-peek)+16px)] right-3 z-30 rounded-full border-2 border-[#f3e9d2] bg-[#191430]/90 px-3 py-1.5 font-pixel text-sm text-[#f3e9d2] lg:bottom-6"
+      >
+        Play the town
+      </a>
     </main>
   );
 }

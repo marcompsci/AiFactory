@@ -231,3 +231,13 @@ export const knowledge = {
       call<Json>(`/api/knowledge/upload?${new URLSearchParams({ filename: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name, company })}`,
         { method: "PUT", body: text, headers: { "content-type": "text/markdown" } })),
 };
+
+/** V6 playable town: avatar state, NPC conversations, and proposals that run only on Confirm. */
+export const play = {
+  state: () => call<Json>("/api/play/state"),
+  save: (body: Json) => call<Json>("/api/play/state", { method: "PUT", body: JSON.stringify(body) }),
+  conversation: (agentId: string) => call<{ messages: Json[]; proposals: Record<string, Json> }>(`/api/play/conversations/${agentId}`),
+  talk: (agent_id: string, text: string) => call<Json>("/api/play/talk", post({ agent_id, text })),
+  confirm: (id: string) => call<Json>(`/api/play/proposals/${id}/confirm`, post()),
+  decline: (id: string) => call<Json>(`/api/play/proposals/${id}/decline`, post()),
+};
