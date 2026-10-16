@@ -30,7 +30,7 @@ def supabase(monkeypatch):
     auth._confirmed.clear()
     calls = []
 
-    def fake_urlopen(req, timeout=0):
+    def fake_urlopen(req, timeout=0, context=None):
         calls.append(req)
         bearer = req.headers["Authorization"].split(" ", 1)[1]
         assert req.headers["Apikey"] == "sb_publishable_test" and req.full_url == URL + "/auth/v1/user"
@@ -69,7 +69,7 @@ def test_supabase_refusal_wrong_issuer_and_expiry_are_refused(supabase):
 
 
 def test_supabase_unreachable_is_503_and_never_locks_you_out(supabase, monkeypatch):
-    def down(req, timeout=0):
+    def down(req, timeout=0, context=None):
         raise urllib.error.URLError("no route")
     monkeypatch.setattr("urllib.request.urlopen", down)
     security.auth_failures.clear()

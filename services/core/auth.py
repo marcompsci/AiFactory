@@ -52,6 +52,19 @@ def _token_from(request: Request) -> str | None:
 _jwks: dict[str, "jwt.PyJWKClient"] = {}
 
 
+def _tls():
+    """Certificates for talking to Supabase. Python from python.org on a Mac ships without any (until "Install
+    Certificates" is run), which made every signing-key download fail; certifi's bundle always works."""
+    import ssl
+
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # noqa: BLE001
+        return ssl.create_default_context()
+
+
 def _publishable_key() -> str:
     import os
 
@@ -94,7 +107,7 @@ def confirm_with_supabase(token: str, supabase_url: str, issuer: str | None) -> 
     req = urllib.request.Request(supabase_url.rstrip("/") + "/auth/v1/user",
                                  headers={"apikey": key, "Authorization": f"Bearer {token}", "Accept": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=8) as resp:  # noqa: S310 (fixed https Supabase address from config)
+        with urllib.request.urlopen(req, timeout=8, context=_tls()) as resp:  # noqa: S310 (fixed https Supabase address from config)
             user = json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
         if exc.code in (401, 403):
@@ -134,11 +147,12 @@ def verify_supabase_token(token: str, secret: str, jwks_url: str, issuer: str | 
             return jwt.decode(token, secret, algorithms=["HS256"], **kw)
         if alg not in ("ES256", "RS256") or not jwks_url:
             raise jwt.InvalidTokenError("unsupported token algorithm")
-        client = _jwks.setdefault(jwks_url, jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=600))
+        client = _jwks.get(jwks_url) or _jwks.setdefault(jwks_url, jwt.PyJWKClient(jwks_url, cache_keys=True, lifespan=600, timeout=10, ssl_context=_tls()))
         try:
             key = client.get_signing_key_from_jwt(token).key
-        except jwt.PyJWKClientError:
-            return confirm_with_supabase(token, supabase_url, issuer)  # signing keys unreachable or rotated
+        except jwt.PyJWKClientError as exc:
+            log.warning("couldn't load Supabase signing keys (%s); confirming the sign-in with Supabase instead", exc)
+            return confirm_with_supabase(token, supabase_url, issuer)
         return jwt.decode(token, key, algorithms=[alg], **kw)
     except jwt.ExpiredSignatureError as exc:
         # correctly signed but old: a stale session, not an attack (never counts toward the lockout)
