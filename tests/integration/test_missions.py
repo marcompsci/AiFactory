@@ -268,7 +268,7 @@ def test_missions_run_as_langgraph_threads_with_approval_interrupts(client):
     mid = start(client)
     a = pending_approval(client, mid)
     # the approval row is written a moment before the graph checkpoints its interrupt
-    g = wait_for(lambda: (x := client.get(f"/api/missions/{mid}/graph").json())["next"] == ["await_approval"] and x)
+    g = wait_for(lambda: (x := client.get(f"/api/missions/{mid}/graph").json())["next"] == ["await_approval"] and x["interrupts"] and x)
     assert g["engine"] == "langgraph" and g["thread_id"] == mid
     assert g["next"] == ["await_approval"], g
     assert g["interrupts"] == [{"mission_id": mid, "waiting_for": "approval"}]

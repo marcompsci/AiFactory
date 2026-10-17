@@ -215,9 +215,13 @@ def tick(only: str | None = None) -> dict:
     """Start follow-ons whose first mission completed; cancel those whose first mission failed or was cancelled."""
     L, M = db.mission_links, db.missions
     stale = (datetime.now(timezone.utc) - STALE_STARTING).isoformat()
-    with transaction() as conn:  # a claim the process didn't finish (it stopped mid-start) goes back in line
-        conn.execute(update(L).where(L.c.kind == "followup", L.c.status == "STARTING", L.c.updated_at < stale)
-                     .values(status="WAITING", reason="retrying after an interrupted start", updated_at=db.utcnow()))
+    with db.get_engine().connect() as conn:
+        has_stale = conn.execute(select(L.c.id).where(L.c.kind == "followup", L.c.status == "STARTING", L.c.updated_at < stale)
+                                 .limit(1)).first() is not None
+    if has_stale:  # a claim the process didn't finish (it stopped mid-start) goes back in line
+        with transaction() as conn:
+            conn.execute(update(L).where(L.c.kind == "followup", L.c.status == "STARTING", L.c.updated_at < stale)
+                         .values(status="WAITING", reason="retrying after an interrupted start", updated_at=db.utcnow()))
     with db.get_engine().connect() as conn:
         q = (select(L.c.id, L.c.organization_id, L.c.spec, L.c.created_by, L.c.from_mission_id, M.c.status.label("first"))
              .join(M, M.c.id == L.c.from_mission_id)
