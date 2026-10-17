@@ -171,11 +171,27 @@ enum TownRules {
             let ah = $0.homeDistrict == m.id, bh = $1.homeDistrict == m.id
             return ah != bh ? ah : $0.id < $1.id
         }
+        let spare = standingSpots(m)
         for (i, a) in here.enumerated() {
-            let w = i < m.workstations.count ? m.workstations[i] : Workstation(x: Double(4 + i * 2), y: 10, facing: .down)
+            // more agents than desks: free floor tiles, never inside a wall or furniture
+            let k = i - m.workstations.count
+            let w = i < m.workstations.count ? m.workstations[i] : (k < spare.count ? spare[k] : Workstation(x: 8, y: 10, facing: .down))
             let an = anim(a, talking: talkingTo == a.id)
             let seated = an == .working || an == .coding || an == .researching || an == .testing
             out.append(Placed(agent: a, x: seated ? w.x : w.x + 1, y: seated ? w.y + 0.4 : w.y + 0.6, facing: seated ? w.facing : .down, anim: an))
+        }
+        return out
+    }
+
+    /// Floor tiles for agents without a desk (as Workstations whose "standing" spot is the tile's centre), clear of
+    /// walls, furniture, chairs and the walkway to the door.
+    static func standingSpots(_ m: GameMap) -> [Workstation] {
+        let taken = Set(m.props.filter { !$0.solid }.flatMap { p in (0..<max(1, p.w)).map { (p.y * m.w) + p.x + $0 } })
+        var out: [Workstation] = []
+        for y in stride(from: m.h - 2, through: 2, by: -1) {
+            for x in stride(from: 2, to: m.w - 1, by: 2) where x != m.spawn.x && !m.isSolid(x, y) && !taken.contains(y * m.w + x) {
+                out.append(Workstation(x: Double(x) - 0.5, y: Double(y), facing: .down))
+            }
         }
         return out
     }

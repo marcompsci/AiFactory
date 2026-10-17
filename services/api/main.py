@@ -451,7 +451,11 @@ def set_priority(mission_id: str, body: PriorityIn, p: Principal = Depends(opera
                                                               priority=body.priority, set_by=p.user_id))
         emit(conn, "mission.priority_changed", mission_id=mission_id, execution_mode=m.execution_mode, payload={"priority": body.priority})
     state.worker.reprioritize(mission_id, body.priority)
-    return {"ok": True, "priority": body.priority, "waiting": state.worker.waiting()}
+    waiting = state.worker.waiting()
+    with db.get_engine().connect() as conn:  # only this organization's missions
+        mine = {r.id for r in conn.execute(select(db.missions.c.id).where(db.missions.c.organization_id == p.organization_id,
+                                                                           db.missions.c.id.in_(waiting)))} if waiting else set()
+    return {"ok": True, "priority": body.priority, "waiting": [w for w in waiting if w in mine]}
 
 
 class BudgetIn(BaseModel):

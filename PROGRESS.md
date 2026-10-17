@@ -423,3 +423,5 @@ stuck in action loops). See services/management/reliability.py.
 ### Still open
 - The game's joystick and tap-to-walk still need sight; the Nearby panel is the VoiceOver way to move.
 - Schedules can't yet run "every weekday"; they're daily or one named day a week.
+- Only the owner can create a schedule, and runs act as that owner. The server keeps no list of owners (the role comes
+  from each sign-in), so if ownership changes, delete the old owner's schedules under Owner → Schedules.

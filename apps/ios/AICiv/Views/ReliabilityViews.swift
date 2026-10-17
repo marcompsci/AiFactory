@@ -756,7 +756,7 @@ struct SchedulesView: View {
                             .labelsHidden()
                             .accessibilityLabel(s.get("enabled")?.int == 1 ? "Pause this schedule" : "Resume this schedule")
                     }
-                    Text(s.get("enabled")?.int == 1 ? "Next: \(ForecastView.clock(s.s("next_run_at"))) on \(String(s.s("next_run_at").prefix(10)))" : "Paused")
+                    Text(s.get("enabled")?.int == 1 ? "Next: \(Self.local(s.s("next_run_at")))" : "Paused")
                         .font(.caption).foregroundStyle(.secondary)
                     Text("\(s.get("runs")?.int ?? 0) run(s)" + (s.s("last_error").isEmpty ? "" : " · last try: \(s.s("last_error"))"))
                         .font(.caption2).foregroundStyle(s.s("last_error").isEmpty ? Color.secondary : Theme.warn)
@@ -779,6 +779,12 @@ struct SchedulesView: View {
         loaded = true
     }
 
+    /// The next run in this phone's time zone (the server stores UTC).
+    static func local(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter.flexible(iso) else { return iso }
+        return d.formatted(date: .abbreviated, time: .shortened)
+    }
+
     private func toggle(_ id: String, _ on: Bool) async {
         guard let api = app.api else { return }
         do { _ = try await api.json("/api/schedules/\(id)/enabled", method: "POST", body: ["enabled": .bool(on)]) } catch { message = error.localizedDescription }
@@ -799,6 +805,7 @@ struct PriorityPicker: View {
     let missionId: String
     @State var priority: String
     @State private var note: String?
+    @State private var saved = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -808,7 +815,8 @@ struct PriorityPicker: View {
                 Text("Low").tag("low")
             }
             .pickerStyle(.segmented)
-            .onChange(of: priority) { _, new in Task { await save(new) } }
+            .onChange(of: priority) { _, new in if new != saved { Task { await save(new) } } }
+            .onAppear { if saved.isEmpty { saved = priority } }
             Text(note ?? "When more missions are waiting than can run at once, urgent ones start first.")
                 .font(.caption2).foregroundStyle(.secondary)
         }
@@ -820,6 +828,10 @@ struct PriorityPicker: View {
             let r = try await api.json("/api/missions/\(missionId)/priority", method: "POST", body: ["priority": .string(p)])
             let waiting = r.get("waiting")?.list.count ?? 0
             note = waiting > 0 ? "Saved. \(waiting) mission(s) waiting for a free slot." : "Saved."
-        } catch { note = error.localizedDescription }
+            saved = p
+        } catch {
+            note = error.localizedDescription
+            priority = saved  // show what's really stored
+        }
     }
 }

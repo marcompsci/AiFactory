@@ -55,8 +55,14 @@ def validate(kind: str, params: dict, cadence: str, weekday: int | None, hour: i
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError) as exc:
         raise ScheduleError(f"unknown time zone {tz}") from exc
-    if kind == "market_research" and not (params.get("query") and params.get("source")):
-        raise ScheduleError("research needs a topic and a source")
+    if kind == "market_research":
+        from pydantic import ValidationError
+
+        from services.api.v4 import ResearchIn
+        try:
+            ResearchIn(**params)  # the same check every run will face, so a bad schedule is refused now, not on each run
+        except (ValidationError, TypeError) as exc:
+            raise ScheduleError("research needs a valid topic and source") from exc
 
 
 def create(conn: Connection, *, org_id: str, user_id: str, kind: str, params: dict, cadence: str, weekday: int | None,
@@ -111,11 +117,18 @@ def remove(conn: Connection, org_id: str, sid: str) -> None:
 
 
 def claim_due(conn: Connection, now: datetime | None = None) -> list[dict]:
-    """Due, enabled schedules, each claimed by moving its next run on (so one slot runs once)."""
+    """Due, enabled schedules, each claimed by moving its next run on (so one slot runs once). A schedule whose
+    organization is in quiet hours waits (it isn't claimed) until they end."""
+    from . import charter
     now = now or datetime.now(timezone.utc)
     out = []
+    quiet: dict[str, bool] = {}
     for r in conn.execute(select(db.mission_schedules).where(db.mission_schedules.c.enabled == 1,
                                                              db.mission_schedules.c.next_run_at <= now.isoformat())).fetchall():
+        if r.organization_id not in quiet:
+            quiet[r.organization_id] = charter.quiet_now(charter.rules(conn, r.organization_id), now)
+        if quiet[r.organization_id]:
+            continue
         nxt = next_run(r.cadence, r.weekday, r.hour, r.minute, r.tz, now).isoformat()
         res = conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == r.id,
                                                               db.mission_schedules.c.next_run_at == r.next_run_at)
@@ -158,3 +171,4 @@ def parse(text: str) -> dict | None:
     if m.group("ap") == "am" and hour == 12:
         hour = 0
     return {"cadence": cadence, "weekday": weekday, "hour": hour, "minute": minute, "rest": m.group("rest").strip()}
+

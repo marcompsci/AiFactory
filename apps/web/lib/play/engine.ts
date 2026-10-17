@@ -154,8 +154,10 @@ export function placeAgents(m: GameMap, agents: WorldAgent[], now: number, talki
   }
   const here = agents.filter((a) => a.district === m.id && a.movement !== "MOVING")
     .sort((a, b) => Number(b.homeDistrict === m.id) - Number(a.homeDistrict === m.id) || a.id.localeCompare(b.id));
+  const spare = standingSpots(m);
   here.forEach((a, i) => {
-    const w = m.workstations[i] ?? { x: 4 + i * 2, y: 10, facing: "down" as Dir };
+    // more agents than desks: free floor tiles, never inside a wall or furniture
+    const w = m.workstations[i] ?? spare[i - m.workstations.length] ?? { x: 8, y: 10, facing: "down" as Dir };
     const anim = animFor(a, talkingTo === a.id);
     // at work: seated at the desk, back to you; otherwise standing beside it, facing the room
     const seated = anim === "WORKING" || anim === "CODING" || anim === "RESEARCHING" || anim === "TESTING";
@@ -232,3 +234,14 @@ export const PACKAGE_LABEL: Record<string, string> = {
   release_package: "Release for your review", revision_request: "Revision request", bill_reminder: "Bill reminder",
   payment_proposal: "Payment proposal", purchase_request: "Purchase request", tax_review_package: "Tax review",
 };
+
+/** Floor tiles for agents without a desk, clear of walls, furniture, chairs and the walkway to the door. */
+export function standingSpots(m: GameMap): { x: number; y: number; facing: Dir }[] {
+  const taken = new Set<number>();
+  for (const p of m.props) if (p.solid === false) for (let dx = 0; dx < Math.max(1, p.w ?? 1); dx++) taken.add(p.y * m.w + p.x + dx);
+  const out: { x: number; y: number; facing: Dir }[] = [];
+  for (let y = m.h - 2; y >= 2; y--)
+    for (let x = 2; x < m.w - 1; x += 2)
+      if (x !== m.spawn.x && !isSolid(m, x, y) && !taken.has(y * m.w + x)) out.push({ x: x - 0.5, y, facing: "down" });
+  return out;
+}

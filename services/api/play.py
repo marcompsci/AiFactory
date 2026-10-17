@@ -65,7 +65,7 @@ class PlayerIn(BaseModel):
 class TalkIn(BaseModel):
     agent_id: str = Field(min_length=36, max_length=36)
     text: str = Field(default="", max_length=2000)
-    tz: str = Field(default="UTC", max_length=64, pattern=r"^[A-Za-z_]+(/[A-Za-z0-9_+\-]+)*$")  # the player's time zone, for schedules
+    tz: str = Field(default="UTC", max_length=64)  # the player's time zone, for schedules (unknown zones fall back to UTC)
 
 
 def _agent(conn, agent_id: str, org: str):
@@ -161,11 +161,16 @@ def _run(pr, p: Principal) -> dict:
             m = conn.execute(select(db.missions.c.title, db.missions.c.execution_mode).where(db.missions.c.id == r["mission_id"])).first()
         return {"mission_id": r["mission_id"], "title": m.title, "execution_mode": m.execution_mode}
     if pr.kind == "create_schedule":
+        from services.finance.permissions import require_owner
         from services.management import schedules
-        with transaction() as conn:
-            s = schedules.create(conn, org_id=p.organization_id, user_id=p.user_id, kind=pr.params["kind"], params=pr.params["params"],
-                                 cadence=pr.params["cadence"], weekday=pr.params.get("weekday"), hour=pr.params["hour"],
-                                 minute=pr.params["minute"], tz=pr.params["tz"], title=pr.params["title"])
+        require_owner(p)  # a schedule acts on its own later, so only the owner may set one (the API rule too)
+        try:
+            with transaction() as conn:
+                s = schedules.create(conn, org_id=p.organization_id, user_id=p.user_id, kind=pr.params["kind"], params=pr.params["params"],
+                                     cadence=pr.params["cadence"], weekday=pr.params.get("weekday"), hour=pr.params["hour"],
+                                     minute=pr.params["minute"], tz=pr.params["tz"], title=pr.params["title"])
+        except schedules.ScheduleError as exc:
+            raise HTTPException(422, str(exc)) from exc
         return {"schedule_id": s["id"], "title": s["title"], "when": s["when"], "next_run_at": s["next_run_at"]}
     if pr.kind == "cancel_mission":
         main.cancel(pr.params["mission_id"], p)
@@ -200,6 +205,8 @@ def confirm(pid: str, p: Principal = Depends(operator)):
 
 
 def _done_text(kind: str, r: dict) -> str:
+    if kind == "create_schedule":
+        return f"Scheduled: {r.get('when', '')}. Nothing runs until then; pause or delete it under Owner → Schedules."
     if kind == "cancel_mission":
         return "Done: the mission is cancelled. Anything already running stops at its next step."
     sim = " It's running in simulation because no AI model is connected, so treat its output as a rehearsal." if r.get("execution_mode") == "simulation" else ""

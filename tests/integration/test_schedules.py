@@ -93,3 +93,21 @@ def test_emergency_stop_and_quiet_hours_hold_schedules_and_the_owner_controls_th
     assert client.post("/api/schedules", json={"kind": "fix_failing_test", "cadence": "daily", "hour": 9, "title": "nope"}).status_code == 422
     with db.get_engine().connect() as conn:
         assert conn.execute(select(db.mission_schedules)).first() is None
+
+
+def test_only_the_owner_schedules_and_bad_times_are_refused_up_front(client, monkeypatch):
+    sentry = _agent(client, "qa")
+    assert _talk(client, sentry, "every day at 25 run the tests")["reply"].startswith("I can't schedule that")
+    assert _talk(client, sentry, "check the test results")["proposal"] is None or \
+        _talk(client, sentry, "check the test results")["proposal"]["params"].get("kind") != "run_tests"
+    assert _talk(client, sentry, "run the tests and fix the failing one")["proposal"] is None or \
+        _talk(client, sentry, "run the tests and fix the failing one")["proposal"]["params"].get("kind") != "run_tests"
+    prop = _talk(client, sentry, "every day at 9 run the tests")["proposal"]
+    from fastapi import HTTPException
+
+    def not_owner(p):
+        raise HTTPException(403, "requires role owner")
+    import services.finance.permissions as perms
+    monkeypatch.setattr(perms, "require_owner", not_owner)
+    r = client.post(f"/api/play/proposals/{prop['id']}/confirm").json()
+    assert r["status"] == "FAILED" and client.get("/api/schedules").json()["schedules"] == []

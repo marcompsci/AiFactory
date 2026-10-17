@@ -264,7 +264,7 @@ final class TownScene: SKScene {
         let people = placed.map { pl in
             GameModel.Here(id: pl.agent.id, name: pl.agent.name, detail: "\(pl.agent.role), \(TownRules.statusLabel(pl.agent).lowercased())",
                            steps: Int(hypot(pl.x - p.x, pl.y - p.y).rounded()))
-        }.sorted { $0.steps < $1.steps }
+        }.sorted { $0.name < $1.name }  // a steady order, so rows don't move under VoiceOver focus as people walk
         let places = map.interactables.filter { $0.action != .enter && $0.action != .exit && !$0.id.hasPrefix("door:") }.map { o in
             GameModel.Here(id: o.id, name: o.label, detail: "", steps: Int(hypot(Double(o.x) + 0.5 - p.x, Double(o.y) + 0.5 - p.y).rounded()))
         }.sorted { $0.steps < $1.steps }

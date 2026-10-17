@@ -265,7 +265,8 @@ def _build(conn: Connection, org: str, user: str, agent, raw: str) -> Reply:
                  proposal=prop)
 
 
-_TESTS = re.compile(_LEAD + r"(?:run|check|rerun|re-run)\s+(?:the\s+|all\s+the\s+|all\s+)?(?:tests?|test\s+suite|suite)\b")
+_TESTS = re.compile(_LEAD + r"(?:run|rerun|re-run)\s+(?:the\s+|all\s+the\s+|all\s+)?(?:tests?|test\s+suite|suite)"
+                    r"\s*(?:again|now|please|for\s+me)?[.!?]*$")
 TESTERS = {"qa"}
 BANKERS = {"cfo", "forecaster", "revenue_analyst", "expense_auditor", "savings_strategist", "bill_manager", "tax_agent"}
 
@@ -285,12 +286,15 @@ def _spend(conn: Connection, org: str) -> Reply:
     fc = forecast(conn, org)
     t = fc["total"]
     parts = [f"Estimated AI spend today is ${t['spent']:.2f}" + (f" of a ${t['daily_budget_usd']:.2f} daily budget" if t.get("daily_budget_usd") else "") + "."]
-    if t.get("projected") is not None:
+    if t.get("already_at_cap"):
+        parts.append("That's already the whole daily budget, so new AI work waits until tomorrow or until the budget is raised.")
+    elif t.get("projected") is not None:
         parts.append(f"At today's pace it ends the day around ${t['projected']:.2f}.")
     else:
         parts.append("There aren't enough AI calls yet today to project the rest of the day.")
-    if fc["warnings"]:
-        parts.append("Heading for a cap: " + ", ".join(w["agent"] for w in fc["warnings"][:3]) + ".")
+    soon = [w["agent"] for w in fc["warnings"] if not w.get("already")]
+    if soon:
+        parts.append("Heading for a cap: " + ", ".join(soon[:3]) + ".")
     top = [a for a in fc["agents"] if a["spent"] > 0][:2]
     if top:
         parts.append("Most so far: " + ", ".join(f"{a['agent']} (${a['spent']:.2f})" for a in top) + ".")
@@ -350,6 +354,10 @@ def _schedule(conn: Connection, org: str, user: str, agent, t: str, tz: str) -> 
         ZoneInfo(tz)
     except Exception:
         tz = "UTC"
+    try:
+        schedules.validate(kind, params, sc["cadence"], sc["weekday"], sc["hour"], sc["minute"], tz)
+    except schedules.ScheduleError as exc:
+        return Reply(f"I can't schedule that: {exc}. Try a time like 9am or 18:30.")
     preview = schedules.describe({**sc, "tz": tz})
     title = f"{what[0].upper()}{what[1:]}, {preview}"
     prop = _propose(conn, org=org, user=user, agent=agent, kind="create_schedule",

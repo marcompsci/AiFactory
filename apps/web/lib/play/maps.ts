@@ -275,6 +275,9 @@ export function buildInterior(id: string): GameMap | null {
       m.interactables.push({ id: "money-terminal", x: 8, y: 4, label: "Decision terminal", action: "approvals" });
       desk(m, 3, 5);
       desk(m, 12, 6);
+      desk(m, 15, 6);
+      desk(m, 2, 8);
+      desk(m, 12, 9);
       prop(m, { kind: "table", x: 5, y: 8, w: 3, h: 2 });
       prop(m, { kind: "plant", x: 1, y: 2 });
       prop(m, { kind: "cooler", x: 16, y: 10 });
