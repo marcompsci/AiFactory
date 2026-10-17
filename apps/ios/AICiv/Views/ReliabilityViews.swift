@@ -365,6 +365,10 @@ struct BriefCard: View {
                     if let l = b.get("lessons")?.list.first {
                         Text("\(l.s("agent")) learned: \(l.s("lesson"))").font(.caption).foregroundStyle(.secondary).lineLimit(3)
                     }
+                    ForEach(Array((b.get("forecast_warnings")?.list ?? []).prefix(2).enumerated()), id: \.offset) { _, w in
+                        Label("At today's pace \(w.s("agent")) hits a cap around \(ForecastView.clock(w.s("hits_cap_at")))",
+                              systemImage: "exclamationmark.triangle.fill").font(.caption).foregroundStyle(Theme.warn)
+                    }
                     if b.get("quiet_now")?.bool == true {
                         Label("Quiet hours: scheduled work is waiting", systemImage: "moon.zzz.fill").font(.caption).foregroundStyle(Theme.gold)
                     }
@@ -660,5 +664,67 @@ struct RecordSearchView: View {
             Text(String(x.s("at").prefix(16)).replacingOccurrences(of: "T", with: " ")).font(.caption2).foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Where today's estimated spend is heading (GET /api/insights/forecast).
+struct ForecastView: View {
+    @Environment(AppState.self) private var app
+    @State private var data: JSONValue?
+
+    var body: some View {
+        List {
+            if let d = data {
+                let warnings = d.get("warnings")?.list ?? []
+                if !warnings.isEmpty {
+                    Section("Heading for a cap today") {
+                        ForEach(Array(warnings.enumerated()), id: \.offset) { _, w in
+                            Label("\(w.s("agent")) around \(Self.clock(w.s("hits_cap_at")))", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Theme.warn)
+                        }
+                    }
+                }
+                let t = d.get("total")
+                Section("Everyone") {
+                    line("Spent so far", t?.get("spent")?.double)
+                    line("At this pace by midnight UTC", t?.get("projected")?.double)
+                    line("Daily budget", t?.get("daily_budget_usd")?.double)
+                }
+                Section("By agent") {
+                    let agents = d.get("agents")?.list ?? []
+                    if agents.isEmpty { Text("No AI calls yet today.").foregroundStyle(.secondary) }
+                    ForEach(agents) { a in
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text(a.s("agent")).bold()
+                                Spacer()
+                                Text(String(format: "$%.2f", a.get("spent")?.double ?? 0)).font(Pixel.mono(13))
+                            }
+                            Text(a.get("enough_data")?.bool == true
+                                 ? String(format: "about $%.2f by midnight · $%.3f an hour", a.get("projected")?.double ?? 0, a.get("per_hour")?.double ?? 0)
+                                 : "Not enough calls today to project").font(.caption).foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                Section { } footer: { Text("An estimate: \(d.s("method")). The cap per agent comes from your charter.") }
+            } else if app.connection != .live {
+                Text("Connect to your Mac and sign in to see the forecast.").foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+            }
+        }
+        .navigationTitle("Spend forecast")
+        .task { data = try? await app.api?.json("/api/insights/forecast") }
+        .refreshable { data = try? await app.api?.json("/api/insights/forecast") }
+    }
+
+    private func line(_ k: String, _ v: Double?) -> some View {
+        HStack { Text(k); Spacer(); Text(v.map { String(format: "$%.2f", $0) } ?? "—").font(Pixel.mono(13)) }
+    }
+
+    static func clock(_ iso: String) -> String {
+        guard let d = ISO8601DateFormatter.flexible(iso) else { return "later today" }
+        return d.formatted(date: .omitted, time: .shortened)
     }
 }

@@ -108,3 +108,11 @@ def search_records(q: str = Query("", max_length=100), p: Principal = Depends(me
     from services.management.search import search
     with db.get_engine().connect() as conn:
         return search(conn, p.organization_id, q)
+
+
+@router.get("/forecast")
+def spend_forecast(p: Principal = Depends(member)) -> dict:
+    """Where today's estimated spend is heading, per agent, and who will hit a cap (services/management/forecast.py)."""
+    from services.management.forecast import forecast
+    with db.get_engine().connect() as conn:
+        return forecast(conn, p.organization_id)

@@ -105,3 +105,25 @@ def test_only_the_owner_amends(client, monkeypatch):
     assert client.put("/api/charter", json={"agent_daily_usd": 1}).status_code == 403
     with transaction() as conn:
         assert conn.execute(select(db.charters)).first() is None
+
+
+def test_spend_forecast_projects_todays_pace_and_warns_before_a_cap(client):
+    from sqlalchemy import insert
+    from services.management.forecast import forecast
+    assert client.get("/api/insights/forecast").json()["agents"] == []
+    client.put("/api/charter", json={"agent_daily_usd": 1.0})
+    now = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+    with transaction() as conn:
+        agent = conn.execute(select(db.agents.c.id, db.agents.c.name)).first()
+        mission = conn.execute(select(db.missions.c.id)).first()
+        mid = mission.id if mission else None
+        for h in (8, 9, 10):  # $0.10 an hour since 08:00 → $0.40 by noon, $1.60 by midnight: crosses $1 at 18:00
+            conn.execute(insert(db.usage_records).values(id=db.new_id(), organization_id=ORG_ID, mission_id=mid, agent_id=agent.id,
+                                                         provider="test", model="m", input_tokens=1, output_tokens=1,
+                                                         estimated_cost_usd=0.4 / 3,
+                                                         created_at=(now.replace(hour=h)).isoformat()))
+        fc = forecast(conn, ORG_ID, now)
+    a = next(x for x in fc["agents"] if x["agent_id"] == agent.id)
+    assert a["enough_data"] and abs(a["per_hour"] - 0.1) < 1e-6 and abs(a["projected"] - 1.6) < 1e-6
+    assert a["hits_cap_at"].startswith(now.replace(hour=18).isoformat()[:16])
+    assert fc["warnings"][0]["agent"] == agent.name and fc["is_estimate"] is True

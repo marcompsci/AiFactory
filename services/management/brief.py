@@ -86,6 +86,10 @@ def brief(conn: Connection, org_id: str, hours: int = 24) -> dict:
     parts.append(f"{_plural(waiting, 'thing')} waiting for you" if waiting else "nothing is waiting for you")
     if near_cap:
         parts.append(f"{', '.join(a['agent'] for a in near_cap)} near the daily cap")
+    from .forecast import forecast
+    fc = forecast(conn, org_id, now)
+    if fc["warnings"]:
+        parts.append(f"at today's pace {', '.join(w['agent'] for w in fc['warnings'][:3])} will hit a cap today")
     span = "day" if hours == 24 else "week" if hours == 168 else f"{hours} hours"
     headline = f"In the last {span}: " + "; ".join(parts) + "."
 
@@ -93,7 +97,7 @@ def brief(conn: Connection, org_id: str, hours: int = 24) -> dict:
             "completed": completed, "failed": failed, "running": running, "counts": {"completed": n_done, "failed": n_failed},
             "waiting": {"approvals": approvals, "recovery_plans": recovery, "releases": releases, "total": waiting},
             "spend": spend, "lessons": lessons, "loops_caught": loops,
-            "quiet_now": charter.quiet_now(rules), "method": "records"}
+            "quiet_now": charter.quiet_now(rules), "forecast_warnings": fc["warnings"], "method": "records"}
 
 
 def spoken(b: dict) -> str:

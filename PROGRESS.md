@@ -372,3 +372,21 @@ stuck in action loops). See services/management/reliability.py.
 - The City game (walking, dialogue) is not yet usable with VoiceOver; the home city's list and the sheets are.
 - The audit chain makes tampering evident but someone with database access could rewrite the whole chain; note the
   latest link from the Audit log screen now and then to catch that.
+
+## V6.11: One inbox
+
+- `GET /api/insights/inbox`: everything waiting for the owner (mission approvals, recovery plans, releases, money
+  approvals, permission suggestions), soonest-to-expire first, then oldest. Top of the Owner tab on the iPhone; the
+  Owner tab badge counts all of it; a local notification arrives when a new approval, actionable recovery plan or
+  money decision needs you (while the app is running; remote push needs an APNs key).
+
+## V6.12: Search the records
+
+- `GET /api/insights/search?q=`: text match across missions, steps, agent messages, lessons, manager decisions and
+  artifacts, newest first, each linking to its mission trace. Owner → Search the records; Atlas answers "find …".
+
+## V6.13: Spend forecast
+
+- `GET /api/insights/forecast`: today's estimated spend per agent carried forward at today's pace (spend ÷ hours since
+  the first spend, at least half an hour) to midnight UTC, with the time each agent would reach your charter's daily
+  cap. Needs 3+ AI calls before projecting. Warnings appear in the daily brief and on Owner → Spend forecast.

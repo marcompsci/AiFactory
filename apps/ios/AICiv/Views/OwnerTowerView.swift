@@ -15,6 +15,9 @@ struct OwnerTowerView: View {
                 RecoveryPlansSection()
                 FinanceDecisionsSection()
                 Section("Reliability") {
+                    NavigationLink { ForecastView() } label: {
+                        Label("Spend forecast: where today is heading", systemImage: "chart.line.uptrend.xyaxis")
+                    }
                     NavigationLink { RecordSearchView() } label: {
                         Label("Search the records", systemImage: "magnifyingglass")
                     }
