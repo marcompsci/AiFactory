@@ -42,7 +42,7 @@ struct RootView: View {
             ArenaView().tabItem { Label("Arena", systemImage: "trophy") }.tag("arena")
             OwnerTowerView()
                 .tabItem { Label("Owner", systemImage: "building.columns") }
-                .badge(app.ownerWaiting + app.approvals.count)
+                .badge(max(app.inboxTotal, app.ownerWaiting + app.approvals.count))
                 .tag("owner")
             MoreView().tabItem { Label("More", systemImage: "ellipsis.circle") }.tag("more")
         }

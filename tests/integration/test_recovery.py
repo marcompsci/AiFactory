@@ -106,3 +106,25 @@ def test_daily_brief_counts_from_records_and_atlas_reads_it(monkeypatch):
         assert "1 failed" in b["headline"] and "waiting for you" in b["headline"]
         r = say(client, ATLAS, "what happened today?")
         assert r["proposal"] is None and "recovery plan" in r["reply"] and "estimated" in r["reply"]
+
+
+def test_inbox_gathers_everything_waiting(monkeypatch):
+    with live_client(monkeypatch, FakeGateway(patch=EVIL)) as client:
+        assert client.get("/api/insights/inbox").json()["total"] == 0
+        bad = start(client)
+        wait_for(lambda: mission_status(client, bad)["status"] == "FAILED")
+        _plan(client, bad)
+        box = client.get("/api/insights/inbox").json()
+        kinds = [i["kind"] for i in box["items"]]
+        assert "recovery_plan" in kinds and box["counts"]["recovery_plan"] == 1
+        plan = next(i for i in box["items"] if i["kind"] == "recovery_plan")
+        assert plan["mission_id"] == bad and 160 < plan["hours_left"] <= 168 and plan["urgent"] is False
+
+
+def test_inbox_lists_mission_approvals(client):
+    from tests.integration.test_missions import pending_approval
+    mid = start(client)
+    a = pending_approval(client, mid)
+    box = client.get("/api/insights/inbox").json()
+    item = next(i for i in box["items"] if i["kind"] == "approval")
+    assert item["id"] == a["id"] and item["mission_id"] == mid and item["age_minutes"] is not None

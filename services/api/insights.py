@@ -92,3 +92,11 @@ def audit_export(mission_id: str, p: Principal = Depends(member)):
             raise HTTPException(404, "mission not found")
         bundle = audit.mission_export(conn, mission_id)
     return JSONResponse(bundle, headers={"Content-Disposition": f'attachment; filename="mission-{mission_id[:8]}-audit.json"'})
+
+
+@router.get("/inbox")
+def owner_inbox(p: Principal = Depends(member)) -> dict:
+    """Everything waiting for a decision, soonest-to-expire first (services/management/inbox.py)."""
+    from services.management.inbox import inbox
+    with db.get_engine().connect() as conn:
+        return inbox(conn, p.organization_id)

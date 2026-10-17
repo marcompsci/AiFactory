@@ -10,6 +10,7 @@ struct OwnerTowerView: View {
     var body: some View {
         NavigationStack {
             List {
+                InboxSection()
                 MissionApprovalsSection()
                 RecoveryPlansSection()
                 FinanceDecisionsSection()

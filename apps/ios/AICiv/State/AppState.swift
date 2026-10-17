@@ -16,6 +16,8 @@ final class AppState {
     var opportunities: [OpportunitySummary] = []
     /// Mission steps waiting for the owner, and packages on the conveyor (the town draws both).
     var approvals: [ApprovalRow] = []
+    /// Everything waiting for the owner (GET /api/insights/inbox): approvals, recovery plans, releases, money, permissions.
+    var inboxTotal = 0
     var packages: [TownPackage] = []
     /// server time minus device time, so packages move by the backend's clock
     var serverOffset: TimeInterval = 0
@@ -197,6 +199,10 @@ final class AppState {
                      ownerQueue: (snap.opportunities ?? []).filter { $0.status == "OWNER_APPROVAL" }.map(\.id))
     }
 
+    func refreshInbox(api: APIClient) async {
+        if let box = try? await api.json("/api/insights/inbox") { inboxTotal = box.get("total")?.int ?? 0 }
+    }
+
     private func applyWorld(_ snap: Snapshot) {
         executionMode = snap.executionMode
         approvals = (snap.approvals ?? []).filter { $0.status == "PENDING" }
@@ -246,7 +252,7 @@ final class AppState {
                         let text = String(decoding: line, as: UTF8.self)
                         line.removeAll(keepingCapacity: true)
                         guard let msg = parser.consume(line: text) else { continue }
-                        if msg.event == "ready" { connection = .live; attempt = 0; continue }
+                        if msg.event == "ready" { connection = .live; attempt = 0; Task { await refreshInbox(api: api) }; continue }
                         guard msg.event == "envelope", let data = msg.data.data(using: .utf8),
                               let event = try? APIClient.decoder.decode(EventEnvelope.self, from: data),
                               event.schemaVersion == 1 else { continue }
@@ -290,6 +296,14 @@ final class AppState {
             result = ledger.ingest(missing)
         }
         let types = Set(result.applied.map(\.eventType))
+        let decisionTypes: Set<String> = ["approval.requested", "approval.decided", "recovery.proposed", "recovery.decided",
+                                          "finance.approval_requested", "finance.approval_decided", "finance.approval_expired",
+                                          "release.owner_approval_requested", "release.owner_approved", "permission.revoked",
+                                          "permission.restored", "opportunity.status_changed"]
+        if !types.isDisjoint(with: decisionTypes) { await refreshInbox(api: api) }
+        if !UserDefaults.standard.bool(forKey: "screenshots") {
+            for e in result.applied { Notifier.needsYou(e) }  // something new waits for you: a local notification
+        }
         if types.contains(where: { $0.hasPrefix("task.") || $0.hasPrefix("package.") || $0.hasPrefix("approval.") || $0.hasPrefix("agent.") || $0.hasPrefix("mission.") }) {
             refreshWorldSoon(api: api)
         }
@@ -308,6 +322,24 @@ final class AppState {
 enum Notifier {
     static func requestPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    /// A local notification for events that put a decision in front of you.
+    static func needsYou(_ e: EventEnvelope) {
+        func s(_ k: String) -> String { e.payload.get(k)?.string ?? "" }
+        let text: (String, String)?
+        switch e.eventType {
+        case "approval.requested": text = ("Approval needed", s("summary"))
+        case "recovery.proposed" where e.payload.get("actionable")?.bool == true: text = ("Recovery plan for you", s("summary"))
+        case "finance.approval_requested": text = ("Money decision needed", s("summary").isEmpty ? "A payment proposal is waiting." : s("summary"))
+        default: text = nil
+        }
+        guard let t = text else { return }
+        let content = UNMutableNotificationContent()
+        content.title = t.0
+        content.body = t.1.isEmpty ? "Open the Owner tab to decide." : t.1
+        content.sound = .default
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: e.eventId, content: content, trigger: nil))
     }
 
     static func releaseWaiting(title: String) {

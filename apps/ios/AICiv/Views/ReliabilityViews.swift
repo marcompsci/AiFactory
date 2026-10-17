@@ -552,3 +552,64 @@ extension APIClient {
         return data
     }
 }
+
+/// Everything waiting for you, at the top of the Owner tab (GET /api/insights/inbox).
+struct InboxSection: View {
+    @Environment(AppState.self) private var app
+    @State private var box: JSONValue?
+
+    var body: some View {
+        let items = box?.get("items")?.list ?? []
+        Section {
+            if items.isEmpty {
+                Text(app.connection == .live ? "Nothing is waiting for you." : "Connect to see what's waiting.").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(Array(items.prefix(12).enumerated()), id: \.offset) { _, i in
+                if i.s("kind") == "permissions" {
+                    NavigationLink { PermissionsView() } label: { row(i) }
+                } else {
+                    row(i)
+                }
+            }
+        } header: {
+            Text("Waiting for you (\(box?.get("total")?.int ?? 0))")
+        } footer: {
+            Text("Soonest to expire first, then oldest. Decide each one in its section below.")
+        }
+        .task(id: "\(app.connection == .live)-\(app.inboxTotal)") {
+            guard app.connection == .live, let api = app.api else { box = nil; return }
+            box = try? await api.json("/api/insights/inbox")
+        }
+    }
+
+    private func row(_ i: JSONValue) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: Self.icon(i.s("kind"))).foregroundStyle(i.get("urgent")?.bool == true ? Theme.bad : Theme.cyan).frame(width: 20)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(i.s("title")).font(.subheadline.bold()).lineLimit(2)
+                if !i.s("detail").isEmpty { Text(i.s("detail")).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                Text(Self.when(i)).font(.caption2).foregroundStyle(i.get("urgent")?.bool == true ? Theme.bad : .secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    static func icon(_ kind: String) -> String {
+        switch kind {
+        case "approval": return "checkmark.seal"
+        case "recovery_plan": return "arrow.triangle.2.circlepath"
+        case "release": return "shippingbox"
+        case "money": return "dollarsign.circle"
+        case "permissions": return "key"
+        default: return "tray"
+        }
+    }
+
+    static func when(_ i: JSONValue) -> String {
+        var parts: [String] = []
+        if let m = i.get("age_minutes")?.int { parts.append(m < 60 ? "waiting \(m) min" : m < 1440 ? "waiting \(m / 60) h" : "waiting \(m / 1440) d") }
+        if let h = i.get("hours_left")?.double { parts.append(h <= 0 ? "expired" : h < 24 ? "expires in \(Int(h)) h" : "expires in \(Int(h / 24)) d") }
+        return parts.joined(separator: " · ")
+    }
+}
