@@ -131,6 +131,9 @@ app.include_router(recovery_router)
 from services.api.permissions import router as permissions_router  # noqa: E402
 
 app.include_router(permissions_router)
+from services.api.schedules import router as schedules_router  # noqa: E402
+
+app.include_router(schedules_router)
 # AICIV_ALLOW_LAN_ORIGINS=1 (set by scripts/run-local.sh when serving your phone): also accept the city page served from
 # this computer's private-network address on port 3000 (Wi-Fi, Personal Hotspot 172.20.10.x / 192.0.0.x, .local names).
 LAN_ORIGIN_RX = (r"^http://(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.0\.0\.\d{1,3}"

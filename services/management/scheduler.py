@@ -46,6 +46,7 @@ class Scheduler(threading.Thread):
             "applab": self.applab.tick,
             "game": self._game,
             "factories": self._factories,
+            "schedules": self._schedules,
         }
 
     def poke(self) -> None:
@@ -62,6 +63,37 @@ class Scheduler(threading.Thread):
     def _factories(self) -> dict:
         from services.factories.pipeline import tick
         return tick(self.applab.enqueue)
+
+    def _schedules(self) -> dict:
+        """Start every due schedule's mission through the regular functions (emergency stop, charter caps apply)."""
+        from fastapi import HTTPException
+
+        from services.api import main, v4
+        from services.core.auth import Principal
+
+        from . import schedules
+        with transaction() as conn:
+            due = schedules.claim_due(conn)
+        started = 0
+        for s in due:
+            p = Principal(user_id=s["created_by"], organization_id=s["organization_id"], role="operator", mode="schedule")
+            mid, err = None, None
+            try:
+                if s["kind"] == "run_tests":
+                    m = main.create_mission(main.MissionIn(prompt=s["params"]["prompt"], kind="run_tests",
+                                                           title=s["title"][:120], idempotency_key=f"schedule:{s['id']}:{s['slot']}"), p)
+                    mid = m["id"]
+                else:
+                    mid = v4.start_research(v4.ResearchIn(**s["params"]), p)["mission_id"]
+                started += 1
+            except HTTPException as exc:
+                err = str(exc.detail)[:300]
+            except Exception as exc:  # recorded on the schedule; the next slot tries again
+                log.exception("schedule %s failed", s["id"])
+                err = str(exc)[:300]
+            with transaction() as conn:
+                schedules.record_run(conn, s["id"], mission_id=mid, error=err)
+        return {"due": len(due), "started": started}
 
     def _game(self) -> dict:
         from services.game.scoring import tick

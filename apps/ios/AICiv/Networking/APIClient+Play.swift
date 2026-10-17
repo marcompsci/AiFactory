@@ -18,7 +18,8 @@ extension APIClient {
     func conversation(_ agentId: String) async throws -> JSONValue { try await json("/api/play/conversations/\(agentId)") }
 
     func talk(_ agentId: String, _ text: String) async throws -> JSONValue {
-        try await json("/api/play/talk", method: "POST", body: ["agent_id": .string(agentId), "text": .string(text)])
+        try await json("/api/play/talk", method: "POST",
+                       body: ["agent_id": .string(agentId), "text": .string(text), "tz": .string(TimeZone.current.identifier)])
     }
 
     func confirmProposal(_ id: String) async throws -> JSONValue { try await json("/api/play/proposals/\(id)/confirm", method: "POST") }

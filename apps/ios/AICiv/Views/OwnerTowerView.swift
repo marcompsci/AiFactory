@@ -15,6 +15,9 @@ struct OwnerTowerView: View {
                 RecoveryPlansSection()
                 FinanceDecisionsSection()
                 Section("Reliability") {
+                    NavigationLink { SchedulesView() } label: {
+                        Label("Schedules: missions that repeat", systemImage: "calendar.badge.clock")
+                    }
                     NavigationLink { ForecastView() } label: {
                         Label("Spend forecast: where today is heading", systemImage: "chart.line.uptrend.xyaxis")
                     }

@@ -1220,6 +1220,39 @@ recovery_plans = Table(
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
+# ---------------------------------------------------------------- V6.16 scheduled missions (only after the owner confirms)
+mission_schedules = Table(
+    "mission_schedules", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),                  # run_tests | market_research (read-only kinds)
+    Column("params", JSON, nullable=False, default=dict),
+    Column("title", Text, nullable=False),
+    Column("cadence", String, nullable=False),               # daily | weekly
+    Column("weekday", Integer),                              # 0 = Monday, for weekly
+    Column("hour", Integer, nullable=False),
+    Column("minute", Integer, nullable=False, default=0),
+    Column("tz", String, nullable=False, default="UTC"),
+    Column("next_run_at", String, nullable=False),
+    Column("enabled", Integer, nullable=False, default=1),
+    Column("created_by", String(36), nullable=False),
+    Column("runs", Integer, nullable=False, default=0),
+    Column("last_run_at", String),
+    Column("last_mission_id", String(36)),
+    Column("last_error", Text),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+# ---------------------------------------------------------------- V6.17 mission priority (urgent | normal | low)
+mission_priorities = Table(
+    "mission_priorities", metadata,
+    Column("mission_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("priority", String, nullable=False, default="normal"),
+    Column("set_by", String(36)),
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
 # ---------------------------------------------------------------- V6.9 tamper-evident log: each event linked to the last
 event_chain = Table(               # hash = sha256(prev_hash + canonical event); append-only (services/core/audit.py)
     "event_chain", metadata,
@@ -1476,7 +1509,8 @@ def seed(engine: Engine) -> None:
             if not _ensure(conn, logistics_routes, {"id": sg.id}, {"organization_id": org_id, "from_node": sg.from_node,
                                                                   "to_node": sg.to_node, "length": sg.length, "status": "UP"}):
                 conn.execute(update(logistics_routes).where(logistics_routes.c.id == sg.id).values(length=sg.length))
-        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2), ("applab", 2), ("game", 5), ("factories", 15)):
+        for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2), ("applab", 2), ("game", 5), ("factories", 15),
+                              ("schedules", 30)):
             _ensure(conn, scheduled_jobs, {"key": key}, {"interval_seconds": interval, "next_run_at": utcnow()})
         from services.finance.categories import seed as seed_categories
 

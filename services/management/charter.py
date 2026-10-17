@@ -31,7 +31,7 @@ LOCKED = [
     "Integrations are read-only; secrets live only in the environment or encrypted storage.",
     "The emergency stop halts all work, whatever the charter says.",
 ]
-QUIET_JOBS = {"pipeline", "finance", "applab", "factories"}
+QUIET_JOBS = {"pipeline", "finance", "applab", "factories", "schedules"}
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 MAX_USD = 50.0
 

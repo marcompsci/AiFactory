@@ -323,7 +323,42 @@ def _search(conn: Connection, org: str, q: str) -> Reply:
     return Reply(f"From the records: {lines}.{more}")
 
 
-def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply:
+def _schedule(conn: Connection, org: str, user: str, agent, t: str, tz: str) -> Reply | None:
+    from services.management import schedules
+    sc = schedules.parse(t)
+    if sc is None:
+        if re.match(r"^(?:please\s+)?every\s+weekday\b", t):
+            return Reply("I can schedule every day or one day a week. Which would you like: every day, or a named day like every Monday?")
+        return None
+    rest = sc.pop("rest")
+    if _TESTS.match(rest):
+        if agent.key not in TESTERS | MANAGERS:
+            return Reply("Sentry at the Sentinel Citadel can schedule test runs.")
+        kind, params, what = "run_tests", {"prompt": "Run the test suite of the connected repository and report which tests fail."}, "run the test suite"
+    else:
+        m = _RESEARCH.match(rest)
+        query = _clean_query(m.group("q")) if m else ""
+        if not m or not _content_words(query):
+            return Reply("I can schedule test runs (\"every Monday at 9 run the tests\") or market research "
+                         "(\"every day research budgeting apps\"). What should repeat?")
+        if agent.key not in RESEARCHERS | MANAGERS:
+            return Reply("The Research Observatory schedules research. Lumen, Pip or Wren can set it up.")
+        source = _source(rest, agent.key)
+        kind, params, what = "market_research", {"source": source, "query": query, "region": "US"}, f"research \"{query}\""
+    try:
+        from zoneinfo import ZoneInfo
+        ZoneInfo(tz)
+    except Exception:
+        tz = "UTC"
+    preview = schedules.describe({**sc, "tz": tz})
+    title = f"{what[0].upper()}{what[1:]}, {preview}"
+    prop = _propose(conn, org=org, user=user, agent=agent, kind="create_schedule",
+                    params={"kind": kind, "params": params, "tz": tz, "title": title, **sc}, summary=f"Schedule: {title}.")
+    return Reply(f"I can {what} {preview}. Each run follows your charter and quiet hours, and you can pause or delete it "
+                 "under Owner → Schedules. Confirm to set it up.", proposal=prop)
+
+
+def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str = "UTC") -> Reply:
     raw = (text or "").strip()
     t = raw.lower()
     if not t or re.fullmatch(r"(hi|hello|hey|yo|sup|help|what can you do\??|who are you\??)[!. ]*", t):
@@ -334,6 +369,9 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
         if _has(t, "everything", "all", "missions", "team"):
             return _missions(conn, org)
         return _status(conn, agent)
+    scheduled = _schedule(conn, org, user, agent, t, tz)
+    if scheduled:
+        return scheduled
     if _has(t, "cancel", "stop the", "abort"):
         return _cancel(conn, org, user, agent, t)
     m = _RESEARCH.match(t)

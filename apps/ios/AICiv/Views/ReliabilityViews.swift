@@ -730,3 +730,65 @@ struct ForecastView: View {
         return d.formatted(date: .omitted, time: .shortened)
     }
 }
+
+/// Scheduled missions (GET /api/schedules): pause, resume or delete. New ones are set up by asking in the City
+/// ("every Monday at 9 run the tests") and confirming.
+struct SchedulesView: View {
+    @Environment(AppState.self) private var app
+    @State private var list: [JSONValue] = []
+    @State private var loaded = false
+    @State private var message: String?
+
+    var body: some View {
+        List {
+            if app.connection != .live {
+                Text("Connect to your Mac and sign in to see schedules.").foregroundStyle(.secondary)
+            } else if loaded && list.isEmpty {
+                Text("No schedules yet. In the City, ask Sentry \"every Monday at 9 run the tests\" or Lumen \"every day research budgeting apps\", then confirm.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            ForEach(list) { s in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(s.s("title")).font(.subheadline.bold()).lineLimit(2)
+                        Spacer()
+                        Toggle("", isOn: Binding(get: { s.get("enabled")?.int == 1 }, set: { on in Task { await toggle(s.s("id"), on) } }))
+                            .labelsHidden()
+                            .accessibilityLabel(s.get("enabled")?.int == 1 ? "Pause this schedule" : "Resume this schedule")
+                    }
+                    Text(s.get("enabled")?.int == 1 ? "Next: \(ForecastView.clock(s.s("next_run_at"))) on \(String(s.s("next_run_at").prefix(10)))" : "Paused")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("\(s.get("runs")?.int ?? 0) run(s)" + (s.s("last_error").isEmpty ? "" : " · last try: \(s.s("last_error"))"))
+                        .font(.caption2).foregroundStyle(s.s("last_error").isEmpty ? Color.secondary : Theme.warn)
+                }
+                .swipeActions {
+                    Button("Delete", role: .destructive) { Task { await remove(s.s("id")) } }
+                }
+            }
+            if let message { Text(message).font(.caption) }
+            Section { } footer: { Text("Each run follows your charter, quiet hours and the emergency stop. Only test runs and research can be scheduled.") }
+        }
+        .navigationTitle("Schedules")
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func load() async {
+        guard app.connection == .live, let api = app.api else { return }
+        list = (try? await api.json("/api/schedules"))?.get("schedules")?.list ?? []
+        loaded = true
+    }
+
+    private func toggle(_ id: String, _ on: Bool) async {
+        guard let api = app.api else { return }
+        do { _ = try await api.json("/api/schedules/\(id)/enabled", method: "POST", body: ["enabled": .bool(on)]) } catch { message = error.localizedDescription }
+        await load()
+    }
+
+    private func remove(_ id: String) async {
+        guard let api = app.api else { return }
+        guard await ReleaseReviewView.authenticate(reason: "Delete this schedule") else { message = "Face ID didn't confirm it's you."; return }
+        do { _ = try await api.json("/api/schedules/\(id)", method: "DELETE") } catch { message = error.localizedDescription }
+        await load()
+    }
+}
