@@ -29,6 +29,21 @@ final class GameModel {
     /// Bumped by the Talk / Use button; the scene acts on whatever is near.
     var interactSeq = 0
 
+    /// For VoiceOver and the Nearby panel: who and what is in this room or in town, nearest first (the scene keeps it
+    /// current), and requests the scene carries out by walking there for you.
+    struct Here: Equatable, Identifiable {
+        let id: String
+        let name: String
+        let detail: String
+        let steps: Int
+    }
+    enum Request: Equatable { case talk(String), use(String), goToBuilding(String), leave }
+    var people: [Here] = []
+    var places: [Here] = []
+    var request: Request?
+    var requestSeq = 0
+    func ask(_ r: Request) { request = r; requestSeq += 1 }
+
     /// Who lives in town: the live roster when connected, otherwise the cast bundled with the app.
     var agents: [TownAgent] = []
     var packages: [TownPackage] = []

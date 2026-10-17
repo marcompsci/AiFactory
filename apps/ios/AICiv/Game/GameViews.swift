@@ -7,11 +7,15 @@ struct CityGameView: View {
     @Environment(AppState.self) private var app
     @State private var game = GameModel()
     @State private var showSignIn = false
+    @State private var showNearby = false
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     var body: some View {
         ZStack {
             SpriteView(scene: game.scene, options: [.ignoresSiblingOrder], debugOptions: [])
                 .ignoresSafeArea()
+                .accessibilityLabel("City map")
+                .accessibilityHint("Use the Nearby panel to walk, talk to agents and go into buildings")
             VStack(spacing: 8) {
                 GameTopBar(game: game, signIn: { showSignIn = true })
                 HStack(alignment: .top) {
@@ -28,6 +32,19 @@ struct CityGameView: View {
                 }
                 if let id = game.packageId, let pk = game.packages.first(where: { $0.id == id }) { PackageCard(pkg: pk) { game.packageId = nil } }
                 Spacer()
+                if game.talkingTo == nil && (voiceOver || showNearby) {
+                    NearbyPanel(game: game) { showNearby = false }
+                }
+                if game.talkingTo == nil {
+                    HStack {
+                        Spacer()
+                        Button { showNearby.toggle() } label: { Image(systemName: "person.2.fill").padding(10) }
+                            .foregroundStyle(GameStyle.cream).gamePanel()
+                            .accessibilityLabel(showNearby ? "Hide the Nearby panel" : "Show who and what is nearby")
+                            .opacity(voiceOver ? 0 : 1)
+                    }
+                    .padding(.horizontal, 12)
+                }
                 if game.talkingTo == nil { GameControls(game: game) }
             }
             if let id = game.talkingTo, let a = game.agent(id) {
@@ -343,5 +360,68 @@ struct PackageCard: View {
         .padding(12)
         .gamePanel()
         .padding(.horizontal, 24)
+    }
+}
+
+/// The City game without looking at the map: who's here, what you can use, and where you can go. Opens on its own
+/// with VoiceOver, or from the people button. Every row walks you there (or talks / uses right away when close).
+struct NearbyPanel: View {
+    let game: GameModel
+    var close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(game.mapId == "town" ? "In town" : Town.name(of: game.mapId)).font(Pixel.title(14)).foregroundStyle(GameStyle.cream)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button("Close", action: close).font(.caption).foregroundStyle(GameStyle.cream)
+            }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    if !game.people.isEmpty { header("People") }
+                    ForEach(game.people) { h in
+                        Button { game.ask(.talk(h.id)) } label: { row("Talk to \(h.name)", h.detail, h.steps) }
+                            .accessibilityLabel("Talk to \(h.name), \(h.detail), \(h.steps) steps away")
+                    }
+                    if !game.places.isEmpty { header("Things to use") }
+                    ForEach(game.places) { h in
+                        Button { game.ask(.use(h.id)) } label: { row(h.name, "", h.steps) }
+                            .accessibilityLabel("\(h.name), \(h.steps) steps away")
+                    }
+                    if game.mapId == "town" {
+                        header("Go to")
+                        ForEach(Town.buildings.filter(\.enterable), id: \.id) { b in
+                            Button { game.ask(.goToBuilding(b.id)) } label: { row(b.name, "walk to the door and go in", nil) }
+                                .accessibilityLabel("Go to \(b.name)")
+                        }
+                    } else {
+                        Button { game.ask(.leave) } label: { row("Leave", "back to town", nil) }
+                            .accessibilityLabel("Leave \(Town.name(of: game.mapId)), back to town")
+                    }
+                }
+            }
+            .frame(maxHeight: 280)
+        }
+        .padding(12)
+        .gamePanel()
+        .padding(.horizontal, 12)
+    }
+
+    private func header(_ t: String) -> some View {
+        Text(t.uppercased()).font(Pixel.mono(11)).foregroundStyle(GameStyle.cream.opacity(0.7)).padding(.top, 4).accessibilityAddTraits(.isHeader)
+    }
+
+    private func row(_ title: String, _ detail: String, _ steps: Int?) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.subheadline.bold()).foregroundStyle(GameStyle.cream)
+                if !detail.isEmpty { Text(detail).font(.caption).foregroundStyle(GameStyle.cream.opacity(0.75)).lineLimit(1) }
+            }
+            Spacer()
+            if let steps { Text("\(steps) steps").font(Pixel.mono(11)).foregroundStyle(GameStyle.cream.opacity(0.7)) }
+        }
+        .padding(.vertical, 6).padding(.horizontal, 8)
+        .background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))
     }
 }

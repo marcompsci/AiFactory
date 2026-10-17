@@ -38,6 +38,8 @@ final class TownScene: SKScene {
     private var placed: [TownRules.Placed] = []
     private var points: [TownRules.PackagePoint] = []
     private var seenInteract = 0
+    private var seenRequest = 0
+    private var hereClock: TimeInterval = 0
     private var transitioning = false
     private var scale: CGFloat = 3
     private var textureCache: [ObjectIdentifier: SKTexture] = [:]
@@ -157,6 +159,9 @@ final class TownScene: SKScene {
         model?.mapId = m.id
         model?.nearby = nil
         update(dtOnly: 0)
+        refreshHere()
+        let who = (model?.people ?? []).map(\.name)
+        Self.announce(m.id == "town" ? "In town." : "Entered \(m.name)." + (who.isEmpty ? "" : " Here: \(who.joined(separator: ", ")).") )
     }
 
     private func go(to id: String, at: Vec?, facing: Dir) {
@@ -228,6 +233,50 @@ final class TownScene: SKScene {
         if n.kind == .npc { path = []; pathGoal = nil; model?.talk(n.id) } else { use(n.id) }
     }
 
+    // MARK: VoiceOver and the Nearby panel
+
+    /// Walk to (or act on) what the Nearby panel asked for.
+    private func carryOut(_ r: GameModel.Request) {
+        guard let model, !transitioning else { return }
+        let p = model.player
+        switch r {
+        case .talk(let id):
+            guard let npc = placed.first(where: { $0.agent.id == id }) else { return }
+            if hypot(npc.x - p.x, npc.y - p.y) < 2.1 { model.talk(id) } else { walk(to: Vec(x: npc.x, y: npc.y + 1), goal: (.npc, id)) }
+        case .use(let id):
+            guard let obj = map.interactables.first(where: { $0.id == id }) else { return }
+            if hypot(Double(obj.x) + 0.5 - p.x, Double(obj.y) + 0.5 - p.y) < 1.6 { use(id) }
+            else { walk(to: Vec(x: Double(obj.x) + 0.5, y: Double(obj.y) + 1.5), goal: (.object, id)) }
+        case .goToBuilding(let id):
+            guard map.id == "town", let b = map.buildings.first(where: { $0.id == id }) else { return }
+            if b.enterable { walk(to: Vec(x: Double(b.door.x) + 0.5, y: Double(b.door.y) + 0.5), goal: nil) }
+            else { walk(to: Vec(x: Double(b.door.x) + 0.5, y: Double(b.door.y) + 1.5), goal: (.object, "door:\(b.id)")) }
+            Self.announce("Walking to \(b.name).")
+        case .leave:
+            guard let ex = map.exits.first else { return }
+            walk(to: Vec(x: Double(ex.x) + 0.5, y: Double(ex.y) + 0.5), goal: nil)
+        }
+    }
+
+    private func refreshHere() {
+        guard let model, let map else { return }
+        let p = model.player
+        let people = placed.map { pl in
+            GameModel.Here(id: pl.agent.id, name: pl.agent.name, detail: "\(pl.agent.role), \(TownRules.statusLabel(pl.agent).lowercased())",
+                           steps: Int(hypot(pl.x - p.x, pl.y - p.y).rounded()))
+        }.sorted { $0.steps < $1.steps }
+        let places = map.interactables.filter { $0.action != .enter && $0.action != .exit && !$0.id.hasPrefix("door:") }.map { o in
+            GameModel.Here(id: o.id, name: o.label, detail: "", steps: Int(hypot(Double(o.x) + 0.5 - p.x, Double(o.y) + 0.5 - p.y).rounded()))
+        }.sorted { $0.steps < $1.steps }
+        if people != model.people { model.people = people }
+        if places != model.places { model.places = places }
+    }
+
+    static func announce(_ text: String) {
+        guard UIAccessibility.isVoiceOverRunning else { return }
+        UIAccessibility.post(notification: .announcement, argument: text)
+    }
+
     private func use(_ id: String) {
         guard let model, let obj = map.interactables.first(where: { $0.id == id }) else { return }
         switch obj.action {
@@ -254,8 +303,10 @@ final class TownScene: SKScene {
         guard let model, let map else { return }
         clock += dt
         if model.interactSeq != seenInteract { seenInteract = model.interactSeq; interact() }
+        if model.requestSeq != seenRequest { seenRequest = model.requestSeq; if let r = model.request { carryOut(r) } }
 
         placed = TownRules.place(map, model.agents, now: clock, talkingTo: model.talkingTo, town: town)
+        if clock - hereClock > 0.5 { hereClock = clock; refreshHere() }
         let serverNow = Date().addingTimeInterval(model.serverOffset)
         points = map.id == "town" ? model.packages.compactMap { TownRules.packagePoint(map, $0, serverNow: serverNow) } : []
 

@@ -390,3 +390,36 @@ stuck in action loops). See services/management/reliability.py.
 - `GET /api/insights/forecast`: today's estimated spend per agent carried forward at today's pace (spend ÷ hours since
   the first spend, at least half an hour) to midnight UTC, with the time each agent would reach your charter's daily
   cap. Needs 3+ AI calls before projecting. Warnings appear in the daily brief and on Owner → Spend forecast.
+
+## V6.14: Three new buildings
+
+- Sentinel Citadel (test console), AI Central Bank (decision terminal) and Owner's Tower (mission board and approval
+  terminal) are enterable on the iPhone and the web, with their agents at desks. Six interiors in all.
+
+## V6.15: More to ask agents
+
+- Sentry (QA) runs the test suite as a `run_tests` mission after you confirm: one step, nothing changed, objective
+  checked. The Bank's agents (Sterling, Vesta and team) answer "how's spending?" with today's estimate and forecast.
+
+## V6.16: Scheduled missions
+
+- "Every Monday at 9 run the tests" / "every day research budgeting apps" in the City becomes a schedule only when you
+  confirm (your phone's time zone is used). Due runs start through the regular functions, so the emergency stop,
+  charter caps and quiet hours apply; each slot is claimed before it runs, so it runs once. Only read-only kinds
+  (test runs, research). Owner → Schedules: pause, resume (no back-filling), delete. `GET/POST/DELETE /api/schedules`.
+
+## V6.17: Mission priority
+
+- Urgent / normal / low, set when a mission is created or later (`POST /api/missions/{id}/priority`, mission page on the
+  iPhone). When every worker slot is busy, waiting missions start urgent first, then normal, then low, first come
+  first served within a level; changing a waiting mission's priority moves it in line.
+
+## V6.18: The City game with VoiceOver
+
+- A Nearby panel (automatic with VoiceOver, or the people button) lists who's in the room with their status and
+  distance, the things you can use, and every building you can go to; each row walks you there and talks, uses or
+  goes in. Entering or leaving a room is announced with who's there.
+
+### Still open
+- The game's joystick and tap-to-walk still need sight; the Nearby panel is the VoiceOver way to move.
+- Schedules can't yet run "every weekday"; they're daily or one named day a week.
