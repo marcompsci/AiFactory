@@ -20,6 +20,9 @@ struct OwnerTowerView: View {
                     NavigationLink { ScorecardsView() } label: {
                         Label("Agent scorecards: reliability week by week", systemImage: "chart.bar.xaxis")
                     }
+                    NavigationLink { PermissionsView() } label: {
+                        Label("Permissions: tools agents have but don't use", systemImage: "key")
+                    }
                     NavigationLink { CharterView() } label: {
                         Label("Your charter: caps and quiet hours only you can change", systemImage: "scroll")
                     }

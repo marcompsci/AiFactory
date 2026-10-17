@@ -1220,6 +1220,20 @@ recovery_plans = Table(
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
+# ---------------------------------------------------------------- V6.8 least privilege: tools the owner took away
+capability_revocations = Table(    # a revoked grant stays revoked across restarts (the seed skips it) until restored
+    "capability_revocations", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("agent_id", String(36), nullable=False),
+    Column("tool_name", String, nullable=False),
+    Column("reason", Text, nullable=False, default=""),
+    Column("revoked_by", String(36), nullable=False),
+    Column("revoked_at", String, nullable=False, default=utcnow),
+    Column("restored_by", String(36)),
+    Column("restored_at", String),
+)
+
 # ---------------------------------------------------------------- the money game: agents compete on *verified* money only
 game_seasons = Table(
     "game_seasons", metadata,
@@ -1420,8 +1434,11 @@ def seed(engine: Engine) -> None:
             if not created:
                 conn.execute(update(agents).where(agents.c.id == a["id"]).values(tier=a.get("tier", "specialist"), model_name=model_of(a),
                                                                                  avatar=a["avatar"]))
+            revoked = {r.tool_name for r in conn.execute(select(capability_revocations.c.tool_name).where(
+                capability_revocations.c.agent_id == a["id"], capability_revocations.c.restored_at.is_(None)))}
             for t in a["tools"]:
-                _ensure(conn, agent_capabilities, {"agent_id": a["id"], "tool_name": t}, {})
+                if t not in revoked:  # the owner's revocation outlives restarts
+                    _ensure(conn, agent_capabilities, {"agent_id": a["id"], "tool_name": t}, {})
             _ensure(conn, agent_positions, {"agent_id": a["id"]}, {"organization_id": org_id, "district": a["home_district"]})
         for dpt in data.get("departments", []):
             _ensure(conn, departments, {"id": dept_ids[dpt["key"]]}, {"organization_id": org_id, "key": dpt["key"], "name": dpt["name"],

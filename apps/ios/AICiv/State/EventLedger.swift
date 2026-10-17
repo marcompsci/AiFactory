@@ -85,6 +85,8 @@ enum FeedText {
         case "approval.requested": return (who, "Asks for approval: \(s("summary"))")
         case "recovery.proposed": return (who, "Recovery plan drafted: \(s("summary"))")
         case "recovery.decided": return (who, "Recovery plan \(s("status").lowercased())")
+        case "permission.revoked": return (who, "Permission revoked: \(s("tool"))")
+        case "permission.restored": return (who, "Permission restored: \(s("tool"))")
         case "charter.amended": return (who, "Charter amended (version \(s("version")))")
         case "manager.loop_detected": return (who, "Loop caught: \(s("rationale"))")
         case "mission.objective_checked":
