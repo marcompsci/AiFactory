@@ -26,10 +26,10 @@ def _age_min(iso: str | None, now: datetime) -> int | None:
 def inbox(conn: Connection, org_id: str) -> dict:
     now = datetime.now(timezone.utc)
     items: list[dict] = []
-    for a in conn.execute(select(db.approvals).where(db.approvals.c.organization_id == org_id, db.approvals.c.status == "PENDING")
-                          .limit(200)).fetchall():
-        title = conn.execute(select(db.missions.c.title).where(db.missions.c.id == a.mission_id)).scalar()
-        items.append({"kind": "approval", "id": a.id, "title": a.summary or a.action.replace("_", " "), "detail": title,
+    for a in conn.execute(select(db.approvals, db.missions.c.title.label("mt"))
+                          .join(db.missions, (db.missions.c.id == db.approvals.c.mission_id) & (db.missions.c.organization_id == org_id))
+                          .where(db.approvals.c.organization_id == org_id, db.approvals.c.status == "PENDING").limit(200)).fetchall():
+        items.append({"kind": "approval", "id": a.id, "title": a.summary or a.action.replace("_", " "), "detail": a.mt,
                       "mission_id": a.mission_id, "created_at": a.created_at, "expires_at": None})
     for r in conn.execute(select(db.recovery_plans, db.missions.c.title.label("mt"))
                           .join(db.missions, db.missions.c.id == db.recovery_plans.c.mission_id)
@@ -42,7 +42,9 @@ def inbox(conn: Connection, org_id: str) -> dict:
         items.append({"kind": "release", "id": o.id, "title": f"Release decision: {o.title}", "detail": "Waiting at the Owner's Tower",
                       "mission_id": None, "created_at": o.updated_at, "expires_at": None})
     for f in conn.execute(select(db.financial_approvals).where(db.financial_approvals.c.organization_id == org_id,
-                                                              db.financial_approvals.c.status == "REQUESTED").limit(200)).fetchall():
+                                                              db.financial_approvals.c.status == "REQUESTED",
+                                                              (db.financial_approvals.c.expires_at.is_(None))
+                                                              | (db.financial_approvals.c.expires_at > now.isoformat())).limit(200)).fetchall():
         amount = f"{f.amount_minor / 100:.2f} {f.currency}" if f.amount_minor is not None else ""
         items.append({"kind": "money", "id": f.id, "title": f"{f.action_type.replace('_', ' ').capitalize()} {amount}".strip(),
                       "detail": f.recipient or "", "mission_id": None, "created_at": f.created_at, "expires_at": f.expires_at,

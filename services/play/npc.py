@@ -298,14 +298,14 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
         return _status(conn, agent)
     if _has(t, "cancel", "stop the", "abort"):
         return _cancel(conn, org, user, agent, t)
-    found = re.match(r"^(?:please\s+)?(?:find|search(?: for)?|look up|where is|when did)\s+(?P<q>.{2,80})$", t)
-    if found:
-        return _search(conn, org, found.group("q").strip(" ?.!"))
     m = _RESEARCH.match(t)
     if m:
         return _research(conn, org, user, agent, t, m.group("q"))
     if _BUILD.match(t):
         return _build(conn, org, user, agent, raw)
+    found = re.match(_LEAD + r"(?:find(?!\s+out\b)|search(?: for)?|look up|where is|when did)\s+(?P<q>.{2,80})$", t)
+    if found:  # after research and build, so "find out about…" still starts research
+        return _search(conn, org, found.group("q").strip(" ?.!"))
     if agent.key in MANAGERS and (_has(t, "what happened", "catch me up", "daily brief", "what did i miss", "recap")
                                   or re.fullmatch(r"(brief|today|summary|yesterday)\??[!. ]*", t)):
         from services.management.brief import brief, spoken

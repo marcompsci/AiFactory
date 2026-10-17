@@ -648,7 +648,9 @@ struct RecordSearchView: View {
             guard query.count >= 2, let api = app.api else { result = nil; return }
             try? await Task.sleep(for: .milliseconds(300))  // wait for typing to pause
             if Task.isCancelled { return }
-            let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+            var allowed = CharacterSet.urlQueryAllowed
+            allowed.remove(charactersIn: "&+=?#")  // so "R&D" or "C++" reach the server whole
+            let q = query.addingPercentEncoding(withAllowedCharacters: allowed) ?? query
             result = try? await api.json("/api/insights/search?q=\(q)")
         }
     }

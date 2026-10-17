@@ -20,6 +20,9 @@ MIN_HOURS = 0.5
 
 
 def _project(spent: float, first: str | None, calls: int, now: datetime, end: datetime, cap: float | None) -> dict:
+    if cap is not None and spent >= cap:  # already at the cap, however few calls it took
+        return {"spent": round(spent, 4), "projected": None, "per_hour": None, "hits_cap_at": now.isoformat(), "enough_data": calls >= MIN_CALLS,
+                "already_at_cap": True}
     if calls < MIN_CALLS or not first:
         return {"spent": round(spent, 4), "projected": None, "per_hour": None, "hits_cap_at": None, "enough_data": False}
     hours = max(MIN_HOURS, (now - datetime.fromisoformat(first)).total_seconds() / 3600)
@@ -28,8 +31,6 @@ def _project(spent: float, first: str | None, calls: int, now: datetime, end: da
     hits = None
     if cap is not None and rate > 0 and spent < cap and projected >= cap:
         hits = (now + timedelta(hours=(cap - spent) / rate)).isoformat()
-    elif cap is not None and spent >= cap:
-        hits = now.isoformat()  # already there
     return {"spent": round(spent, 4), "projected": round(projected, 4), "per_hour": round(rate, 4), "hits_cap_at": hits, "enough_data": True}
 
 
@@ -47,16 +48,17 @@ def forecast(conn: Connection, org_id: str, now: datetime | None = None) -> dict
     agents = []
     for r in rows:
         p = _project(float(r.usd or 0), r.first, int(r.n), now, end, cap)
-        agents.append({"agent_id": r.agent_id, "agent": names.get(r.agent_id, ""), "calls": int(r.n), **p})
+        agents.append({"agent_id": r.agent_id, "agent": names.get(r.agent_id, "Unassigned AI calls"), "calls": int(r.n), **p})
     agents.sort(key=lambda a: -(a["projected"] or a["spent"]))
     budget = conn.execute(select(db.organizations.c.daily_budget_usd).where(db.organizations.c.id == org_id)).scalar()
     total_spent = sum(float(r.usd or 0) for r in rows)
     first = min((r.first for r in rows), default=None)
     total = _project(total_spent, first, sum(int(r.n) for r in rows), now, end, budget)
-    warnings = [{"agent": a["agent"], "agent_id": a["agent_id"], "hits_cap_at": a["hits_cap_at"], "cap": cap}
-                for a in agents if a["hits_cap_at"]]
+    warnings = [{"agent": a["agent"], "agent_id": a["agent_id"], "hits_cap_at": a["hits_cap_at"], "cap": cap,
+                 "already": bool(a.get("already_at_cap"))} for a in agents if a["hits_cap_at"] and a["agent_id"]]
     if total["hits_cap_at"]:
-        warnings.append({"agent": "Everyone together", "agent_id": None, "hits_cap_at": total["hits_cap_at"], "cap": budget})
+        warnings.append({"agent": "Everyone together", "agent_id": None, "hits_cap_at": total["hits_cap_at"], "cap": budget,
+                         "already": bool(total.get("already_at_cap"))})
     return {"as_of": now.isoformat(), "day_ends": end.isoformat(), "agents": agents, "total": {**total, "daily_budget_usd": budget},
             "agent_daily_cap_usd": cap, "warnings": warnings, "is_estimate": True,
             "method": f"today's pace (spend ÷ hours since the first spend, at least {MIN_HOURS} h) carried to midnight UTC; "

@@ -208,3 +208,11 @@ def test_search_finds_records_across_kinds_and_atlas_answers(monkeypatch):
         reply = say(client, ATLAS, "find refusing to edit tests")["reply"]
         assert reply.startswith("From the records:") and "refusing" in reply
         assert say(client, ATLAS, "find zebra unicorn")["reply"].startswith("I found nothing")
+
+
+def test_find_out_about_still_starts_research_and_wildcards_are_literal(client):
+    assert say(client, ATLAS, "find out about budgeting apps on the App Store")["proposal"]["kind"] == "start_research"
+    assert say(client, ATLAS, "can you find zebra unicorn")["reply"].startswith("I found nothing")
+    start(client)
+    assert client.get("/api/insights/search?q=%25%25").json()["total"] == 0
+    assert client.get("/api/insights/search?q=__").json()["total"] == 0

@@ -296,9 +296,9 @@ final class AppState {
             result = ledger.ingest(missing)
         }
         let types = Set(result.applied.map(\.eventType))
-        let decisionTypes: Set<String> = ["approval.requested", "approval.decided", "recovery.proposed", "recovery.decided",
+        let decisionTypes: Set<String> = ["approval.requested", "approval.granted", "approval.rejected", "recovery.proposed", "recovery.decided",
                                           "finance.approval_requested", "finance.approval_decided", "finance.approval_expired",
-                                          "release.owner_approval_requested", "release.owner_approved", "permission.revoked",
+                                          "release.owner_approval_requested", "release.owner_approved", "release.owner_rejected", "permission.revoked",
                                           "permission.restored", "opportunity.status_changed"]
         if !types.isDisjoint(with: decisionTypes) { await refreshInbox(api: api) }
         if !UserDefaults.standard.bool(forKey: "screenshots") {

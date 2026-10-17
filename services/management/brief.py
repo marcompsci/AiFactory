@@ -89,7 +89,12 @@ def brief(conn: Connection, org_id: str, hours: int = 24) -> dict:
     from .forecast import forecast
     fc = forecast(conn, org_id, now)
     if fc["warnings"]:
-        parts.append(f"at today's pace {', '.join(w['agent'] for w in fc['warnings'][:3])} will hit a cap today")
+        at = [w["agent"] for w in fc["warnings"] if w.get("already")]
+        soon = [w["agent"] for w in fc["warnings"] if not w.get("already")]
+        if at:
+            parts.append(f"{', '.join(at[:3])} reached a cap")
+        if soon:
+            parts.append(f"at today's pace {', '.join(soon[:3])} will hit a cap today")
     span = "day" if hours == 24 else "week" if hours == 168 else f"{hours} hours"
     headline = f"In the last {span}: " + "; ".join(parts) + "."
 
