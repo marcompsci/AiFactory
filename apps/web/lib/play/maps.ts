@@ -88,9 +88,9 @@ export const TOWN_BUILDINGS: BuildingDef[] = [
   { id: "nexus-spire", name: "Nexus Spire", x: 21, y: 2, w: 7, h: 10, door: { x: 24, y: 11 }, style: "spire", roof: "#7A5CD6", wall: "#E8DDF2", enterable: true },
   { id: "code-forge", name: "Code Forge", x: 36, y: 5, w: 7, h: 7, door: { x: 39, y: 11 }, style: "forge", roof: "#C2553A", wall: "#E9D6BC", enterable: true },
   { id: "vision-quarter", name: "Creative Studio", x: 4, y: 16, w: 7, h: 6, door: { x: 7, y: 21 }, style: "studio", roof: "#D65C9E", wall: "#F2E4D6", enterable: false, note: "The Creative Studio opens in a later update." },
-  { id: "sentinel-citadel", name: "Sentinel Citadel", x: 37, y: 16, w: 7, h: 6, door: { x: 40, y: 21 }, style: "citadel", roof: "#4F8A62", wall: "#D9D6CC", enterable: false, note: "The Sentinel Citadel opens in a later update." },
-  { id: "central-bank", name: "AI Central Bank", x: 5, y: 27, w: 7, h: 6, door: { x: 8, y: 32 }, style: "bank", roof: "#C9A23A", wall: "#F1E9D2", enterable: false, note: "The Bank's interior opens in a later update. Use the Bank panel on the main screen meanwhile." },
-  { id: "owners-tower", name: "Owner's Tower", x: 21, y: 25, w: 7, h: 8, door: { x: 24, y: 32 }, style: "tower", roof: "#3D4F8F", wall: "#E2E6EF", enterable: false },
+  { id: "sentinel-citadel", name: "Sentinel Citadel", x: 37, y: 16, w: 7, h: 6, door: { x: 40, y: 21 }, style: "citadel", roof: "#4F8A62", wall: "#D9D6CC", enterable: true },
+  { id: "central-bank", name: "AI Central Bank", x: 5, y: 27, w: 7, h: 6, door: { x: 8, y: 32 }, style: "bank", roof: "#C9A23A", wall: "#F1E9D2", enterable: true },
+  { id: "owners-tower", name: "Owner's Tower", x: 21, y: 25, w: 7, h: 8, door: { x: 24, y: 32 }, style: "tower", roof: "#3D4F8F", wall: "#E2E6EF", enterable: true },
   { id: "memory-vault", name: "Memory Vault", x: 36, y: 27, w: 7, h: 6, door: { x: 39, y: 32 }, style: "vault", roof: "#5A5F73", wall: "#CFCBD8", enterable: false, note: "The Memory Vault opens in a later update." },
 ];
 
@@ -253,6 +253,46 @@ export function buildInterior(id: string): GameMap | null {
       prop(m, { kind: "plant", x: 1, y: 2 });
       prop(m, { kind: "sofa", x: 2, y: 10, w: 2, h: 1 });
       prop(m, { kind: "cooler", x: 16, y: 10 });
+    });
+  }
+  if (id === "sentinel-citadel") {
+    return room(id, "Sentinel Citadel", "tile", "#4F8A62", (m) => {
+      for (const x of [2, 3, 4, 5]) prop(m, { kind: "server", x, y: 2, h: 1 });
+      prop(m, { kind: "board", x: 12, y: 0, w: 3, h: 2 });
+      m.interactables.push({ id: "test-console", x: 13, y: 2, label: "Test console: missions", action: "journal" });
+      desk(m, 3, 6);
+      desk(m, 11, 6);
+      prop(m, { kind: "terminal", x: 15, y: 5 });
+      prop(m, { kind: "plant", x: 1, y: 9 });
+      prop(m, { kind: "plant", x: 16, y: 9 });
+      prop(m, { kind: "cooler", x: 16, y: 2 });
+    });
+  }
+  if (id === "central-bank") {
+    return room(id, "AI Central Bank", "carpet", "#C9A23A", (m) => {
+      for (const x of [13, 14, 15, 16]) prop(m, { kind: "shelf", x, y: 0, h: 2 });
+      prop(m, { kind: "terminal", x: 8, y: 3 });
+      m.interactables.push({ id: "money-terminal", x: 8, y: 4, label: "Decision terminal", action: "approvals" });
+      desk(m, 3, 5);
+      desk(m, 12, 6);
+      prop(m, { kind: "table", x: 5, y: 8, w: 3, h: 2 });
+      prop(m, { kind: "plant", x: 1, y: 2 });
+      prop(m, { kind: "cooler", x: 16, y: 10 });
+      prop(m, { kind: "rug", x: 7, y: 9, w: 4, h: 2, solid: false });
+    });
+  }
+  if (id === "owners-tower") {
+    return room(id, "Owner's Tower", "carpet", "#3D4F8F", (m) => {
+      prop(m, { kind: "screen", x: 6, y: 0, w: 6, h: 2 });
+      m.interactables.push({ id: "board", x: 8, y: 2, label: "Mission board", action: "journal" });
+      prop(m, { kind: "terminal", x: 14, y: 4 });
+      m.interactables.push({ id: "approvals", x: 14, y: 5, label: "Approval terminal", action: "approvals" });
+      desk(m, 3, 6);
+      desk(m, 11, 7);
+      prop(m, { kind: "sofa", x: 12, y: 10, w: 2, h: 1 });
+      prop(m, { kind: "plant", x: 1, y: 2 });
+      prop(m, { kind: "plant", x: 16, y: 2 });
+      prop(m, { kind: "rug", x: 6, y: 9, w: 5, h: 2, solid: false });
     });
   }
   return null;

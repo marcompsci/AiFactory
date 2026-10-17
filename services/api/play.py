@@ -20,7 +20,7 @@ from services.play import npc
 
 router = APIRouter(prefix="/api/play")
 
-MAPS = ("town", "nexus-spire", "data-observatory", "code-forge")
+MAPS = ("town", "nexus-spire", "data-observatory", "code-forge", "sentinel-citadel", "central-bank", "owners-tower")
 HAIR = ("spiky", "short", "buzz", "curly", "long", "bun", "afro", "bald")
 HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
 

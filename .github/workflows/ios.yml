@@ -48,7 +48,7 @@ jobs:
           APP=$(find build/Build/Products -name "AICiv.app" -path "*iphonesimulator*" | head -1)
           xcrun simctl install "$UDID" "$APP"
           mkdir -p shots
-          for spot in town plaza nexus-spire data-observatory code-forge; do
+          for spot in town plaza nexus-spire data-observatory code-forge sentinel-citadel central-bank owners-tower; do
             xcrun simctl terminate "$UDID" ai.civilization.app || true
             xcrun simctl launch "$UDID" ai.civilization.app -screenshots YES -startTab city -townStart "$spot"
             sleep 14

@@ -30,8 +30,8 @@ final class TownTests: XCTestCase {
         for a in ids { for b in ids where a != b { XCTAssertGreaterThan(TownRules.beltRoute(town, town.docks[a]!, town.docks[b]!).count, 1, "\(a)>\(b)") } }
     }
 
-    func testThreeInteriorsYouCanLeave() {
-        XCTAssertEqual(Town.enterable, ["data-observatory", "nexus-spire", "code-forge"])
+    func testSixInteriorsYouCanLeave() {
+        XCTAssertEqual(Town.enterable, ["data-observatory", "nexus-spire", "code-forge", "sentinel-citadel", "central-bank", "owners-tower"])
         for id in Town.enterable {
             let m = Town.buildInterior(id)!
             XCTAssertFalse(m.isSolid(m.spawn.x, m.spawn.y))

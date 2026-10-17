@@ -8,7 +8,8 @@ import { usePlay } from "@/lib/play/state";
 import { useStore } from "@/lib/store";
 import { live } from "./runner";
 
-const MAP_NAME: Record<string, string> = { town: "Town", "nexus-spire": "Nexus Spire", "data-observatory": "Research Observatory", "code-forge": "Code Forge" };
+const MAP_NAME: Record<string, string> = { town: "Town", "nexus-spire": "Nexus Spire", "data-observatory": "Research Observatory", "code-forge": "Code Forge",
+  "sentinel-citadel": "Sentinel Citadel", "central-bank": "AI Central Bank", "owners-tower": "Owner's Tower" };
 
 function Icon({ d, label }: { d: string; label: string }) {
   return (

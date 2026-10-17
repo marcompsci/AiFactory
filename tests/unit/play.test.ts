@@ -28,8 +28,8 @@ describe("town map", () => {
     for (const a of ids) for (const b of ids) if (a !== b) expect(beltRoute(town, town.docks[a], town.docks[b]).length, `${a}>${b}`).toBeGreaterThan(1);
   });
 
-  it("has three enterable buildings, each with an interior you can leave", () => {
-    expect(ENTERABLE).toEqual(["data-observatory", "nexus-spire", "code-forge"]);
+  it("has six enterable buildings, each with an interior you can leave", () => {
+    expect(ENTERABLE).toEqual(["data-observatory", "nexus-spire", "code-forge", "sentinel-citadel", "central-bank", "owners-tower"]);
     for (const id of ENTERABLE) {
       const m = buildInterior(id)!;
       expect(isSolid(m, m.spawn.x, m.spawn.y)).toBe(false);
