@@ -1,7 +1,7 @@
 """The weekly report (V6.23): the last seven days, day by day, against the seven before. Counted from the records by
 rules, like the daily brief: no model writes it and nothing is invented. Money is the gateway's estimate and is
-labelled as one. Days are the caller's local days (V6.27: the phone, the web and the City send their time zone; an
-unknown zone falls back to UTC).
+labelled as one. Days are the caller's local days (V6.27: the phone and the City send their time zone; an unknown
+zone falls back to UTC).
 """
 from __future__ import annotations
 

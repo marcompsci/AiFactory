@@ -338,6 +338,12 @@ def create_mission(body: MissionIn, p: Principal = Depends(operator)):
         org = conn.execute(select(db.organizations).where(db.organizations.c.id == p.organization_id)).first()
         if org.emergency_stopped:
             raise HTTPException(409, "emergency stop is engaged")
+        if body.repository_id:
+            import uuid
+            try:
+                uuid.UUID(body.repository_id)
+            except ValueError as exc:
+                raise HTTPException(404, "repository not found") from exc
         if body.repository_id and conn.execute(select(db.repositories.c.id).where(
                 db.repositories.c.id == body.repository_id, db.repositories.c.organization_id == p.organization_id)).first() is None:
             raise HTTPException(404, "repository not found")  # only this organization's repositories

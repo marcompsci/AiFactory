@@ -202,7 +202,9 @@ struct WeeklyReportView: View {
 
     private func load() async {
         guard app.connection == .live, let api = app.api else { return }
-        let tz = TimeZone.current.identifier.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "UTC"
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "+&=")  // "Etc/GMT+5" must arrive with its plus sign
+        let tz = TimeZone.current.identifier.addingPercentEncoding(withAllowedCharacters: allowed) ?? "UTC"
         report = try? await api.json("/api/insights/weekly?tz=\(tz)")
     }
 

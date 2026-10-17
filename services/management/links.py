@@ -79,7 +79,10 @@ def start(spec: dict, p: Principal, *, priority: str = "normal", key: str | None
     """Start a mission from a spec through the regular functions. Raises HTTPException as they do."""
     from services.api import main, v4
     if spec["kind"] == "market_research":
-        mid = v4.start_research(v4.ResearchIn(**spec["params"]), p)["mission_id"]
+        params = {**spec["params"]}
+        if spec.get("budget_usd") is not None:  # a saved request's budget (research keeps its own otherwise)
+            params["budget_usd"] = spec["budget_usd"]
+        mid = v4.start_research(v4.ResearchIn(**params), p)["mission_id"]
         if priority != "normal":
             with transaction() as conn:
                 conn.execute(insert(db.mission_priorities).values(mission_id=mid, organization_id=p.organization_id,

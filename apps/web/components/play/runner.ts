@@ -49,6 +49,8 @@ export class Runner {
   private down: { x: number; y: number; t: number } | null = null;
   private outfitCache: { key: string; o: Outfit } | null = null;
   private agentOutfits = new Map<string, Outfit>();
+  /** A Shift+arrow step in progress: if it gets blocked on the way, say so. */
+  private stepTo: { x: number; y: number; d: Dir } | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext("2d")!;
@@ -65,7 +67,7 @@ export class Runner {
         if (on && !e.repeat) this.step(STEP[k]);
         return;
       }
-      if (on && k === "l" && !e.repeat) { e.preventDefault(); this.lookAround(); return; }
+      if (on && k === "l" && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); this.lookAround(); return; }
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) {
         e.preventDefault();
         if (on) this.keys.add(k); else this.keys.delete(k);
@@ -188,6 +190,7 @@ export class Runner {
   step(d: Dir) {
     const st = usePlay.getState();
     if (st.talkingTo || st.panel || this.fade) return;
+    if (this.path.length) { st.announce("Still moving."); return; }  // finish one step before the next
     const { map } = this.here;
     const tx = Math.floor(live.x), ty = Math.floor(live.y);
     const nx = tx + DELTA[d].dx, ny = ty + DELTA[d].dy;
@@ -199,12 +202,15 @@ export class Runner {
     }
     this.path = [{ x: nx + 0.5, y: ny + 0.5 }];
     this.pathGoal = null;
+    this.stepTo = { x: nx, y: ny, d };
     const name = DIR_NAME[d];
     st.announce(`${name[0].toUpperCase()}${name.slice(1)}. Ahead: ${ahead(map, nx, ny, d, people)}.`);
   }
 
   /** What's in each direction from here. */
   lookAround() {
+    const st = usePlay.getState();
+    if (st.talkingTo || st.panel || this.fade) return;
     const { map } = this.here;
     const tx = Math.floor(live.x), ty = Math.floor(live.y);
     const people = this.peopleTiles();
@@ -278,7 +284,7 @@ export class Runner {
       if (this.keys.has("arrowdown") || this.keys.has("s")) vy += 1;
       if (!vx && !vy && (Math.abs(st.stick.x) > 0.15 || Math.abs(st.stick.y) > 0.15)) { vx = st.stick.x; vy = st.stick.y; }
     }
-    if (vx || vy) { this.path = []; this.pathGoal = null; }
+    if (vx || vy) { this.path = []; this.pathGoal = null; this.stepTo = null; }
     else if (this.path.length) {
       const n = this.path[0];
       const dx = n.x - live.x, dy = n.y - live.y, d = Math.hypot(dx, dy);
@@ -296,6 +302,11 @@ export class Runner {
       live.x = after.x; live.y = after.y;
       live.moved = true;
       this.walkT += dt;
+    }
+    if (this.stepTo && !this.path.length) {  // a Shift+arrow step ended: on its tile, or stopped short
+      const t = this.stepTo;
+      this.stepTo = null;
+      if ((Math.floor(live.x) !== t.x || Math.floor(live.y) !== t.y)) usePlay.getState().announce("Stopped: something was in the way.");
     }
     // doors
     const tx = Math.floor(live.x), ty = Math.floor(live.y);

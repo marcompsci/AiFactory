@@ -89,6 +89,8 @@ def compare(mission_id: str, with_id: str | None = None, p: Principal = Depends(
                 uuid.UUID(v)
             except ValueError as exc:
                 raise HTTPException(404, "mission not found") from exc
+    if with_id == mission_id:
+        raise HTTPException(422, "pick a different mission to compare with")
     with db.get_engine().connect() as conn:
         out = build(conn, p.organization_id, mission_id, with_id)
     if out is None:

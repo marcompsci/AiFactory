@@ -153,3 +153,31 @@ def test_compare_a_schedule_run_with_the_previous_one(client):
     _finished(client, b)
     c = client.get(f"/api/missions/{b}/compare").json()
     assert c["before"]["id"] == a and c["how"] == "the schedule's previous run"
+
+
+def test_review_fixes_saved_research_budget_compare_self_and_bad_repo_ids(client):
+    r = client.post("/api/saved-requests", json={"name": "Candles", "kind": "market_research",
+                                                 "params": {"source": "etsy", "query": "candles"}, "budget_usd": 0.5})
+    assert r.status_code == 201, r.text
+    mid = client.post(f"/api/saved-requests/{r.json()['id']}/start").json()["mission_id"]
+    assert client.get(f"/api/missions/{mid}").json()["mission"]["budget_usd"] == 0.5
+    assert client.get(f"/api/missions/{mid}/compare?with_id={mid}").status_code == 422
+    assert client.post("/api/missions", json={"prompt": TESTS, "kind": "run_tests", "repository_id": "nope"}).status_code == 404
+
+
+def test_saved_request_claim_refuses_a_second_start_while_starting(client, monkeypatch):
+    sid = client.post("/api/saved-requests", json={"name": "Again", "kind": "run_tests"}).json()["id"]
+    from services.management import saved
+    with transaction() as conn:  # mid-start: claimed a moment ago, no mission yet
+        conn.execute(update(db.saved_requests).where(db.saved_requests.c.id == sid)
+                     .values(last_used_at=datetime.now(timezone.utc).isoformat(), last_mission_id=None))
+    assert client.post(f"/api/saved-requests/{sid}/start").status_code == 409
+
+    def boom(*a, **k):
+        raise RuntimeError("worker unavailable")
+    with transaction() as conn:
+        conn.execute(update(db.saved_requests).where(db.saved_requests.c.id == sid).values(last_used_at=None))
+    monkeypatch.setattr(saved.links, "start", boom)
+    assert client.post(f"/api/saved-requests/{sid}/start").status_code == 422
+    with db.get_engine().connect() as conn:  # the claim was put back, so it can be tried again at once
+        assert saved._row(conn, client.get("/api/saved-requests").json()["saved_requests"][0]["organization_id"], sid).last_used_at is None

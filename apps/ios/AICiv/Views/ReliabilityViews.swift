@@ -844,7 +844,10 @@ struct SchedulesView: View {
         guard let api = app.api, let id = budgetFor else { return }
         budgetFor = nil
         let t = budgetText.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "$", with: "")
-        let value: JSONValue = t.isEmpty ? .null : .number(Double(t) ?? -1)
+            .replacingOccurrences(of: ",", with: ".")  // "0,50" where the comma is the decimal mark
+        let parsed = Double(t)
+        if !t.isEmpty && parsed == nil { message = "That isn't an amount. Try 0.50."; return }
+        let value: JSONValue = parsed.map { .number($0) } ?? .null
         do {
             _ = try await api.json("/api/schedules/\(id)/budget", method: "POST", body: ["budget_usd": value])
             message = t.isEmpty ? "Back to the default budget." : "Budget saved."

@@ -1,6 +1,6 @@
 """Compare runs (V6.31): a mission next to the run before it, from the records.
 
-"The run before" is, in order: the mission it was started again from (or followed), the previous run of the same
+"The run before" is, in order: the mission it was started again from, the previous run of the same
 schedule, or else the latest earlier mission of the same kind with the same request. You can also name the other
 mission. Everything is counted from the records; cost is the gateway's estimate.
 """
@@ -42,9 +42,10 @@ def summary(conn: Connection, m) -> dict:
 def previous(conn: Connection, org: str, m) -> tuple[str | None, str]:
     """(mission id, how it was found) for the run before `m`."""
     L, R, M = db.mission_links, db.schedule_runs, db.missions
-    link = conn.execute(select(L.c.from_mission_id, L.c.kind).where(L.c.organization_id == org, L.c.to_mission_id == m.id)).first()
-    if link:
-        return link.from_mission_id, "started again from" if link.kind == "rerun" else "followed"
+    link = conn.execute(select(L.c.from_mission_id).where(L.c.organization_id == org, L.c.to_mission_id == m.id,
+                                                          L.c.kind == "rerun")).first()
+    if link:  # (a follow-on is different work, so it's not "the run before")
+        return link.from_mission_id, "started again from"
     run = conn.execute(select(R.c.schedule_id, R.c.started_at).where(R.c.organization_id == org, R.c.mission_id == m.id)).first()
     if run:
         prior = conn.execute(select(R.c.mission_id).where(R.c.schedule_id == run.schedule_id, R.c.started_at < run.started_at)

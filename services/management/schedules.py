@@ -112,12 +112,14 @@ COST_SAMPLE = 10
 
 
 def cost(conn: Connection, sid: str, cadence: str) -> dict:
-    """Estimated AI spend per run (average of the last COST_SAMPLE runs that started a mission) and a monthly
+    """Estimated AI spend per run (average of the last COST_SAMPLE finished runs) and a monthly
     projection at this cadence. Estimates from the gateway's usage records, not bills."""
     from sqlalchemy import func
     R, U = db.schedule_runs, db.usage_records
-    mids = [r.mission_id for r in conn.execute(select(R.c.mission_id).where(R.c.schedule_id == sid)
-                                               .order_by(R.c.started_at.desc()).limit(COST_SAMPLE)).fetchall()]
+    M = db.missions
+    mids = [r.mission_id for r in conn.execute(select(R.c.mission_id).join(M, M.c.id == R.c.mission_id)
+                                               .where(R.c.schedule_id == sid, M.c.status.in_(["COMPLETED", "FAILED", "CANCELLED"]))
+                                               .order_by(R.c.started_at.desc()).limit(COST_SAMPLE)).fetchall()]  # finished runs only
     if not mids:
         return {"runs_counted": 0, "per_run_usd": None, "monthly_usd": None, "is_estimate": True}
     total = float(conn.execute(select(func.coalesce(func.sum(U.c.estimated_cost_usd), 0.0)).where(U.c.mission_id.in_(mids))).scalar() or 0)

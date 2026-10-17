@@ -61,6 +61,12 @@ def save(p: Principal, name: str, spec: dict, priority: str = "normal") -> dict:
         raise SavedError(str(exc), exc.status) from exc
     if spec.get("budget_usd") is not None:
         clean["budget_usd"] = float(spec["budget_usd"])
+        from . import charter
+        with db.get_engine().connect() as conn:
+            try:
+                charter.check_mission_budget(conn, p.organization_id, clean["budget_usd"])
+            except charter.CharterError as exc:
+                raise SavedError(str(exc)) from exc
     repo = spec.get("repository_id")
     S = db.saved_requests
     sid = db.new_id()
@@ -96,22 +102,30 @@ def save_from_mission(p: Principal, mission_id: str, name: str) -> dict:
 
 
 def start(p: Principal, sid: str) -> dict:
-    """Start a saved request now, as `p`. A second press within a few seconds returns the run that just started."""
+    """Start a saved request now, as `p`. Claimed first with a conditional update, so two presses can't both start
+    one: a press while it's starting gets 409; a press within a few seconds after it started gets that run back."""
+    from fastapi import HTTPException
+    from sqlalchemy import or_
     S = db.saved_requests
     now = datetime.now(timezone.utc)
-    with transaction() as conn:  # claim inside the write lock, so two presses can't both start one
+    cutoff = (now - DOUBLE_TAP).isoformat()
+    with transaction() as conn:
         r = _row(conn, p.organization_id, sid)
-        if r.last_used_at and r.last_mission_id and datetime.fromisoformat(str(r.last_used_at)) >= now - DOUBLE_TAP:
-            return {"mission_id": r.last_mission_id, "saved_request_id": sid, "repeat": True}
-        conn.execute(update(S).where(S.c.id == sid).values(last_used_at=now.isoformat()))
+        claimed = conn.execute(update(S).where(S.c.id == sid, or_(S.c.last_used_at.is_(None), S.c.last_used_at < cutoff))
+                               .values(last_used_at=now.isoformat(), last_mission_id=None)).rowcount
+        if not claimed:
+            if r.last_mission_id:
+                return {"mission_id": r.last_mission_id, "saved_request_id": sid, "repeat": True}
+            raise SavedError("it's starting right now", 409)
     spec = dict(r.spec or {})
-    from fastapi import HTTPException
     try:
         mid = links.start(spec, p, priority=r.priority, key=f"saved:{sid}:{now.strftime('%Y%m%dT%H%M%S')}")
-    except HTTPException:
-        with transaction() as conn:  # let them try again straight away
-            conn.execute(update(S).where(S.c.id == sid).values(last_used_at=r.last_used_at))
-        raise
+    except BaseException as exc:
+        with transaction() as conn:  # put the claim back, so they can try again straight away
+            conn.execute(update(S).where(S.c.id == sid).values(last_used_at=r.last_used_at, last_mission_id=r.last_mission_id))
+        if isinstance(exc, (HTTPException, KeyboardInterrupt, SystemExit)):
+            raise
+        raise SavedError(f"couldn't start it: {exc}"[:300]) from exc
     with transaction() as conn:
         conn.execute(update(S).where(S.c.id == sid).values(uses=(r.uses or 0) + 1, last_mission_id=mid, last_used_at=now.isoformat()))
         emit(conn, "saved_request.started", mission_id=mid, org_id=p.organization_id,
