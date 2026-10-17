@@ -151,7 +151,8 @@ def _run(pr, p: Principal) -> dict:
     """Runs the action through the regular endpoints' functions, so permissions and validation are identical."""
     from services.api import main, v4
     if pr.kind == "create_mission":
-        m = main.create_mission(main.MissionIn(prompt=pr.params["prompt"], idempotency_key=f"play:{pr.id}"), p)
+        m = main.create_mission(main.MissionIn(prompt=pr.params["prompt"], kind=pr.params.get("kind", "fix_failing_test"),
+                                               idempotency_key=f"play:{pr.id}"), p)
         return {"mission_id": m["id"], "title": m["title"], "execution_mode": m["execution_mode"]}
     if pr.kind == "start_research":
         r = v4.start_research(v4.ResearchIn(**pr.params), p)

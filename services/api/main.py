@@ -305,6 +305,7 @@ class MissionIn(BaseModel):
     repository_id: str | None = None
     budget_usd: float | None = Field(default=None, gt=0, le=50)
     idempotency_key: str | None = Field(default=None, max_length=100)
+    kind: str = Field(default="fix_failing_test", pattern="^(fix_failing_test|run_tests)$")  # what the team does with the repository
 
 
 @app.post("/api/missions", status_code=201)
@@ -336,7 +337,7 @@ def create_mission(body: MissionIn, p: Principal = Depends(operator)):
         mode = "live" if s.model_available else "simulation"
         row = dict(id=mid, organization_id=p.organization_id, project_id=seed["project_id"], repository_id=repo_id,
                    title=(body.title or prompt.split(".")[0])[:120], prompt=prompt, status="CREATED", execution_mode=mode,
-                   budget_usd=budget, spent_usd_estimated=0.0,
+                   budget_usd=budget, spent_usd_estimated=0.0, kind=body.kind,
                    idempotency_key=body.idempotency_key, created_by=p.user_id, paused=0)
         conn.execute(insert(db.missions).values(**row))
         emit(conn, "mission.created", mission_id=mid, execution_mode=mode,

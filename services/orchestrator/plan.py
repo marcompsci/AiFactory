@@ -190,7 +190,12 @@ FACTORY_SYNC_GRAPH = [
              ["read_plan_usage"], expected_outputs={"count": "int"}),
 ]
 
-KINDS = ("fix_failing_test", "market_research", "build_prototype", "qa_prototype", "release",
+RUN_TESTS_GRAPH: list[TaskSpec] = [  # V6.15: Sentry runs the suite and reports; nothing is changed
+    TaskSpec("reproduce", "qa", "Run the test suite", "sentinel-citadel", "citadel-testbay", ["run_tests"],
+             expected_outputs={"failing_tests": "list[str]", "output": "str"}, validation={"tests_executed": True}),
+]
+
+KINDS = ("fix_failing_test", "run_tests", "market_research", "build_prototype", "qa_prototype", "release",
          "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS, *LAB_KINDS, "factory_sync")
 
 
@@ -198,6 +203,8 @@ def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list
     params = params or {}
     if kind in ("fix_failing_test", "") or kind not in KINDS:
         graph = FIX_FAILING_TEST_GRAPH
+    elif kind == "run_tests":
+        graph = RUN_TESTS_GRAPH
     elif kind == "market_research":
         graph = research_graph(params.get("agent_key", "research_apps"))
     elif kind == "build_prototype":

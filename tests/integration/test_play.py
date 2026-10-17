@@ -92,3 +92,34 @@ def test_district_activity_shows_work_in_progress(client):
     assert {a["name"] for a in forge["agents"]} >= {"Kade", "Orin"}
     assert all(t["mission_id"] == m["id"] for t in forge["tasks"])
     assert client.get("/api/play/districts/moon").status_code == 404
+
+
+
+def _agent_id(client, key):
+    return next(a["id"] for a in client.get("/api/snapshot").json()["agents"] if a["key"] == key)
+
+
+def test_sentry_runs_the_tests_as_a_confirmed_mission(client):
+    sentry = _agent_id(client, "qa")
+    r = say(client, sentry, "please run the tests")
+    prop = r["proposal"]
+    assert prop and prop["kind"] == "create_mission" and prop["params"]["kind"] == "run_tests" and "nothing" in prop["summary"].lower()
+    assert client.get("/api/missions").json()["missions"] == []  # nothing until you confirm
+    c = client.post(f"/api/play/proposals/{prop['id']}/confirm")
+    assert c.status_code == 200, c.text
+    mid = c.json()["result"]["mission_id"]
+    m = wait_for(lambda: (s := mission_status(client, mid))["status"] in ("COMPLETED", "FAILED") and s)
+    assert m["status"] == "COMPLETED" and m["kind"] == "run_tests"
+    detail = client.get(f"/api/missions/{mid}").json()
+    assert [t["key"] for t in detail["tasks"]] == ["reproduce"]
+    assert detail["tasks"][0]["outputs"]["failing_tests"] == ["tests/test_stats.py::test_median_even"]
+    assert not [t for t in detail["tool_executions"] if t["tool_name"] in ("edit_file", "prepare_pull_request")]
+    assert detail["objective"]["met"] is True
+    # a developer can't start a test run, and Kade's builds still work
+    assert say(client, KADE, "run the tests")["proposal"] is None
+
+
+def test_the_bank_talks_spending_with_a_forecast(client):
+    sterling = _agent_id(client, "cfo")
+    r = say(client, sterling, "how's spending?")
+    assert "Estimated AI spend today" in r["reply"] and "estimates, not bills" in r["reply"] and r["proposal"] is None

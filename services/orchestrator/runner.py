@@ -131,7 +131,7 @@ class MissionRunner:
             project = conn.execute(select(db.projects).where(db.projects.c.id == m.project_id)).first()
         if org.emergency_stopped:
             raise PlanError("emergency stop is engaged")
-        if m.kind == "fix_failing_test" and (repo is None or repo.project_id != m.project_id):
+        if m.kind in ("fix_failing_test", "run_tests") and (repo is None or repo.project_id != m.project_id):
             raise PlanError("repository is not part of this project")
         needed = {t for spec in plan_for(m.kind, m.params) for t in spec.permitted_tools}
         missing = needed - set(project.allowed_tools or [])

@@ -156,7 +156,10 @@ def reproduce(env: TaskEnv) -> dict:
         raise TaskError("test run timed out")
     msg = (f"Ran the suite: {r['summary_line']}. Failing: {', '.join(r['failing_tests']) or 'none'}."
            f"{'' if r['network_isolated'] else ' (network isolation unavailable on this host)'}")
-    env.say(msg, to_key="developer", kind="handoff")
+    if env.mission.kind == "run_tests":  # asked for a test run only: report it, there's no developer waiting on it
+        env.say(msg, kind="status")
+    else:
+        env.say(msg, to_key="developer", kind="handoff")
     return {"failing_tests": r["failing_tests"], "passed": r["passed"], "failed": r["failed"], "output": r["output"][-4000:]}
 
 

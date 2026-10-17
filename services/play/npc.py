@@ -79,6 +79,12 @@ def _intro(agent) -> Reply:
     if agent.key in RESEARCHERS:
         can += ["research a product idea on the App Store charts, Etsy or Depop", "share my findings"]
         sugg += ["Research budgeting apps", "Show me your findings"]
+    if agent.key in TESTERS:
+        can += ["run the test suite and report the results"]
+        sugg += ["Run the tests"]
+    if agent.key in BANKERS:
+        can += ["tell you how spending is going and where it's heading"]
+        sugg += ["How's spending?"]
     if agent.key in BUILDERS:
         can += ["take on a software change to the connected repository", "show what I've produced"]
         sugg += ["Fix the failing test", "Show me your artifacts"]
@@ -175,8 +181,7 @@ def _finance(conn: Connection, org: str) -> Reply:
     spent = ops.spent_today(conn, org)
     budget = conn.execute(select(db.organizations.c.daily_budget_usd).where(db.organizations.c.id == org)).scalar()
     return Reply(f"Estimated AI spend today is ${spent:.2f} of a ${budget:.2f} daily budget (an estimate, not a bill). "
-                 "Sterling's team at the AI Central Bank does financial analysis. The Bank's interior opens in a later update; "
-                 "until then use the Bank panel on the main screen.")
+                 "Sterling's team at the AI Central Bank can tell you where it's heading.")
 
 
 # ---------------------------------------------------------------- requests that become proposals
@@ -260,6 +265,39 @@ def _build(conn: Connection, org: str, user: str, agent, raw: str) -> Reply:
                  proposal=prop)
 
 
+_TESTS = re.compile(_LEAD + r"(?:run|check|rerun|re-run)\s+(?:the\s+|all\s+the\s+|all\s+)?(?:tests?|test\s+suite|suite)\b")
+TESTERS = {"qa"}
+BANKERS = {"cfo", "forecaster", "revenue_analyst", "expense_auditor", "savings_strategist", "bill_manager", "tax_agent"}
+
+
+def _run_tests(conn: Connection, org: str, user: str, agent) -> Reply:
+    if agent.key not in TESTERS | MANAGERS:
+        return Reply("Test runs are Sentry's job, at the Sentinel Citadel.")
+    prompt = "Run the test suite of the connected repository and report which tests fail."
+    prop = _propose(conn, org=org, user=user, agent=agent, kind="create_mission", params={"prompt": prompt, "kind": "run_tests"},
+                    summary="Run the test suite and report the results (nothing is changed).")
+    return Reply("I can run the whole suite in the sandbox and report what passes and what fails. Nothing gets changed. "
+                 "Confirm to start it.", proposal=prop)
+
+
+def _spend(conn: Connection, org: str) -> Reply:
+    from services.management.forecast import forecast
+    fc = forecast(conn, org)
+    t = fc["total"]
+    parts = [f"Estimated AI spend today is ${t['spent']:.2f}" + (f" of a ${t['daily_budget_usd']:.2f} daily budget" if t.get("daily_budget_usd") else "") + "."]
+    if t.get("projected") is not None:
+        parts.append(f"At today's pace it ends the day around ${t['projected']:.2f}.")
+    else:
+        parts.append("There aren't enough AI calls yet today to project the rest of the day.")
+    if fc["warnings"]:
+        parts.append("Heading for a cap: " + ", ".join(w["agent"] for w in fc["warnings"][:3]) + ".")
+    top = [a for a in fc["agents"] if a["spent"] > 0][:2]
+    if top:
+        parts.append("Most so far: " + ", ".join(f"{a['agent']} (${a['spent']:.2f})" for a in top) + ".")
+    parts.append("These are estimates, not bills.")
+    return Reply(" ".join(parts), suggestions=["What happened today?"])
+
+
 def _cancel(conn: Connection, org: str, user: str, agent, text: str) -> Reply:
     rows = conn.execute(select(db.missions.c.id, db.missions.c.title, db.missions.c.status)
                         .where(db.missions.c.organization_id == org, db.missions.c.status.notin_(DONE_MISSION))
@@ -301,6 +339,8 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
     m = _RESEARCH.match(t)
     if m:
         return _research(conn, org, user, agent, t, m.group("q"))
+    if _TESTS.match(t):
+        return _run_tests(conn, org, user, agent)
     if _BUILD.match(t):
         return _build(conn, org, user, agent, raw)
     found = re.match(_LEAD + r"(?:find(?!\s+out\b)|search(?: for)?|look up|where is|when did)\s+(?P<q>.{2,80})$", t)
@@ -310,8 +350,8 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
                                   or re.fullmatch(r"(brief|today|summary|yesterday)\??[!. ]*", t)):
         from services.management.brief import brief, spoken
         return Reply(spoken(brief(conn, org)), suggestions=["What needs my approval?", "Show everything in progress"])
-    if _has(t, "money", "budget", "spend", "cost", "bill", "tax", "financ", "revenue", "saving"):
-        return _finance(conn, org)
+    if _has(t, "money", "budget", "spend", "cost", "bill", "tax", "financ", "revenue", "saving", "forecast"):
+        return _spend(conn, org) if agent.key in BANKERS | MANAGERS else _finance(conn, org)
     if _has(t, "recommend", "opportunit", "review", "should we", "idea"):
         return _recommendations(conn, org) if agent.key in MANAGERS else _findings(conn, agent)
     if _has(t, "artifact", "result", "finding", "report", "show me", "deliverable", "produced"):
