@@ -68,3 +68,27 @@ def agent_scorecards(weeks: int = Query(4, ge=2, le=26), p: Principal = Depends(
     from services.management.scorecards import scorecards
     with db.get_engine().connect() as conn:
         return scorecards(conn, p.organization_id, weeks)
+
+
+@router.get("/audit/verify")
+def audit_verify(p: Principal = Depends(member)) -> dict:
+    """Recompute the event chain and report the first place it was altered, if any (services/core/audit.py)."""
+    from services.core import audit
+    with db.get_engine().connect() as conn:
+        return audit.verify(conn, p.organization_id)
+
+
+@router.get("/audit/missions/{mission_id}")
+def audit_export(mission_id: str, p: Principal = Depends(member)):
+    """One mission's audit file: its record, trace, checks, recovery plans and chained events, plus a bundle hash."""
+    from fastapi import HTTPException
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import select
+
+    from services.core import audit
+    with db.get_engine().connect() as conn:
+        m = conn.execute(select(db.missions.c.organization_id).where(db.missions.c.id == mission_id)).first()
+        if m is None or m.organization_id != p.organization_id:
+            raise HTTPException(404, "mission not found")
+        bundle = audit.mission_export(conn, mission_id)
+    return JSONResponse(bundle, headers={"Content-Disposition": f'attachment; filename="mission-{mission_id[:8]}-audit.json"'})

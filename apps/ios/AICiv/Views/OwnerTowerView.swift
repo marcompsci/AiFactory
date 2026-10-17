@@ -23,6 +23,9 @@ struct OwnerTowerView: View {
                     NavigationLink { PermissionsView() } label: {
                         Label("Permissions: tools agents have but don't use", systemImage: "key")
                     }
+                    NavigationLink { AuditLogView() } label: {
+                        Label("Audit log: check nothing was changed", systemImage: "checkmark.shield")
+                    }
                     NavigationLink { CharterView() } label: {
                         Label("Your charter: caps and quiet hours only you can change", systemImage: "scroll")
                     }

@@ -57,6 +57,8 @@ def emit(
         occurred_at=db.utcnow(),
     )
     conn.execute(insert(db.events).values(**row))
+    from .audit import link
+    link(conn, row)  # chain it to the previous event in the same transaction (tamper-evident log)
     conn.execute(insert(db.event_outbox).values(event_id=event_id, organization_id=org_id))
     return to_envelope(row)
 

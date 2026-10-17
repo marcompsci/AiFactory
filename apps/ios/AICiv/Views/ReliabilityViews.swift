@@ -197,6 +197,9 @@ struct MissionTraceView: View {
                         Text("Showing the most recent entries; the web trace has the full list.").font(.caption2).foregroundStyle(.secondary)
                     }
                 } header: { Text("Timeline") } footer: { Text("AI costs are the gateway's estimates.") }
+                Section { AuditExportButton(missionId: missionId) } footer: {
+                    Text("The audit file holds this mission's record, trace, checks and chained events, with a hash of the whole file.")
+                }
             } else if failed {
                 Text(app.connection == .live ? "Couldn't load the trace." : "Connect to your Mac and sign in to see the trace.").foregroundStyle(.secondary)
             } else {
@@ -469,5 +472,75 @@ struct ScorecardRow: View {
         case "steady": return Theme.cyan
         default: return .secondary
         }
+    }
+}
+
+/// Check the tamper-evident event log (GET /api/insights/audit/verify).
+struct AuditLogView: View {
+    @Environment(AppState.self) private var app
+    @State private var result: JSONValue?
+    @State private var busy = false
+
+    var body: some View {
+        List {
+            Section {
+                Button(busy ? "Checking…" : "Verify the log") { Task { await check() } }.disabled(busy || app.connection != .live)
+            } footer: {
+                Text("Every event is chained to the one before it with SHA-256. Changing, deleting or reordering any event breaks the chain from that point, and this check says where.")
+            }
+            if let r = result {
+                Section {
+                    Label(r.get("ok")?.bool == true ? "The log is intact" : "The log was altered",
+                          systemImage: r.get("ok")?.bool == true ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
+                        .foregroundStyle(r.get("ok")?.bool == true ? Theme.ok : Theme.bad).font(.headline)
+                    Text(r.s("note")).font(.subheadline)
+                    Text("\(r.get("checked")?.int ?? 0) events checked").font(.caption).foregroundStyle(.secondary)
+                    if !r.s("latest_hash").isEmpty {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Latest link").font(.caption2).foregroundStyle(.secondary)
+                            Text(r.s("latest_hash")).font(Pixel.mono(10)).textSelection(.enabled)
+                        }
+                        .accessibilityLabel("Latest link hash, starts with \(String(r.s("latest_hash").prefix(8)))")
+                    }
+                } footer: { Text("Note the latest link somewhere else now and then: if it ever stops matching, the history was rewritten.") }
+            }
+        }
+        .navigationTitle("Audit log")
+    }
+
+    private func check() async {
+        guard let api = app.api else { return }
+        busy = true
+        defer { busy = false }
+        result = try? await api.json("/api/insights/audit/verify")
+    }
+}
+
+/// Saves a mission's audit file (GET /api/insights/audit/missions/{id}) so you can share or keep it.
+struct AuditExportButton: View {
+    @Environment(AppState.self) private var app
+    let missionId: String
+    @State private var file: URL?
+    @State private var failed = false
+
+    var body: some View {
+        Group {
+            if let file {
+                ShareLink(item: file) { Label("Share the audit file", systemImage: "square.and.arrow.up") }
+            } else {
+                Button { Task { await make() } } label: { Label(failed ? "Couldn't build the audit file. Try again" : "Build the audit file", systemImage: "doc.badge.gearshape") }
+            }
+        }
+    }
+
+    private func make() async {
+        guard let api = app.api else { return }
+        do {
+            let bundle = try await api.json("/api/insights/audit/missions/\(missionId)")
+            let data = try JSONEncoder().encode(bundle)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("mission-\(missionId.prefix(8))-audit.json")
+            try data.write(to: url, options: .atomic)
+            file = url
+        } catch { failed = true }
     }
 }

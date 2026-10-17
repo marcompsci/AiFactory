@@ -1220,6 +1220,17 @@ recovery_plans = Table(
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
+# ---------------------------------------------------------------- V6.9 tamper-evident log: each event linked to the last
+event_chain = Table(               # hash = sha256(prev_hash + canonical event); append-only (services/core/audit.py)
+    "event_chain", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("sequence", Integer, primary_key=True),
+    Column("event_id", String(36), nullable=False),
+    Column("prev_hash", String(64), nullable=False),
+    Column("hash", String(64), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
 # ---------------------------------------------------------------- V6.8 least privilege: tools the owner took away
 capability_revocations = Table(    # a revoked grant stays revoked across restarts (the seed skips it) until restored
     "capability_revocations", metadata,
@@ -1302,7 +1313,8 @@ FINANCE_TABLES = ("financial_connections", "financial_accounts", "financial_tran
                   "alternative_candidates", "alternative_evidence", "compatibility_assessments", "sandbox_evaluations",
                   "cost_comparisons", "investigation_reviews", "game_scores", "revenue_links")
 
-APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations", "financial_audit_events", "game_scores")
+APPEND_ONLY_TABLES = ("owner_decisions", "release_authorizations", "release_invalidations", "financial_audit_events", "game_scores",
+                      "event_chain", "charter_amendments")
 
 
 _engine: Engine | None = None
