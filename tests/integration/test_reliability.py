@@ -193,3 +193,18 @@ def test_today_doesnt_hijack_other_requests(client):
     assert say(client, ATLAS, "what happened today?")["reply"].startswith("In the last day")
     assert say(client, ATLAS, "today?")["reply"].startswith("In the last day")
     assert say(client, ATLAS, "research a summary app on the App Store")["proposal"]["kind"] == "start_research"
+
+
+def test_search_finds_records_across_kinds_and_atlas_answers(monkeypatch):
+    with live_client(monkeypatch, FakeGateway(patch=EVIL)) as client:
+        mid = start(client)
+        wait_for(lambda: mission_status(client, mid)["status"] == "FAILED")
+        r = client.get("/api/insights/search?q=refusing to edit tests").json()
+        kinds = set(r["counts"])
+        assert r["total"] >= 2 and {"lesson", "decision"} <= kinds
+        assert all(x["mission_id"] in (mid, None) for x in r["results"])
+        assert any(x["kind"] == "lesson" and x["mission_id"] == mid for x in r["results"])
+        assert client.get("/api/insights/search?q=a").json()["total"] == 0  # too short
+        reply = say(client, ATLAS, "find refusing to edit tests")["reply"]
+        assert reply.startswith("From the records:") and "refusing" in reply
+        assert say(client, ATLAS, "find zebra unicorn")["reply"].startswith("I found nothing")

@@ -15,6 +15,9 @@ struct OwnerTowerView: View {
                 RecoveryPlansSection()
                 FinanceDecisionsSection()
                 Section("Reliability") {
+                    NavigationLink { RecordSearchView() } label: {
+                        Label("Search the records", systemImage: "magnifyingglass")
+                    }
                     NavigationLink { FailureClinicView() } label: {
                         Label("Failure clinic: why agents failed, and what they learned", systemImage: "stethoscope")
                     }

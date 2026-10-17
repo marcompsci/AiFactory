@@ -100,3 +100,11 @@ def owner_inbox(p: Principal = Depends(member)) -> dict:
     from services.management.inbox import inbox
     with db.get_engine().connect() as conn:
         return inbox(conn, p.organization_id)
+
+
+@router.get("/search")
+def search_records(q: str = Query("", max_length=100), p: Principal = Depends(member)) -> dict:
+    """Text search across missions, steps, messages, lessons, decisions and artifacts (services/management/search.py)."""
+    from services.management.search import search
+    with db.get_engine().connect() as conn:
+        return search(conn, p.organization_id, q)

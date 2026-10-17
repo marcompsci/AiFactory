@@ -274,6 +274,17 @@ def _cancel(conn: Connection, org: str, user: str, agent, text: str) -> Reply:
                  "their next step. Confirm to cancel it.", proposal=prop)
 
 
+def _search(conn: Connection, org: str, q: str) -> Reply:
+    from services.management.search import search
+    res = search(conn, org, q)
+    if not res["results"]:
+        return Reply(f"I found nothing in the records about \"{q}\".")
+    top = res["results"][:3]
+    lines = "; ".join(f"{r['title']}: {r['snippet'][:90]}" for r in top)
+    more = f" ({res['total']} results in all; the search screen in the Owner tab has the rest.)" if res["total"] > 3 else ""
+    return Reply(f"From the records: {lines}.{more}")
+
+
 def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply:
     raw = (text or "").strip()
     t = raw.lower()
@@ -287,6 +298,9 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
         return _status(conn, agent)
     if _has(t, "cancel", "stop the", "abort"):
         return _cancel(conn, org, user, agent, t)
+    found = re.match(r"^(?:please\s+)?(?:find|search(?: for)?|look up|where is|when did)\s+(?P<q>.{2,80})$", t)
+    if found:
+        return _search(conn, org, found.group("q").strip(" ?.!"))
     m = _RESEARCH.match(t)
     if m:
         return _research(conn, org, user, agent, t, m.group("q"))

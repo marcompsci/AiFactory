@@ -613,3 +613,52 @@ struct InboxSection: View {
         return parts.joined(separator: " · ")
     }
 }
+
+/// Search the records (GET /api/insights/search): missions, steps, messages, lessons, decisions, artifacts.
+struct RecordSearchView: View {
+    @Environment(AppState.self) private var app
+    @State private var query = ""
+    @State private var result: JSONValue?
+
+    var body: some View {
+        List {
+            if app.connection != .live {
+                Text("Connect to your Mac and sign in to search.").foregroundStyle(.secondary)
+            } else if let r = result {
+                let items = r.get("results")?.list ?? []
+                if items.isEmpty && query.count >= 2 { Text("Nothing in the records matches \"\(query)\".").foregroundStyle(.secondary) }
+                ForEach(Array(items.enumerated()), id: \.offset) { _, x in
+                    if !x.s("mission_id").isEmpty {
+                        NavigationLink { MissionTraceView(missionId: x.s("mission_id")) } label: { row(x) }
+                    } else {
+                        row(x)
+                    }
+                }
+            } else {
+                Text("Search missions, steps, what agents said, lessons, manager decisions and files.").font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Search")
+        .searchable(text: $query, prompt: "Search the records")
+        .task(id: query) {
+            guard query.count >= 2, let api = app.api else { result = nil; return }
+            try? await Task.sleep(for: .milliseconds(300))  // wait for typing to pause
+            if Task.isCancelled { return }
+            let q = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+            result = try? await api.json("/api/insights/search?q=\(q)")
+        }
+    }
+
+    private func row(_ x: JSONValue) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(x.s("kind")).font(Pixel.mono(10)).padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(Theme.cyan.opacity(0.2), in: Capsule())
+                Text(x.s("title")).font(.subheadline.bold()).lineLimit(1)
+            }
+            Text(x.s("snippet")).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+            Text(String(x.s("at").prefix(16)).replacingOccurrences(of: "T", with: " ")).font(.caption2).foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
