@@ -94,6 +94,11 @@ def start(spec: dict, p: Principal, *, priority: str = "normal", key: str | None
 
 
 def _mission(conn: Connection, org: str, mid: str):
+    import uuid
+    try:
+        uuid.UUID(str(mid))
+    except ValueError as exc:  # not an id at all (Postgres would refuse it with an error, not "not found")
+        raise LinkError("mission not found", 404) from exc
     m = conn.execute(select(db.missions).where(db.missions.c.id == mid)).first()
     if m is None or m.organization_id != org:
         raise LinkError("mission not found", 404)
@@ -164,6 +169,11 @@ def add_followup(mission_id: str, p: Principal, spec: dict, priority: str = "nor
 
 def cancel_followup(org: str, link_id: str, user_id: str) -> dict:
     L = db.mission_links
+    import uuid
+    try:
+        uuid.UUID(str(link_id))
+    except ValueError as exc:
+        raise LinkError("follow-on not found", 404) from exc
     with transaction() as conn:
         n = conn.execute(update(L).where(L.c.id == link_id, L.c.organization_id == org, L.c.kind == "followup", L.c.status == "WAITING")
                          .values(status="CANCELLED", reason="cancelled by you", updated_at=db.utcnow())).rowcount
