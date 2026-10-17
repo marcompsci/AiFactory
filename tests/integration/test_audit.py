@@ -95,7 +95,7 @@ def test_unchained_events_are_reported(client):
     with transaction() as conn:
         seq = conn.execute(select(db.events.c.sequence).order_by(db.events.c.sequence.desc()).limit(1)).scalar() + 1
         conn.execute(db.events.insert().values(id=db.new_id(), organization_id=ORG_ID, sequence=seq, event_type="agent.message",
-                                               schema_version=1, correlation_id="x", execution_mode="live", payload={},
+                                               schema_version=1, correlation_id=db.new_id(), execution_mode="live", payload={},
                                                occurred_at=db.utcnow()))
     v = _verify(client)
     assert v["ok"] is False and v["problem"]["sequence"] == seq and "never chained" in v["problem"]["reason"]
