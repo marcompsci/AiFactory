@@ -17,6 +17,7 @@ struct HomeView: View {
                         if why.contains("Sign in") { SignInCard() } else { RetryCard(message: why) }
                     }
                     stats
+                    if app.connection == .live { BriefCard().pixelPanel() }
                     LiveCityView()
                         .pixelPanel()
                     activity

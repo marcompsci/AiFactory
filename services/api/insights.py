@@ -52,3 +52,11 @@ def collaboration(days: int = Query(30, ge=1, le=365), p: Principal = Depends(me
     from services.management.collaboration import network
     with db.get_engine().connect() as conn:
         return network(conn, p.organization_id, days)
+
+
+@router.get("/brief")
+def daily_brief(hours: int = Query(24, ge=1, le=168), p: Principal = Depends(member)) -> dict:
+    """The daily brief, counted from the records (services/management/brief.py)."""
+    from services.management.brief import brief
+    with db.get_engine().connect() as conn:
+        return brief(conn, p.organization_id, hours)

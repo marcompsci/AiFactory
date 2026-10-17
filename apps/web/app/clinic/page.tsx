@@ -19,12 +19,14 @@ export default function Clinic() {
   const [data, setData] = useState<Json | null>(null);
   const [lessons, setLessons] = useState<Json | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [brief, setBrief] = useState<Json | null>(null);
 
   useEffect(() => {
     let live = true;
     setError(null);
     api.failures(days).then((d) => live && setData(d)).catch((e) => live && setError(String(e.message ?? e)));
     api.lessons().then((d) => live && setLessons(d)).catch(() => undefined);
+    api.brief().then((d) => live && setBrief(d)).catch(() => undefined);
     return () => {
       live = false;
     };
@@ -50,6 +52,17 @@ export default function Clinic() {
           </div>
         </header>
 
+        {brief ? (
+          <section className="px-panel rounded p-4">
+            <h2 className="font-pixel text-sm uppercase text-cyan">Daily brief · Atlas</h2>
+            <p className="mt-1 font-semibold">{brief.headline}</p>
+            {brief.failed.length ? <p className="text-sm text-bad">Failed: {brief.failed.slice(0, 3).map((f: Json) => f.title).join("; ")}</p> : null}
+            <p className="text-sm text-ink-2">
+              {brief.waiting.approvals} approvals · {brief.waiting.recovery_plans.length} recovery plans · about ${brief.spend.today_usd.toFixed(2)} spent today (estimated)
+            </p>
+            {brief.lessons[0] ? <p className="text-xs text-ink-3">{brief.lessons[0].agent} learned: {brief.lessons[0].lesson}</p> : null}
+          </section>
+        ) : null}
         {error ? <p className="text-bad">Couldn&apos;t load the clinic: {error}</p> : null}
         {!data && !error ? <p className="text-ink-3">Loading…</p> : null}
 

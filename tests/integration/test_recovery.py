@@ -89,3 +89,20 @@ def test_a_plan_that_cannot_start_goes_back_to_waiting_and_decided_plans_stay_de
             assert recovery.claim(conn, plan["id"], user_id="00000000-0000-4000-8000-000000000000", approve=True) is False
         assert client.post(f"/api/recovery/{plan['id']}/approve").status_code == 409
         assert len(client.get("/api/missions").json()["missions"]) == 1
+
+
+def test_daily_brief_counts_from_records_and_atlas_reads_it(monkeypatch):
+    from tests.integration.test_play import ATLAS, say
+    with live_client(monkeypatch, FakeGateway(patch=EVIL)) as client:
+        empty = client.get("/api/insights/brief").json()
+        assert empty["headline"].startswith("In the last day: No missions finished") and empty["method"] == "records"
+        mid = start(client)
+        wait_for(lambda: mission_status(client, mid)["status"] == "FAILED")
+        _plan(client, mid)
+        b = client.get("/api/insights/brief").json()
+        assert [f["id"] for f in b["failed"]] == [mid] and b["completed"] == []
+        assert len(b["waiting"]["recovery_plans"]) == 1 and b["waiting"]["total"] >= 1
+        assert b["loops_caught"] >= 1 and b["lessons"] and b["spend"]["is_estimate"] is True
+        assert "1 failed" in b["headline"] and "waiting for you" in b["headline"]
+        r = say(client, ATLAS, "what happened today?")
+        assert r["proposal"] is None and "recovery plan" in r["reply"] and "estimated" in r["reply"]

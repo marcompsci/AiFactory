@@ -140,6 +140,8 @@ export const api = {
   trace: (id: string) => call<Json>(`/api/insights/missions/${id}/trace`),
   recoveryDecide: (id: string, approve: boolean) => call<Json>(`/api/recovery/${id}/${approve ? "approve" : "decline"}`, { method: "POST" }),
   charter: () => call<Json>("/api/charter"),
+  brief: () => call<Json>("/api/insights/brief"),
+  scorecards: (weeks = 4) => call<Json>(`/api/insights/scorecards?weeks=${weeks}`),
   emergencyStop: (engaged: boolean) => call<Json>("/api/emergency-stop", { method: "POST", body: JSON.stringify({ engaged }) }),
 };
 

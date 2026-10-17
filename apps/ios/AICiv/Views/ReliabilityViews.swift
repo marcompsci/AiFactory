@@ -336,3 +336,50 @@ struct RecoveryPlanRow: View {
         } catch { message = error.localizedDescription }
     }
 }
+
+/// Atlas's daily brief on the Home screen (GET /api/insights/brief): counted from the records, money estimated.
+struct BriefCard: View {
+    @Environment(AppState.self) private var app
+    @State private var brief: JSONValue?
+
+    var body: some View {
+        Group {
+            if let b = brief {
+                VStack(alignment: .leading, spacing: 8) {
+                    PixelHeader(text: "Daily brief", trailing: "Atlas")
+                    Text(b.s("headline")).font(.subheadline.bold()).fixedSize(horizontal: false, vertical: true)
+                    let failed = b.get("failed")?.list ?? []
+                    if !failed.isEmpty {
+                        Text("Failed: " + failed.prefix(3).map { $0.s("title") }.joined(separator: "; "))
+                            .font(.caption).foregroundStyle(Theme.bad).fixedSize(horizontal: false, vertical: true)
+                    }
+                    let w = b.get("waiting")
+                    HStack(spacing: 12) {
+                        stat("\(w?.get("approvals")?.int ?? 0)", "approvals")
+                        stat("\(w?.get("recovery_plans")?.list.count ?? 0)", "recovery plans")
+                        stat(String(format: "$%.2f", b.get("spend")?.get("today_usd")?.double ?? 0), "spent today (est.)")
+                    }
+                    if let l = b.get("lessons")?.list.first {
+                        Text("\(l.s("agent")) learned: \(l.s("lesson"))").font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                    }
+                    if b.get("quiet_now")?.bool == true {
+                        Label("Quiet hours: scheduled work is waiting", systemImage: "moon.zzz.fill").font(.caption).foregroundStyle(Theme.gold)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Daily brief. \(b.s("headline"))")
+            }
+        }
+        .task(id: app.connection == .live) {
+            guard app.connection == .live, let api = app.api else { brief = nil; return }
+            brief = try? await api.json("/api/insights/brief")
+        }
+    }
+
+    private func stat(_ v: String, _ k: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(v).font(Pixel.mono(15)).foregroundStyle(Theme.ink)
+            Text(k).font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+}

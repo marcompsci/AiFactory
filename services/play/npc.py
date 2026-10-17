@@ -74,7 +74,8 @@ def _intro(agent) -> Reply:
     sugg = ["What are you working on?"]
     if agent.key in MANAGERS:
         can += ["show what needs your approval", "recommend opportunities", "start research or a software change"]
-        sugg += ["What needs my approval?", "Any recommendations?", "Show everything in progress"]
+        sugg += ["What happened today?", "What needs my approval?", "Any recommendations?"]
+        can.insert(1, "give you the daily brief")
     if agent.key in RESEARCHERS:
         can += ["research a product idea on the App Store charts, Etsy or Depop", "share my findings"]
         sugg += ["Research budgeting apps", "Show me your findings"]
@@ -278,6 +279,9 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
     t = raw.lower()
     if not t or re.fullmatch(r"(hi|hello|hey|yo|sup|help|what can you do\??|who are you\??)[!. ]*", t):
         return _intro(agent)
+    if agent.key in MANAGERS and _has(t, "what happened", "brief", "today", "yesterday", "catch me up", "summary", "recap"):
+        from services.management.brief import brief, spoken
+        return Reply(spoken(brief(conn, org)), suggestions=["What needs my approval?", "Show everything in progress"])
     if _has(t, "approv", "pending", "sign off", "waiting for me"):
         return _approvals(conn, org)
     if _has(t, "status", "progress", "working on", "doing", "how's it going", "how is it going", "busy", "update me", "what's up"):
