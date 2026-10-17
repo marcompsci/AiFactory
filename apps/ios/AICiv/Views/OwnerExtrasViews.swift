@@ -80,6 +80,7 @@ struct MissionLinksSection: View {
             let r = try await api.json("/api/missions/\(missionId)/rerun", method: "POST")
             message = r.get("repeat")?.bool == true ? "Already started a moment ago." : "Started again. It's in the journal."
             await app.refresh()
+            await reload()
         } catch { message = error.localizedDescription }
     }
 
@@ -209,10 +210,16 @@ struct TeamView: View {
             } footer: {
                 Text(team?.s("note") ?? "")
             }
-            let orphans = team?.get("schedules_without_an_owner")?.list ?? []
+            let orphans = team?.get("schedules_to_check")?.list ?? []
             if !orphans.isEmpty {
-                Section("Schedules whose creator isn't an owner") {
-                    ForEach(orphans, id: \.self) { o in Text(o.s("title")).font(.caption) }
+                Section("Schedules to check") {
+                    ForEach(orphans, id: \.self) { o in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(o.s("title")).font(.caption.bold())
+                            Text(o.s("why")).font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
                     NavigationLink { SchedulesView() } label: { Text("Review schedules") }
                 }
             }
@@ -252,7 +259,7 @@ struct RecordsExportView: View {
     var body: some View {
         List {
             Section {
-                Text("One JSON file with your missions, steps, approvals, decisions, charter, schedules, team and recent events, each event with its audit-chain link, plus a fresh check of the whole chain and a SHA-256 of the contents.")
+                Text("One JSON file with your missions, steps, approvals, decisions, charter, schedules, team and recent events, each event with its audit-chain link, plus a fresh check of the whole chain and a SHA-256 fingerprint of the records (bundle_sha256; how to recompute it is in the file's format notes).")
                     .font(.subheadline)
                 Text("Left out on purpose: money records, stored credentials and server settings.")
                     .font(.caption).foregroundStyle(.secondary)

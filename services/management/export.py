@@ -2,7 +2,8 @@
 
 What's in it: missions, tasks, approvals, owner decisions, the charter and its amendments, schedules, run-again and
 follow-on links, the team roster, and recent events with their audit-chain links, plus a fresh check of the whole chain
-and a SHA-256 of the file's contents. What's left out, on purpose: money records (bank, ledger, financial approvals),
+and `bundle_sha256`: the SHA-256 of the bundle without that field, as compact JSON with sorted keys (the file itself is
+indented for reading, so recompute it from the parsed JSON, not from the file's bytes). What's left out, on purpose: money records (bank, ledger, financial approvals),
 encrypted credentials and anything in the environment. Every export is itself recorded as an event.
 """
 from __future__ import annotations
@@ -49,6 +50,9 @@ def build(conn: Connection, org_id: str, by_user: str) -> dict:
         "organization": dict(org._mapping) if org else {"id": org_id},
         "limits": {"missions": MAX_MISSIONS, "events": MAX_EVENTS, "missions_included": len(missions), "events_included": len(events)},
         "excluded": EXCLUDED,
+        "how_to_check": "bundle_sha256 = SHA-256 of this JSON without the bundle_sha256 field, serialized with sorted keys, "
+                        "no spaces (separators ',' and ':') and UTF-8 text. The audit section is a fresh check of the whole "
+                        "event chain; each event carries its chain_hash and chain_prev.",
         "missions": missions,
         "tasks": tasks,
         "approvals": _rows(conn, select(db.approvals).where(db.approvals.c.organization_id == org_id)),

@@ -65,8 +65,14 @@ def team(conn, org_id: str, me: str) -> dict:
     members = [{"user_id": r.user_id, "role": r.role, "mode": r.mode, "email": r.email, "first_seen": r.first_seen,
                 "last_seen": r.last_seen, "you": r.user_id == me, "active_schedules": counts.get(r.user_id, 0)}
                for r in conn.execute(select(M).where(M.c.organization_id == org_id).order_by(M.c.last_seen.desc())).fetchall()]
-    orphaned = [{"schedule_id": r.id, "title": r.title, "created_by": r.created_by} for r in conn.execute(
-        select(S.c.id, S.c.title, S.c.created_by).where(S.c.organization_id == org_id, S.c.enabled == 1)).fetchall()
-        if not any(m["user_id"] == r.created_by and m["role"] == "owner" for m in members)]
-    return {"members": members, "schedules_without_an_owner": orphaned,
-            "note": "Roles are as of each person's latest sign-in. Schedules run only while their creator is still an owner."}
+    roles = {m["user_id"]: m["role"] for m in members}
+    check = []
+    for r in conn.execute(select(S.c.id, S.c.title, S.c.created_by).where(S.c.organization_id == org_id, S.c.enabled == 1)).fetchall():
+        role = roles.get(r.created_by)
+        if role != "owner":  # matches the scheduler: not an owner pauses at the next run; unknown keeps running
+            check.append({"schedule_id": r.id, "title": r.title, "created_by": r.created_by,
+                          "why": "its creator hasn't signed in since the roster began, so it keeps running" if role is None
+                          else f"its creator is now {role}, so it pauses at its next run"})
+    return {"members": members, "schedules_to_check": check,
+            "note": "Roles are as of each person's latest sign-in. A schedule pauses when its creator's latest sign-in "
+                    "wasn't as an owner."}

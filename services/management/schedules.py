@@ -199,8 +199,10 @@ def skip_next(conn: Connection, org_id: str, sid: str) -> dict:
         raise ScheduleError("the schedule is paused, so there's no next run to skip")
     after = datetime.fromisoformat(s["next_run_at"])
     nxt = next_run(s["cadence"], s["weekday"], s["hour"], s["minute"], s["tz"], after).isoformat()
-    conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid,
-                                                    db.mission_schedules.c.next_run_at == s["next_run_at"]).values(next_run_at=nxt))
+    n = conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid,
+                                                        db.mission_schedules.c.next_run_at == s["next_run_at"]).values(next_run_at=nxt)).rowcount
+    if not n:
+        raise ScheduleError("that run is starting right now, so it can't be skipped")
     emit(conn, "schedule.changed", org_id=org_id, payload={"schedule_id": sid, "skipped": s["next_run_at"], "next_run_at": nxt})
     return get(conn, org_id, sid)
 

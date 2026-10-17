@@ -17,9 +17,8 @@ def member(request: Request) -> Principal:
 
 
 def operator(request: Request) -> Principal:
-    p = authenticate(request)
-    p.require("operator")
-    return p
+    from services.api.finance import operator as op  # the operator role plus the mutation rate limit
+    return op(request)
 
 
 class RerunIn(BaseModel):

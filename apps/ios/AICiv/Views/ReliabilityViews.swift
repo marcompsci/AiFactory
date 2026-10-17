@@ -552,7 +552,10 @@ extension APIClient {
     func rawData(_ path: String) async throws -> Data {
         let (data, resp) = try await URLSession.shared.data(for: request(path))
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw APIError(status: status, detail: HTTPURLResponse.localizedString(forStatusCode: status)) }
+        guard (200..<300).contains(status) else {
+            let detail = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["detail"] as? String
+            throw APIError(status: status, detail: detail ?? HTTPURLResponse.localizedString(forStatusCode: status))
+        }
         return data
     }
 }
@@ -779,7 +782,9 @@ struct SchedulesView: View {
                     Button("Run now") { Task { await post(s.s("id"), "run-now", done: "Started. It's in the journal.") } }.tint(Theme.cyan)
                 }
                 .accessibilityAction(named: "Run now") { Task { await post(s.s("id"), "run-now", done: "Started. It's in the journal.") } }
-                .accessibilityAction(named: "Skip next run") { Task { await post(s.s("id"), "skip", done: "Skipped the next run.") } }
+                .accessibilityAction(named: s.get("enabled")?.int == 1 ? "Skip next run" : "Skip next run (resume it first)") {
+                    Task { await post(s.s("id"), "skip", done: "Skipped the next run.") }
+                }
             }
             if let message { Text(message).font(.caption) }
             Section { } footer: { Text("Each run follows your charter, quiet hours and the emergency stop. Only test runs and research can be scheduled. Three failed runs in a row pause a schedule. Swipe right to run now, left to skip the next run.") }

@@ -79,9 +79,14 @@ def run_now(sid: str, p: Principal = Depends(owner)) -> dict:
         s = schedules.get(conn, p.organization_id, sid)
     if s is None:
         raise HTTPException(404, "schedule not found")
-    last = s.get("last_run_at")
-    if s.get("last_mission_id") and last and datetime.fromisoformat(last) >= now - timedelta(seconds=10):
-        return {"mission_id": s["last_mission_id"], "schedule": s, "repeat": True}
+    from sqlalchemy import or_, update
+    S = db.mission_schedules
+    with transaction() as conn:  # claim the run (inside the write lock), so two taps can't both start one
+        claimed = conn.execute(update(S).where(S.c.id == sid, or_(S.c.last_run_at.is_(None),
+                                                                  S.c.last_run_at < (now - timedelta(seconds=10)).isoformat()))
+                               .values(last_run_at=now.isoformat())).rowcount
+    if not claimed:
+        return {"mission_id": s.get("last_mission_id"), "schedule": s, "repeat": True}
     mid, err = schedules.start(s, slot_key="now:" + now.strftime("%Y%m%dT%H%M%S"), user_id=p.user_id)
     with transaction() as conn:
         schedules.record_run(conn, sid, mission_id=mid, error=err)

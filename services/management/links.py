@@ -8,7 +8,9 @@ A follow-on is a mission written now that starts when another finishes: "when th
 as a link; the scheduler's `followups` job starts it once the first mission completes, and cancels it if the first one
 fails or is cancelled (nothing builds on a failed step). The request is checked when it's written, so a bad follow-on
 is refused up front, not when it's due. It starts as the person who wrote it, and only if their role at their latest
-sign-in still lets them start missions.
+sign-in still lets them start missions. A start interrupted by the server stopping goes back in line after two minutes
+(test runs carry an idempotency key, so they can't start twice; research has none, so an interrupted research start
+may, rarely, run twice).
 """
 from __future__ import annotations
 
@@ -29,6 +31,7 @@ RERUNNABLE = {"fix_failing_test", "run_tests", "market_research"}
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 MAX_WAITING = 5          # follow-ons waiting on one mission
 DOUBLE_TAP = timedelta(seconds=10)  # a second "run again" this soon returns the first one
+STALE_STARTING = timedelta(minutes=2)  # a follow-on claimed this long ago without starting was interrupted
 
 
 class LinkError(ValueError):
@@ -45,7 +48,9 @@ def spec_of(m) -> dict:
     if m.kind == "market_research":
         return {"kind": "market_research", "params": {k: params[k] for k in ("source", "query", "region") if k in params},
                 "title": m.title, "prompt": m.prompt}
-    return {"kind": m.kind, "prompt": m.prompt, "title": m.title, "params": {}}
+    # the same repository and budget as the original (the charter's cap still applies when it starts)
+    return {"kind": m.kind, "prompt": m.prompt, "title": m.title, "params": {}, "repository_id": m.repository_id,
+            "budget_usd": m.budget_usd}
 
 
 def check_spec(spec: dict) -> dict:
@@ -83,6 +88,7 @@ def start(spec: dict, p: Principal, *, priority: str = "normal", key: str | None
             state.worker.reprioritize(mid, priority)
         return mid
     m = main.create_mission(main.MissionIn(prompt=spec["prompt"], kind=spec["kind"], title=spec.get("title"), priority=priority,
+                                           repository_id=spec.get("repository_id"), budget_usd=spec.get("budget_usd"),
                                            idempotency_key=key), p)
     return m["id"]
 
@@ -101,25 +107,31 @@ def _priority(conn: Connection, mid: str) -> str:
 # ---------------------------------------------------------------- run again
 
 def rerun(mission_id: str, p: Principal, priority: str | None = None) -> dict:
+    """Claim first (a STARTING link, inside the write lock), then start: two taps can't both start a mission."""
     now = datetime.now(timezone.utc)
     L = db.mission_links
+    lid = db.new_id()
     with transaction() as conn:
         m = _mission(conn, p.organization_id, mission_id)
         if m.status not in TERMINAL:
             raise LinkError("that mission is still going; you can run it again once it finishes", 409)
         spec = spec_of(m)
-        recent = conn.execute(select(L.c.to_mission_id).where(L.c.from_mission_id == mission_id, L.c.kind == "rerun",
-                                                              L.c.status == "STARTED", L.c.created_by == p.user_id,
-                                                              L.c.created_at >= (now - DOUBLE_TAP).isoformat())
-                              .order_by(L.c.created_at.desc()).limit(1)).scalar()
+        recent = conn.execute(select(L.c.to_mission_id, L.c.status).where(
+            L.c.from_mission_id == mission_id, L.c.kind == "rerun", L.c.status.in_(["STARTING", "STARTED"]),
+            L.c.created_by == p.user_id, L.c.created_at >= (now - DOUBLE_TAP).isoformat()).order_by(L.c.created_at.desc()).limit(1)).first()
+        if recent:  # a double tap: hand back the run that just started (or is starting)
+            return {"mission_id": recent.to_mission_id, "from_mission_id": mission_id, "repeat": True}
         prio = priority or _priority(conn, mission_id)
-    if recent:  # a double tap: hand back the run that just started
-        return {"mission_id": recent, "from_mission_id": mission_id, "repeat": True}
-    lid = db.new_id()
-    new_id = start(spec, p, priority=prio, key=f"rerun:{lid}")
-    with transaction() as conn:
         conn.execute(insert(L).values(id=lid, organization_id=p.organization_id, kind="rerun", from_mission_id=mission_id,
-                                      to_mission_id=new_id, status="STARTED", spec={**spec, "priority": prio}, created_by=p.user_id))
+                                      status="STARTING", spec={**spec, "priority": prio}, created_by=p.user_id))
+    try:
+        new_id = start(spec, p, priority=prio, key=f"rerun:{lid}")
+    except HTTPException as exc:
+        with transaction() as conn:
+            conn.execute(update(L).where(L.c.id == lid).values(status="FAILED", reason=str(exc.detail)[:300], updated_at=db.utcnow()))
+        raise
+    with transaction() as conn:
+        conn.execute(update(L).where(L.c.id == lid).values(status="STARTED", to_mission_id=new_id, updated_at=db.utcnow()))
         emit(conn, "mission.rerun", mission_id=new_id, org_id=p.organization_id,
              payload={"from_mission_id": mission_id, "mission_id": new_id, "title": m.title})
     return {"mission_id": new_id, "from_mission_id": mission_id, "repeat": False}
@@ -139,6 +151,8 @@ def add_followup(mission_id: str, p: Principal, spec: dict, priority: str = "nor
         if len(waiting) >= MAX_WAITING:
             raise LinkError(f"a mission can have at most {MAX_WAITING} follow-ons waiting", 409)
         lid = db.new_id()
+        if clean["kind"] != "market_research":  # work on the same repository as the mission it follows
+            clean["repository_id"] = m.repository_id
         conn.execute(insert(L).values(id=lid, organization_id=p.organization_id, kind="followup", from_mission_id=mission_id,
                                       status="WAITING", spec={**clean, "priority": priority}, created_by=p.user_id))
         emit(conn, "mission.followup_added", mission_id=mission_id, org_id=p.organization_id,
@@ -190,6 +204,10 @@ def _role_ok(conn: Connection, org: str, user_id: str) -> bool:
 def tick(only: str | None = None) -> dict:
     """Start follow-ons whose first mission completed; cancel those whose first mission failed or was cancelled."""
     L, M = db.mission_links, db.missions
+    stale = (datetime.now(timezone.utc) - STALE_STARTING).isoformat()
+    with transaction() as conn:  # a claim the process didn't finish (it stopped mid-start) goes back in line
+        conn.execute(update(L).where(L.c.kind == "followup", L.c.status == "STARTING", L.c.updated_at < stale)
+                     .values(status="WAITING", reason="retrying after an interrupted start", updated_at=db.utcnow()))
     with db.get_engine().connect() as conn:
         q = (select(L.c.id, L.c.organization_id, L.c.spec, L.c.created_by, L.c.from_mission_id, M.c.status.label("first"))
              .join(M, M.c.id == L.c.from_mission_id)

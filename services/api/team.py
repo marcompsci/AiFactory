@@ -37,8 +37,13 @@ def export(p: Principal = Depends(owner)) -> Response:
         if last is not None and now - last < EXPORT_EVERY:
             raise HTTPException(429, f"one export a minute; try again in {int(EXPORT_EVERY - (now - last)) + 1} s")
         _last_export[p.user_id] = now
-    with db.get_engine().connect() as conn:
-        bundle = build(conn, p.organization_id, p.user_id)
+    try:
+        with db.get_engine().connect() as conn:
+            bundle = build(conn, p.organization_id, p.user_id)
+    except Exception:
+        with _lock:  # a failed build doesn't count toward the one-a-minute limit
+            _last_export.pop(p.user_id, None)
+        raise
     with transaction() as conn:
         emit(conn, "records.exported", org_id=p.organization_id,
              payload={"by": p.user_id, "missions": bundle["limits"]["missions_included"], "events": bundle["limits"]["events_included"],

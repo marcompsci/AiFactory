@@ -194,7 +194,7 @@ def test_roster_records_sign_ins_and_a_demoted_creator_stops_their_schedules(cli
     assert state.scheduler._schedules()["started"] == 0
     cur = client.get("/api/schedules").json()["schedules"][0]
     assert cur["enabled"] == 0 and "no longer an owner" in cur["paused_reason"]
-    assert client.get("/api/team").json()["schedules_without_an_owner"] == []  # paused ones aren't listed
+    assert client.get("/api/team").json()["schedules_to_check"] == []  # paused ones aren't listed
 
 
 def test_follow_on_by_someone_who_lost_operator_rights_is_cancelled(client):
@@ -237,3 +237,35 @@ def test_records_export_is_owner_only_hashed_and_rate_limited(client, monkeypatc
         raise HTTPException(403, "only the owner can do this")
     monkeypatch.setattr(fin, "require_owner", not_owner)
     assert client.get("/api/team").status_code == 403
+
+
+def test_run_again_keeps_the_repository_and_budget(client):
+    r = client.post("/api/missions", json={"prompt": TESTS, "kind": "run_tests", "budget_usd": 0.7}).json()
+    _finished(client, r["id"])
+    new = client.post(f"/api/missions/{r['id']}/rerun").json()["mission_id"]
+    nm = client.get(f"/api/missions/{new}").json()["mission"]
+    assert nm["budget_usd"] == 0.7 and nm["repository_id"] == r["repository_id"]
+
+
+def test_skip_refuses_when_the_slot_is_being_claimed(client, monkeypatch):
+    s = _sched(client)
+    real = schedules.get
+
+    def racing(conn, org, sid):  # the scheduler claims the slot between the read and the skip
+        row = real(conn, org, sid)
+        if row:
+            conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid).values(next_run_at="2099-01-01T00:00:00+00:00"))
+        return row
+    monkeypatch.setattr(schedules, "get", racing)
+    assert client.post(f"/api/schedules/{s['id']}/skip").status_code == 409
+
+
+def test_an_interrupted_follow_on_start_goes_back_in_line(client):
+    first = client.post("/api/missions", json={"prompt": TESTS, "kind": "run_tests"}).json()["id"]
+    link = client.post(f"/api/missions/{first}/followups", json={"kind": "run_tests"}).json()
+    with transaction() as conn:
+        conn.execute(update(db.mission_links).where(db.mission_links.c.id == link["id"])
+                     .values(status="STARTING", updated_at="2020-01-01T00:00:00+00:00"))
+    _finished(client, first)
+    links.tick()
+    assert links.get(link["organization_id"], link["id"])["status"] == "STARTED"

@@ -178,6 +178,8 @@ def _run(pr, p: Principal) -> dict:
             r = links.rerun(pr.params["mission_id"], p)
         except links.LinkError as exc:
             raise HTTPException(exc.status, str(exc)) from exc
+        if not r["mission_id"]:
+            raise HTTPException(409, "it's already starting from a moment ago")
         with db.get_engine().connect() as conn:
             m = conn.execute(select(db.missions.c.title, db.missions.c.execution_mode).where(db.missions.c.id == r["mission_id"])).first()
         return {"mission_id": r["mission_id"], "title": m.title, "execution_mode": m.execution_mode, "from_mission_id": pr.params["mission_id"]}
