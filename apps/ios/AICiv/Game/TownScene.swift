@@ -255,7 +255,41 @@ final class TownScene: SKScene {
         case .leave:
             guard let ex = map.exits.first else { return }
             walk(to: Vec(x: Double(ex.x) + 0.5, y: Double(ex.y) + 0.5), goal: nil)
+        case .step(let d):
+            step(d)
+        case .look:
+            let tx = Int(floor(p.x))
+            let ty = Int(floor(p.y))
+            let people = peopleTiles()
+            let parts = Dir.allCases.map { d in "\(TownRules.dirName(d)): \(TownRules.ahead(map, x: tx, y: ty, dir: d, people: people))" }
+            Self.announce(parts.joined(separator: ". "))
         }
+    }
+
+    private func peopleTiles() -> [(name: String, x: Int, y: Int)] {
+        placed.map { (name: $0.agent.name, x: Int(floor($0.x)), y: Int(floor($0.y))) }
+    }
+
+    /// One tile in a direction (the step pad), then say what's ahead.
+    private func step(_ d: Dir) {
+        guard let model else { return }
+        var p = model.player
+        let tx = Int(floor(p.x))
+        let ty = Int(floor(p.y))
+        let o = TownRules.delta(d)
+        let nx = tx + o.dx
+        let ny = ty + o.dy
+        let people = peopleTiles()
+        p.facing = d
+        model.player = p
+        let taken = people.contains { $0.x == nx && $0.y == ny }
+        if map.isSolid(nx, ny) || taken {
+            Self.announce("Can't go \(TownRules.dirName(d)): \(TownRules.ahead(map, x: tx, y: ty, dir: d, people: people, limit: 1)).")
+            return
+        }
+        path = [Vec(x: Double(nx) + 0.5, y: Double(ny) + 0.5)]
+        pathGoal = nil
+        Self.announce("\(TownRules.dirName(d).capitalized). Ahead: \(TownRules.ahead(map, x: nx, y: ny, dir: d, people: people)).")
     }
 
     private func refreshHere() {

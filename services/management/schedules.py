@@ -5,6 +5,11 @@ scheduler starts the mission through the same functions as a person would (so th
 approvals all apply), and quiet hours hold it like any other scheduled work. Each run is claimed first (its next
 time is moved on in the same step), so a schedule can't fire twice for one slot. Only read-only kinds can be
 scheduled: test runs and market research.
+
+V6.19 adds "every weekday" (Monday to Friday), running a schedule now, and skipping its next run. V6.20: a schedule
+that fails three times in a row pauses itself and waits in the owner's inbox (an emergency-stop hold isn't a failure).
+V6.24: before each run the creator's role at their latest sign-in is checked; a creator who is no longer an owner
+pauses the schedule at once.
 """
 from __future__ import annotations
 
@@ -21,6 +26,8 @@ from services.core.events import emit
 KINDS = {"run_tests", "market_research"}
 DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 MAX_SCHEDULES = 20
+MAX_FAILURES = 3  # failed runs in a row before a schedule pauses itself
+CADENCES = ("daily", "weekly", "weekdays")
 
 
 class ScheduleError(ValueError):
@@ -33,22 +40,24 @@ def next_run(cadence: str, weekday: int | None, hour: int, minute: int, tz: str,
     local = after.astimezone(z)
     cand = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
     for _ in range(9):
-        if cand > local and (cadence == "daily" or cand.weekday() == weekday):
+        if cand > local and (cadence == "daily" or (cadence == "weekdays" and cand.weekday() < 5)
+                             or (cadence == "weekly" and cand.weekday() == weekday)):
             return cand.astimezone(timezone.utc)
         cand = (cand + timedelta(days=1)).replace(hour=hour, minute=minute)
     raise ScheduleError("couldn't work out the next run")
 
 
 def describe(s: dict) -> str:
-    when = "every day" if s["cadence"] == "daily" else f"every {DAYS[s['weekday']].capitalize()}"
+    when = ("every day" if s["cadence"] == "daily" else "every weekday" if s["cadence"] == "weekdays"
+            else f"every {DAYS[s['weekday']].capitalize()}")
     return f"{when} at {s['hour']:02d}:{s['minute']:02d} ({s['tz']})"
 
 
 def validate(kind: str, params: dict, cadence: str, weekday: int | None, hour: int, minute: int, tz: str) -> None:
     if kind not in KINDS:
         raise ScheduleError("only test runs and market research can be scheduled")
-    if cadence not in ("daily", "weekly") or (cadence == "weekly" and weekday not in range(7)):
-        raise ScheduleError("a schedule is daily, or weekly on a named day")
+    if cadence not in CADENCES or (cadence == "weekly" and weekday not in range(7)):
+        raise ScheduleError("a schedule is daily, every weekday, or weekly on a named day")
     if not (0 <= hour <= 23 and 0 <= minute <= 59):
         raise ScheduleError("that time doesn't exist")
     try:
@@ -74,7 +83,7 @@ def create(conn: Connection, *, org_id: str, user_id: str, kind: str, params: di
     sid = db.new_id()
     nxt = next_run(cadence, weekday, hour, minute, tz, datetime.now(timezone.utc)).isoformat()
     conn.execute(insert(db.mission_schedules).values(id=sid, organization_id=org_id, kind=kind, params=params, title=title[:160],
-                                                     cadence=cadence, weekday=weekday, hour=hour, minute=minute, tz=tz,
+                                                     cadence=cadence, weekday=weekday if cadence == "weekly" else None, hour=hour, minute=minute, tz=tz,
                                                      next_run_at=nxt, enabled=1, created_by=user_id, runs=0))
     row = get(conn, org_id, sid)
     emit(conn, "schedule.created", org_id=org_id, payload={"schedule_id": sid, "title": row["title"], "when": row["when"]})
@@ -88,6 +97,11 @@ def get(conn: Connection, org_id: str, sid: str) -> dict | None:
         return None
     d = dict(r._mapping)
     d["when"] = describe(d)
+    h = conn.execute(select(db.schedule_health.c.failures, db.schedule_health.c.paused_reason, db.schedule_health.c.paused_at)
+                     .where(db.schedule_health.c.schedule_id == sid)).first()
+    d["failures"] = h.failures if h else 0
+    d["paused_reason"] = h.paused_reason if h else None
+    d["paused_at"] = h.paused_at if h else None
     return d
 
 
@@ -105,6 +119,8 @@ def set_enabled(conn: Connection, org_id: str, sid: str, enabled: bool) -> dict:
     if enabled:  # resuming never back-fills missed runs: the next one is the next slot from now
         values["next_run_at"] = next_run(s["cadence"], s["weekday"], s["hour"], s["minute"], s["tz"], datetime.now(timezone.utc)).isoformat()
     conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid).values(**values))
+    if enabled:  # the owner looked at it and turned it back on: start counting failures afresh
+        conn.execute(delete(db.schedule_health).where(db.schedule_health.c.schedule_id == sid))
     emit(conn, "schedule.changed", org_id=org_id, payload={"schedule_id": sid, "enabled": enabled})
     return get(conn, org_id, sid)
 
@@ -112,6 +128,7 @@ def set_enabled(conn: Connection, org_id: str, sid: str, enabled: bool) -> dict:
 def remove(conn: Connection, org_id: str, sid: str) -> None:
     if get(conn, org_id, sid) is None:
         raise ScheduleError("schedule not found")
+    conn.execute(delete(db.schedule_health).where(db.schedule_health.c.schedule_id == sid))
     conn.execute(delete(db.mission_schedules).where(db.mission_schedules.c.id == sid))
     emit(conn, "schedule.changed", org_id=org_id, payload={"schedule_id": sid, "deleted": True})
 
@@ -138,7 +155,12 @@ def claim_due(conn: Connection, now: datetime | None = None) -> list[dict]:
     return out
 
 
-def record_run(conn: Connection, sid: str, *, mission_id: str | None, error: str | None) -> None:
+HOLD_ERRORS = ("emergency stop is engaged",)  # a deliberate hold, not the schedule failing
+
+
+def record_run(conn: Connection, sid: str, *, mission_id: str | None, error: str | None, pause_now: str | None = None) -> None:
+    """Record one run. Failures in a row are counted; at MAX_FAILURES (or at once with `pause_now`, for a reason retrying
+    can't fix) the schedule pauses itself and waits in the owner's inbox."""
     s = conn.execute(select(db.mission_schedules.c.runs, db.mission_schedules.c.organization_id, db.mission_schedules.c.title)
                      .where(db.mission_schedules.c.id == sid)).first()
     if s is None:
@@ -147,11 +169,75 @@ def record_run(conn: Connection, sid: str, *, mission_id: str | None, error: str
         runs=(s.runs or 0) + (1 if mission_id else 0), last_run_at=db.utcnow(), last_mission_id=mission_id, last_error=error))
     emit(conn, "schedule.ran", mission_id=mission_id, org_id=s.organization_id,
          payload={"schedule_id": sid, "title": s.title, "mission_id": mission_id, "error": error})
+    H = db.schedule_health
+    h = conn.execute(select(H.c.failures).where(H.c.schedule_id == sid)).first()
+    if error is None or any(x in error for x in HOLD_ERRORS):
+        if error is None and h and h.failures:
+            conn.execute(update(H).where(H.c.schedule_id == sid).values(failures=0, updated_at=db.utcnow()))
+        if not pause_now:
+            return
+    failures = (h.failures if h else 0) + (0 if error is None else 1)
+    reason = pause_now or (f"paused itself after {failures} failed runs in a row (last: {error})" if failures >= MAX_FAILURES else None)
+    values = {"failures": failures, "updated_at": db.utcnow()}
+    if reason:
+        values.update(paused_reason=reason[:400], paused_at=db.utcnow())
+    if h:
+        conn.execute(update(H).where(H.c.schedule_id == sid).values(**values))
+    else:
+        conn.execute(insert(H).values(schedule_id=sid, organization_id=s.organization_id, **values))
+    if reason:
+        conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid).values(enabled=0))
+        emit(conn, "schedule.auto_paused", org_id=s.organization_id, payload={"schedule_id": sid, "title": s.title, "reason": reason[:400]})
+
+
+def skip_next(conn: Connection, org_id: str, sid: str) -> dict:
+    """Skip one run: the next run moves to the slot after it."""
+    s = get(conn, org_id, sid)
+    if s is None:
+        raise ScheduleError("schedule not found")
+    if not s["enabled"]:
+        raise ScheduleError("the schedule is paused, so there's no next run to skip")
+    after = datetime.fromisoformat(s["next_run_at"])
+    nxt = next_run(s["cadence"], s["weekday"], s["hour"], s["minute"], s["tz"], after).isoformat()
+    conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid,
+                                                    db.mission_schedules.c.next_run_at == s["next_run_at"]).values(next_run_at=nxt))
+    emit(conn, "schedule.changed", org_id=org_id, payload={"schedule_id": sid, "skipped": s["next_run_at"], "next_run_at": nxt})
+    return get(conn, org_id, sid)
+
+
+def creator_still_owner(conn: Connection, s: dict) -> bool | None:
+    """The creator's role at their latest sign-in (V6.24 roster): True/False, or None when they haven't signed in since
+    the roster started (schedules made before V6.24)."""
+    role = conn.execute(select(db.org_members.c.role).where(db.org_members.c.organization_id == s["organization_id"],
+                                                            db.org_members.c.user_id == s["created_by"])).scalar()
+    return None if role is None else role == "owner"
+
+
+def start(s: dict, *, slot_key: str, user_id: str | None = None) -> tuple[str | None, str | None]:
+    """Start one run of schedule `s` through the regular functions (emergency stop and charter apply). Returns
+    (mission_id, error)."""
+    from fastapi import HTTPException
+
+    from services.api import main, v4
+    from services.core.auth import Principal
+    p = Principal(user_id=user_id or s["created_by"], organization_id=s["organization_id"], role="operator", mode="schedule")
+    try:
+        if s["kind"] == "run_tests":
+            m = main.create_mission(main.MissionIn(prompt=s["params"]["prompt"], kind="run_tests", title=s["title"][:120],
+                                                   idempotency_key=f"schedule:{s['id']}:{slot_key}"[:100]), p)
+            return m["id"], None
+        return v4.start_research(v4.ResearchIn(**s["params"]), p)["mission_id"], None
+    except HTTPException as exc:
+        return None, str(exc.detail)[:300]
+    except Exception as exc:  # recorded on the schedule; the next slot tries again
+        import logging
+        logging.getLogger("aiciv.schedules").exception("schedule %s failed", s["id"])
+        return None, str(exc)[:300]
 
 
 # ---------------------------------------------------------------- reading "every Monday at 9am …" in the City
 
-_EVERY = re.compile(r"^(?:please\s+|can you\s+)?every\s+(?P<day>day|morning|weekday|"
+_EVERY = re.compile(r"^(?:please\s+|can you\s+)?every\s+(?P<day>day|morning|weekdays?|work\s*days?|"
                     + "|".join(DAYS) + r"|week)(?:\s+at\s+(?P<h>\d{1,2})(?::(?P<m>\d{2}))?\s*(?P<ap>am|pm)?)?[,\s]+(?P<rest>.+)$")
 
 
@@ -161,9 +247,12 @@ def parse(text: str) -> dict | None:
     if not m:
         return None
     day = m.group("day")
-    if day == "weekday":
-        return None  # not supported yet; the caller asks the owner to pick a day or every day
-    cadence, weekday = ("daily", None) if day in ("day", "morning") else ("weekly", 0 if day == "week" else DAYS.index(day))
+    if day == "weekday" or day.startswith("work"):
+        cadence, weekday = "weekdays", None
+    elif day in ("day", "morning"):
+        cadence, weekday = "daily", None
+    else:
+        cadence, weekday = "weekly", 0 if day == "week" else DAYS.index(day)
     hour = int(m.group("h") or 9)
     minute = int(m.group("m") or 0)
     if m.group("ap") == "pm" and hour < 12:

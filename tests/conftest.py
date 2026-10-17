@@ -30,6 +30,8 @@ def isolated_env(tmp_path, monkeypatch):
     config.get_settings.cache_clear()
     db.reset_engine()
     auth.mutation_limiter._state.clear()
+    from services.core import roster
+    roster.clear()
     from services.core import security
 
     security.auth_failures.clear()

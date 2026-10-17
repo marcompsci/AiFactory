@@ -62,6 +62,14 @@ def daily_brief(hours: int = Query(24, ge=1, le=168), p: Principal = Depends(mem
         return brief(conn, p.organization_id, hours)
 
 
+@router.get("/weekly")
+def weekly_report(p: Principal = Depends(member)) -> dict:
+    """The last seven days against the seven before, counted from the records (services/management/weekly.py)."""
+    from services.management.weekly import report
+    with db.get_engine().connect() as conn:
+        return report(conn, p.organization_id)
+
+
 @router.get("/scorecards")
 def agent_scorecards(weeks: int = Query(4, ge=2, le=26), p: Principal = Depends(member)) -> dict:
     """Each agent's reliability week by week, counted from task runs (services/management/scorecards.py)."""

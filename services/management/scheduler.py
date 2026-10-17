@@ -47,6 +47,7 @@ class Scheduler(threading.Thread):
             "game": self._game,
             "factories": self._factories,
             "schedules": self._schedules,
+            "followups": self._followups,
         }
 
     def poke(self) -> None:
@@ -65,35 +66,29 @@ class Scheduler(threading.Thread):
         return tick(self.applab.enqueue)
 
     def _schedules(self) -> dict:
-        """Start every due schedule's mission through the regular functions (emergency stop, charter caps apply)."""
-        from fastapi import HTTPException
-
-        from services.api import main, v4
-        from services.core.auth import Principal
-
+        """Start every due schedule's mission through the regular functions (emergency stop, charter caps apply). A
+        schedule whose creator is no longer an owner (their latest sign-in) pauses instead of running."""
         from . import schedules
         with transaction() as conn:
             due = schedules.claim_due(conn)
         started = 0
         for s in due:
-            p = Principal(user_id=s["created_by"], organization_id=s["organization_id"], role="operator", mode="schedule")
-            mid, err = None, None
-            try:
-                if s["kind"] == "run_tests":
-                    m = main.create_mission(main.MissionIn(prompt=s["params"]["prompt"], kind="run_tests",
-                                                           title=s["title"][:120], idempotency_key=f"schedule:{s['id']}:{s['slot']}"), p)
-                    mid = m["id"]
-                else:
-                    mid = v4.start_research(v4.ResearchIn(**s["params"]), p)["mission_id"]
-                started += 1
-            except HTTPException as exc:
-                err = str(exc.detail)[:300]
-            except Exception as exc:  # recorded on the schedule; the next slot tries again
-                log.exception("schedule %s failed", s["id"])
-                err = str(exc)[:300]
+            with db.get_engine().connect() as conn:
+                owner_ok = schedules.creator_still_owner(conn, s)
+            if owner_ok is False:
+                with transaction() as conn:
+                    why = "the person who set it up is no longer an owner"
+                    schedules.record_run(conn, s["id"], mission_id=None, error=why, pause_now=f"paused: {why}")
+                continue
+            mid, err = schedules.start(s, slot_key=s["slot"])
+            started += 1 if mid else 0
             with transaction() as conn:
                 schedules.record_run(conn, s["id"], mission_id=mid, error=err)
         return {"due": len(due), "started": started}
+
+    def _followups(self) -> dict:
+        from . import links
+        return links.tick()
 
     def _game(self) -> dict:
         from services.game.scoring import tick

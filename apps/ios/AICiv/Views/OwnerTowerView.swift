@@ -14,6 +14,17 @@ struct OwnerTowerView: View {
                 MissionApprovalsSection()
                 RecoveryPlansSection()
                 FinanceDecisionsSection()
+                Section("Reports and records") {
+                    NavigationLink { WeeklyReportView() } label: {
+                        Label("This week: missions, spend and schedules", systemImage: "calendar")
+                    }
+                    NavigationLink { TeamView() } label: {
+                        Label("Team: who signs in, and with what role", systemImage: "person.2")
+                    }
+                    NavigationLink { RecordsExportView() } label: {
+                        Label("Export your records", systemImage: "externaldrive")
+                    }
+                }
                 Section("Reliability") {
                     NavigationLink { SchedulesView() } label: {
                         Label("Schedules: missions that repeat", systemImage: "calendar.badge.clock")

@@ -316,6 +316,25 @@ def _cancel(conn: Connection, org: str, user: str, agent, text: str) -> Reply:
                  "their next step. Confirm to cancel it.", proposal=prop)
 
 
+_AGAIN = re.compile(_LEAD + r"(?:do|run|start|try)\s+(?:that|it|this|the\s+last\s+(?:one|mission))\s+again\b|^again[!. ]*$")
+
+
+def _rerun(conn: Connection, org: str, user: str, agent, text: str) -> Reply:
+    from services.management.links import RERUNNABLE, TERMINAL
+    rows = conn.execute(select(db.missions.c.id, db.missions.c.title, db.missions.c.status, db.missions.c.kind)
+                        .where(db.missions.c.organization_id == org, db.missions.c.status.in_(list(TERMINAL)),
+                               db.missions.c.kind.in_(list(RERUNNABLE)))
+                        .order_by(db.missions.c.updated_at.desc()).limit(20)).all()
+    if not rows:
+        return Reply("Nothing has finished yet that I can start again.")
+    words = {w for w in re.findall(r"[a-z0-9]{4,}", text) if w not in {"again", "that", "this", "please", "last", "mission", "start", "the"}}
+    pick = next((r for r in rows if words and words & set(re.findall(r"[a-z0-9]{4,}", r.title.lower()))), None) or rows[0]
+    prop = _propose(conn, org=org, user=user, agent=agent, kind="rerun_mission", params={"mission_id": pick.id},
+                    summary=f"Start \"{pick.title}\" again.")
+    return Reply(f"The last one I can repeat is \"{pick.title}\" ({pick.status.lower()}). Same request, starting fresh, under "
+                 "your charter. Confirm to start it again.", proposal=prop)
+
+
 def _search(conn: Connection, org: str, q: str) -> Reply:
     from services.management.search import search
     res = search(conn, org, q)
@@ -331,8 +350,6 @@ def _schedule(conn: Connection, org: str, user: str, agent, t: str, tz: str) -> 
     from services.management import schedules
     sc = schedules.parse(t)
     if sc is None:
-        if re.match(r"^(?:please\s+)?every\s+weekday\b", t):
-            return Reply("I can schedule every day or one day a week. Which would you like: every day, or a named day like every Monday?")
         return None
     rest = sc.pop("rest")
     if _TESTS.match(rest):
@@ -382,6 +399,8 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str 
         return scheduled
     if _has(t, "cancel", "stop the", "abort"):
         return _cancel(conn, org, user, agent, t)
+    if _AGAIN.search(t):
+        return _rerun(conn, org, user, agent, t)
     m = _RESEARCH.match(t)
     if m:
         return _research(conn, org, user, agent, t, m.group("q"))
@@ -392,6 +411,9 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str 
     found = re.match(_LEAD + r"(?:find(?!\s+out\b)|search(?: for)?|look up|where is|when did)\s+(?P<q>.{2,80})$", t)
     if found:  # after research and build, so "find out about…" still starts research
         return _search(conn, org, found.group("q").strip(" ?.!"))
+    if agent.key in MANAGERS and (_has(t, "the week", "this week", "weekly", "last week", "past week", "last 7 days", "last seven days")):
+        from services.management.weekly import report, spoken as weekly_spoken
+        return Reply(weekly_spoken(report(conn, org)), suggestions=["What happened today?", "What needs my approval?"])
     if agent.key in MANAGERS and (_has(t, "what happened", "catch me up", "daily brief", "what did i miss", "recap")
                                   or re.fullmatch(r"(brief|today|summary|yesterday)\??[!. ]*", t)):
         from services.management.brief import brief, spoken

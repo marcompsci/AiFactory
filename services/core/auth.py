@@ -177,7 +177,7 @@ def authenticate(request: Request) -> Principal:
     s = get_settings()
     org = load_seed()["organization_id"]
     if s.dev_auth:
-        return Principal(user_id="00000000-0000-4000-8000-000000000000", organization_id=org, role="owner", mode="dev")
+        return _seen(Principal(user_id="00000000-0000-4000-8000-000000000000", organization_id=org, role="owner", mode="dev"))
     token = _token_from(request)
     if not token:
         raise HTTPException(status_code=401, detail="missing bearer token")
@@ -186,7 +186,7 @@ def authenticate(request: Request) -> Principal:
     client = request.client.host if request.client else "unknown"
     if s.api_token and hmac.compare_digest(token.encode(), s.api_token.encode()):
         auth_failures.succeed(client)
-        return Principal(user_id="00000000-0000-4000-8000-000000000001", organization_id=org, role="owner", mode="token")
+        return _seen(Principal(user_id="00000000-0000-4000-8000-000000000001", organization_id=org, role="owner", mode="token"))
     if s.supabase_jwt_secret or s.supabase_jwks_url:
         try:
             claims = verify_supabase_token(token, s.supabase_jwt_secret, s.supabase_jwks_url, issuer=_issuer(s.supabase_url),
@@ -200,11 +200,18 @@ def authenticate(request: Request) -> Principal:
         role = (claims.get("app_metadata") or {}).get("role") or owner_by_email(claims) or "viewer"
         from services.finance.stepup import aal2_fresh
 
-        return Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase",
-                         mfa_fresh=aal2_fresh(claims))
+        return _seen(Principal(user_id=claims["sub"], organization_id=org, role=role if role in ROLE_RANK else "viewer", mode="supabase",
+                               mfa_fresh=aal2_fresh(claims)), claims.get("email"))
     if _counts(client):
         auth_failures.fail(client)
     raise HTTPException(status_code=401, detail="invalid token")
+
+
+def _seen(p: Principal, email: str | None = None) -> Principal:
+    """Note the sign-in in the team roster (services/core/roster.py) and hand the principal back."""
+    from .roster import record
+    record(p.organization_id, p.user_id, p.role, p.mode, email)
+    return p
 
 
 def _counts(client: str) -> bool:

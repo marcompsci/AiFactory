@@ -420,8 +420,57 @@ stuck in action loops). See services/management/reliability.py.
   distance, the things you can use, and every building you can go to; each row walks you there and talks, uses or
   goes in. Entering or leaving a room is announced with who's there.
 
+## V6.19: Weekday schedules, run now, skip next
+
+- "Every weekday at 8 run the tests" (Monday to Friday) in the City or `cadence: weekdays` in the API. Owner →
+  Schedules: swipe right to run now (as you; quiet hours don't hold work you start yourself, the emergency stop does;
+  the regular slot doesn't move), swipe left to skip only the next run. `POST /api/schedules/{id}/run-now|skip`.
+
+## V6.20: Schedules that pause themselves
+
+- Three failed runs in a row pause a schedule, with the reason, and it waits in your inbox. A success resets the count;
+  an emergency-stop hold isn't a failure. Turning it back on starts the count afresh.
+
+## V6.21: Run again
+
+- A finished test fix, test run or research mission can be started again with the same request and priority: the
+  mission page's Run again, "do that again" in the City (confirm first), or `POST /api/missions/{id}/rerun`. A second
+  tap within 10 seconds returns the run that just started.
+
+## V6.22: Follow-on missions
+
+- "When this finishes, run the tests / research X": the follow-on waits and starts only if the first mission
+  completes; it's cancelled if the first fails or is cancelled, held during an emergency stop, and checked when it's
+  written (bad requests refused up front). At most 5 waiting per mission; cancel any while waiting.
+  `POST /api/missions/{id}/followups`, `DELETE /api/followups/{id}`; the mission page shows them.
+
+## V6.23: Weekly report
+
+- Owner → This week: missions finished and failed per day (chart, read aloud by VoiceOver), estimated spend, schedule
+  runs, reruns and follow-ons, busiest agents, each against the week before. Atlas answers "how was the week?".
+  `GET /api/insights/weekly`. Counted from the records; days are UTC.
+
+## V6.24: Team roster and the owner check
+
+- Every sign-in records the person's role at that moment (written on a role change, otherwise every few minutes).
+  Before a scheduled run, the creator's latest role is checked: someone no longer an owner pauses the schedule with
+  that reason. A follow-on whose writer can no longer start missions is cancelled. Owner → Team lists who signs in,
+  their role and active schedules. `GET /api/team` (owner only; it holds sign-in emails).
+
+## V6.25: Step-by-step movement for VoiceOver
+
+- The Nearby panel has a step pad: north, south, east, west move one tile and say what's ahead (a person, something to
+  use, a door, the way out or a wall, with distance); Look around reads all four directions.
+
+## V6.26: Records export
+
+- Owner → Export records (Face ID): one JSON file with missions, steps, approvals, decisions, charter, schedules,
+  links, team and recent events with their audit-chain links, a fresh check of the whole chain, and a SHA-256 of the
+  contents. Money records and finance events, credentials and server settings are left out. One export a minute per
+  person; each export is recorded. `GET /api/export` (owner).
+
 ### Still open
-- The game's joystick and tap-to-walk still need sight; the Nearby panel is the VoiceOver way to move.
-- Schedules can't yet run "every weekday"; they're daily or one named day a week.
-- Only the owner can create a schedule, and runs act as that owner. The server keeps no list of owners (the role comes
-  from each sign-in), so if ownership changes, delete the old owner's schedules under Owner → Schedules.
+- Weekly report days are UTC days, not your local days.
+- The roster knows a role only as of each person's latest sign-in; someone demoted who never signs in again keeps
+  their last role there (their schedules keep running until then, or until you pause them).
+- The step pad and Look around are on the iPhone; the web town still uses the keyboard and mouse.

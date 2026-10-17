@@ -37,7 +37,7 @@ final class GameModel {
         let detail: String
         let steps: Int
     }
-    enum Request: Equatable { case talk(String), use(String), goToBuilding(String), leave }
+    enum Request: Equatable { case talk(String), use(String), goToBuilding(String), leave, step(Dir), look }
     var people: [Here] = []
     var places: [Here] = []
     var request: Request?

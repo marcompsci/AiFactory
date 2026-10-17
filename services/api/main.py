@@ -134,6 +134,12 @@ app.include_router(permissions_router)
 from services.api.schedules import router as schedules_router  # noqa: E402
 
 app.include_router(schedules_router)
+from services.api.links import router as links_router  # noqa: E402
+
+app.include_router(links_router)
+from services.api.team import router as team_router  # noqa: E402
+
+app.include_router(team_router)
 # AICIV_ALLOW_LAN_ORIGINS=1 (set by scripts/run-local.sh when serving your phone): also accept the city page served from
 # this computer's private-network address on port 3000 (Wi-Fi, Personal Hotspot 172.20.10.x / 192.0.0.x, .local names).
 LAN_ORIGIN_RX = (r"^http://(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.0\.0\.\d{1,3}"
@@ -386,9 +392,12 @@ def get_mission(mission_id: str, p: Principal = Depends(principal)):
         priority = conn.execute(select(db.mission_priorities.c.priority).where(db.mission_priorities.c.mission_id == mission_id)).scalar() or "normal"
         from services.management import recovery
         recovery_plans = recovery.plans(conn, p.organization_id, mission_id=mission_id)
+        from services.management import links
+        mission_links = links.for_mission(conn, p.organization_id, mission_id)
     return {"mission": dict(m._mapping), "tasks": tasks, "dependencies": deps, "task_runs": runs, "messages": msgs,
             "tool_executions": tools, "artifacts": arts, "approvals": approvals, "usage": usage, "objective": objective,
-            "recovery": recovery_plans, "priority": priority}
+            "recovery": recovery_plans, "priority": priority, "links": mission_links,
+            "can_rerun": m.kind in links.RERUNNABLE and m.status in links.TERMINAL}
 
 
 @app.post("/api/missions/{mission_id}/cancel")

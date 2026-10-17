@@ -62,7 +62,8 @@ def test_research_schedules_and_who_may_set_them(client):
     assert prop["params"]["kind"] == "market_research" and prop["params"]["params"]["query"] == "budgeting apps"
     kade = _agent(client, "developer")
     assert _talk(client, kade, "every day run the tests")["proposal"] is None
-    assert _talk(client, sentry := _agent(client, "qa"), "every weekday run the tests")["reply"].startswith("I can schedule every day")
+    wk = _talk(client, sentry := _agent(client, "qa"), "every weekday at 8:15 run the tests")["proposal"]
+    assert wk["params"]["cadence"] == "weekdays" and "every weekday at 08:15" in wk["summary"]
     assert _talk(client, sentry, "every day dance")["proposal"] is None
     # a time zone the server doesn't know falls back to UTC rather than failing
     assert "(UTC)" in _talk(client, ATLAS, "every day at 8 run the tests", tz="Mars/Base")["proposal"]["summary"]

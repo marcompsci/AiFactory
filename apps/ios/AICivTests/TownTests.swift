@@ -131,4 +131,16 @@ final class TownTests: XCTestCase {
         XCTAssertEqual(shade("#808080", -0.5), "#404040")
         XCTAssertEqual(shade("#000000", 0.5), "#808080")
     }
+
+    func testStepPadSaysWhatIsAhead() {
+        guard let room = Town.buildInterior("owners-tower") else { return XCTFail("no tower") }
+        let spawn = room.spawn
+        // walking up from the doorway meets something within the room, never "clear" off the map
+        let up = TownRules.ahead(room, x: spawn.x, y: spawn.y, dir: .up, people: [], limit: room.h)
+        XCTAssertFalse(up.hasPrefix("clear"))
+        let someone = TownRules.ahead(room, x: spawn.x, y: spawn.y, dir: .up, people: [(name: "Atlas", x: spawn.x, y: spawn.y - 1)])
+        XCTAssertEqual(someone, "Atlas, right ahead")
+        XCTAssertEqual(TownRules.dirName(.left), "west")
+        XCTAssertEqual(TownRules.delta(.down).dy, 1)
+    }
 }

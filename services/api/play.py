@@ -172,6 +172,15 @@ def _run(pr, p: Principal) -> dict:
         except schedules.ScheduleError as exc:
             raise HTTPException(422, str(exc)) from exc
         return {"schedule_id": s["id"], "title": s["title"], "when": s["when"], "next_run_at": s["next_run_at"]}
+    if pr.kind == "rerun_mission":
+        from services.management import links
+        try:
+            r = links.rerun(pr.params["mission_id"], p)
+        except links.LinkError as exc:
+            raise HTTPException(exc.status, str(exc)) from exc
+        with db.get_engine().connect() as conn:
+            m = conn.execute(select(db.missions.c.title, db.missions.c.execution_mode).where(db.missions.c.id == r["mission_id"])).first()
+        return {"mission_id": r["mission_id"], "title": m.title, "execution_mode": m.execution_mode, "from_mission_id": pr.params["mission_id"]}
     if pr.kind == "cancel_mission":
         main.cancel(pr.params["mission_id"], p)
         return {"mission_id": pr.params["mission_id"], "cancelled": True}

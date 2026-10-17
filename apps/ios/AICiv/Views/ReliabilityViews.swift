@@ -571,6 +571,8 @@ struct InboxSection: View {
             ForEach(Array(items.prefix(12).enumerated()), id: \.offset) { _, i in
                 if i.s("kind") == "permissions" {
                     NavigationLink { PermissionsView() } label: { row(i) }
+                } else if i.s("kind") == "schedule" {
+                    NavigationLink { SchedulesView() } label: { row(i) }
                 } else {
                     row(i)
                 }
@@ -606,6 +608,7 @@ struct InboxSection: View {
         case "release": return "shippingbox"
         case "money": return "dollarsign.circle"
         case "permissions": return "key"
+        case "schedule": return "calendar.badge.exclamationmark"
         default: return "tray"
         }
     }
@@ -744,7 +747,7 @@ struct SchedulesView: View {
             if app.connection != .live {
                 Text("Connect to your Mac and sign in to see schedules.").foregroundStyle(.secondary)
             } else if loaded && list.isEmpty {
-                Text("No schedules yet. In the City, ask Sentry \"every Monday at 9 run the tests\" or Lumen \"every day research budgeting apps\", then confirm.")
+                Text("No schedules yet. In the City, ask Sentry \"every weekday at 9 run the tests\" or Lumen \"every day research budgeting apps\", then confirm.")
                     .font(.subheadline).foregroundStyle(.secondary)
             }
             ForEach(list) { s in
@@ -756,17 +759,30 @@ struct SchedulesView: View {
                             .labelsHidden()
                             .accessibilityLabel(s.get("enabled")?.int == 1 ? "Pause this schedule" : "Resume this schedule")
                     }
+                    Text(s.s("when")).font(.caption)
                     Text(s.get("enabled")?.int == 1 ? "Next: \(Self.local(s.s("next_run_at")))" : "Paused")
                         .font(.caption).foregroundStyle(.secondary)
+                    if !s.s("paused_reason").isEmpty && s.get("enabled")?.int != 1 {
+                        Text("Why: \(s.s("paused_reason"))")
+                            .font(.caption2).foregroundStyle(Theme.warn)
+                    }
                     Text("\(s.get("runs")?.int ?? 0) run(s)" + (s.s("last_error").isEmpty ? "" : " · last try: \(s.s("last_error"))"))
                         .font(.caption2).foregroundStyle(s.s("last_error").isEmpty ? Color.secondary : Theme.warn)
                 }
                 .swipeActions {
                     Button("Delete", role: .destructive) { Task { await remove(s.s("id")) } }
+                    if s.get("enabled")?.int == 1 {
+                        Button("Skip next") { Task { await post(s.s("id"), "skip", done: "Skipped the next run.") } }.tint(Theme.warn)
+                    }
                 }
+                .swipeActions(edge: .leading) {
+                    Button("Run now") { Task { await post(s.s("id"), "run-now", done: "Started. It's in the journal.") } }.tint(Theme.cyan)
+                }
+                .accessibilityAction(named: "Run now") { Task { await post(s.s("id"), "run-now", done: "Started. It's in the journal.") } }
+                .accessibilityAction(named: "Skip next run") { Task { await post(s.s("id"), "skip", done: "Skipped the next run.") } }
             }
             if let message { Text(message).font(.caption) }
-            Section { } footer: { Text("Each run follows your charter, quiet hours and the emergency stop. Only test runs and research can be scheduled.") }
+            Section { } footer: { Text("Each run follows your charter, quiet hours and the emergency stop. Only test runs and research can be scheduled. Three failed runs in a row pause a schedule. Swipe right to run now, left to skip the next run.") }
         }
         .navigationTitle("Schedules")
         .task { await load() }
@@ -788,6 +804,15 @@ struct SchedulesView: View {
     private func toggle(_ id: String, _ on: Bool) async {
         guard let api = app.api else { return }
         do { _ = try await api.json("/api/schedules/\(id)/enabled", method: "POST", body: ["enabled": .bool(on)]) } catch { message = error.localizedDescription }
+        await load()
+    }
+
+    private func post(_ id: String, _ action: String, done: String) async {
+        guard let api = app.api else { return }
+        do {
+            _ = try await api.json("/api/schedules/\(id)/\(action)", method: "POST")
+            message = done
+        } catch { message = error.localizedDescription }
         await load()
     }
 

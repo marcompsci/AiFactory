@@ -251,6 +251,7 @@ struct MissionDetailView: View {
                     ForEach(plans) { p in RecoveryPlanRow(plan: p) { detail = try? await app.api?.missionDetail(mission.id) } }
                 }
             }
+            MissionLinksSection(missionId: mission.id, detail: detail) { detail = try? await app.api?.missionDetail(mission.id) }
             Section {
                 NavigationLink { MissionTraceView(missionId: mission.id) } label: {
                     Label("Full trace: every step, tool and AI call", systemImage: "list.bullet.rectangle")

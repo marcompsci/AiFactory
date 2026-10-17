@@ -1169,7 +1169,7 @@ play_proposals = Table(            # an actionable request turned into a structu
     Column("organization_id", String(36), nullable=False),
     Column("user_id", String(36), nullable=False),
     Column("agent_id", String(36), nullable=False),
-    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission
+    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission | create_schedule | rerun_mission
     Column("params", JSON, nullable=False, default=dict),
     Column("summary", Text, nullable=False),
     Column("status", String, nullable=False, default="PENDING"),  # PENDING | CONFIRMED | DECLINED | EXPIRED | FAILED
@@ -1251,6 +1251,45 @@ mission_priorities = Table(
     Column("priority", String, nullable=False, default="normal"),
     Column("set_by", String(36)),
     Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+# ---------------------------------------------------------------- V6.20 schedule health (failures in a row; auto-pause)
+schedule_health = Table(
+    "schedule_health", metadata,
+    Column("schedule_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("failures", Integer, nullable=False, default=0),  # failed runs in a row (emergency-stop holds don't count)
+    Column("paused_reason", Text),                          # set when the schedule paused itself
+    Column("paused_at", String),
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+# ---------------------------------------------------------------- V6.21/V6.22 run again and follow-on missions
+mission_links = Table(
+    "mission_links", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("kind", String, nullable=False),                  # rerun | followup
+    Column("from_mission_id", String(36), nullable=False, index=True),
+    Column("to_mission_id", String(36), index=True),         # set once the mission exists
+    Column("status", String, nullable=False),                # WAITING | STARTING | STARTED | CANCELLED | FAILED
+    Column("spec", JSON, nullable=False, default=dict),      # {kind, prompt, params, title, priority}
+    Column("reason", Text),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+# ---------------------------------------------------------------- V6.24 who has signed in, with the role they had then
+org_members = Table(
+    "org_members", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("user_id", String(36), primary_key=True),
+    Column("role", String, nullable=False),
+    Column("mode", String, nullable=False),
+    Column("email", String),
+    Column("first_seen", String, nullable=False, default=utcnow),
+    Column("last_seen", String, nullable=False, default=utcnow),
 )
 
 # ---------------------------------------------------------------- V6.9 tamper-evident log: each event linked to the last
@@ -1510,7 +1549,7 @@ def seed(engine: Engine) -> None:
                                                                   "to_node": sg.to_node, "length": sg.length, "status": "UP"}):
                 conn.execute(update(logistics_routes).where(logistics_routes.c.id == sg.id).values(length=sg.length))
         for key, interval in (("supervisor", 15), ("logistics", 1), ("pipeline", 1), ("finance", 2), ("applab", 2), ("game", 5), ("factories", 15),
-                              ("schedules", 30)):
+                              ("schedules", 30), ("followups", 5)):
             _ensure(conn, scheduled_jobs, {"key": key}, {"interval_seconds": interval, "next_run_at": utcnow()})
         from services.finance.categories import seed as seed_categories
 

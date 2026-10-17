@@ -38,6 +38,48 @@ enum TownRules {
     static let npcRadius = 0.42
     static let walkSpeed = 4.2   // tiles per second
 
+    /// One tile in a direction (y grows downward).
+    static func delta(_ d: Dir) -> (dx: Int, dy: Int) {
+        switch d {
+        case .up: return (0, -1)
+        case .down: return (0, 1)
+        case .left: return (-1, 0)
+        case .right: return (1, 0)
+        }
+    }
+
+    static func dirName(_ d: Dir) -> String {
+        switch d {
+        case .up: return "north"
+        case .down: return "south"
+        case .left: return "west"
+        case .right: return "east"
+        }
+    }
+
+    /// What a person walking from tile (x, y) toward `dir` meets first, within `limit` tiles: someone, something to
+    /// use, a door, the way out, or a wall. Spoken by VoiceOver after each step.
+    static func ahead(_ m: GameMap, x: Int, y: Int, dir: Dir, people: [(name: String, x: Int, y: Int)], limit: Int = 5) -> String {
+        let d = delta(dir)
+        for i in 1...limit {
+            let tx = x + d.dx * i
+            let ty = y + d.dy * i
+            let dist = i == 1 ? "right ahead" : "\(i) steps ahead"
+            if let p = people.first(where: { $0.x == tx && $0.y == ty }) { return "\(p.name), \(dist)" }
+            if let o = m.interactables.first(where: { $0.x == tx && $0.y == ty }) { return "\(o.label), \(dist)" }
+            if let b = m.buildings.first(where: { $0.door.x == tx && $0.door.y == ty }) { return "the door of \(b.name), \(dist)" }
+            if m.exits.contains(where: { $0.x == tx && $0.y == ty }) { return "the way out, \(dist)" }
+            if !m.inside(tx, ty) { return "the edge of the map, \(dist)" }
+            if m.isSolid(tx, ty) {
+                if let b = m.buildings.first(where: { tx >= $0.x && tx < $0.x + $0.w && ty >= $0.y && ty < $0.y + $0.h }) {
+                    return "the wall of \(b.name), \(dist)"
+                }
+                return "a wall or furniture, \(dist)"
+            }
+        }
+        return "clear for \(limit) steps"
+    }
+
     /// Moves a round body by (dx, dy), sliding along walls and around other bodies.
     static func move(_ m: GameMap, _ p: Vec, dx: Double, dy: Double, blockers: [Vec] = [], r: Double = playerRadius) -> Vec {
         func free(_ x: Double, _ y: Double) -> Bool {

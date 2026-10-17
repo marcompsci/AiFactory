@@ -1,7 +1,7 @@
 """The owner's inbox: everything that is waiting for a decision, in one list.
 
-Mission approvals, recovery plans, releases at the Owner's Tower, money approvals and (once there's enough history)
-permission suggestions. Sorted so that what expires soonest comes first, then what has waited longest. Nothing here
+Mission approvals, recovery plans, releases at the Owner's Tower, money approvals, schedules that paused themselves
+(V6.20) and (once there's enough history) permission suggestions. Sorted so that what expires soonest comes first, then what has waited longest. Nothing here
 decides anything: each item links to the screen where you decide it.
 """
 from __future__ import annotations
@@ -49,6 +49,12 @@ def inbox(conn: Connection, org_id: str) -> dict:
         items.append({"kind": "money", "id": f.id, "title": f"{f.action_type.replace('_', ' ').capitalize()} {amount}".strip(),
                       "detail": f.recipient or "", "mission_id": None, "created_at": f.created_at, "expires_at": f.expires_at,
                       "simulated": f.data_mode != "live" if f.data_mode else None})
+    H, S = db.schedule_health, db.mission_schedules
+    for h in conn.execute(select(H.c.schedule_id, H.c.paused_reason, H.c.paused_at, S.c.title)
+                          .join(S, S.c.id == H.c.schedule_id)
+                          .where(H.c.organization_id == org_id, H.c.paused_reason.is_not(None), S.c.enabled == 0).limit(200)).fetchall():
+        items.append({"kind": "schedule", "id": h.schedule_id, "title": f"Schedule paused: {h.title}", "detail": h.paused_reason,
+                      "mission_id": None, "created_at": h.paused_at, "expires_at": None})
     from .permissions_review import review
     pr = review(conn, org_id)
     if pr["suggestions"]:

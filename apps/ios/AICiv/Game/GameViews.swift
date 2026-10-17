@@ -365,6 +365,34 @@ struct PackageCard: View {
 
 /// The City game without looking at the map: who's here, what you can use, and where you can go. Opens on its own
 /// with VoiceOver, or from the people button. Every row walks you there (or talks / uses right away when close).
+/// Four buttons that move you one tile and say what's ahead, plus "look around": the VoiceOver way to walk.
+struct StepPad: View {
+    let game: GameModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            pad(.left, "arrow.left")
+            VStack(spacing: 6) {
+                pad(.up, "arrow.up")
+                pad(.down, "arrow.down")
+            }
+            pad(.right, "arrow.right")
+            Spacer()
+            Button { game.ask(.look) } label: {
+                Label("Look around", systemImage: "eye").font(.caption).padding(8)
+            }
+            .foregroundStyle(GameStyle.cream).gamePanel()
+            .accessibilityHint("Says what's in each direction")
+        }
+    }
+
+    private func pad(_ d: Dir, _ icon: String) -> some View {
+        Button { game.ask(.step(d)) } label: { Image(systemName: icon).frame(width: 34, height: 28) }
+            .foregroundStyle(GameStyle.cream).gamePanel()
+            .accessibilityLabel("Step \(TownRules.dirName(d))")
+    }
+}
+
 struct NearbyPanel: View {
     let game: GameModel
     var close: () -> Void
@@ -379,6 +407,8 @@ struct NearbyPanel: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
+                    header("Move one step")
+                    StepPad(game: game)
                     if !game.people.isEmpty { header("People") }
                     ForEach(game.people) { h in
                         Button { game.ask(.talk(h.id)) } label: { row("Talk to \(h.name)", h.detail, h.steps) }
