@@ -84,7 +84,8 @@ def test_three_failures_in_a_row_pause_a_schedule_and_it_lands_in_the_inbox(clie
 def test_a_success_resets_the_count_and_the_emergency_stop_is_not_a_failure(client, monkeypatch):
     s = _sched(client)
     from services.api.main import state
-    results = iter([(None, "boom"), (None, "boom"), ("00000000-0000-4000-8000-0000000000aa", None), (None, "emergency stop is engaged"), (None, "boom")])
+    real = client.post("/api/missions", json={"prompt": TESTS, "kind": "run_tests"}).json()["id"]  # a mission that exists
+    results = iter([(None, "boom"), (None, "boom"), (real, None), (None, "emergency stop is engaged"), (None, "boom")])
     monkeypatch.setattr(schedules, "start", lambda *a, **k: next(results))
     for _ in range(5):
         _due(s["id"])
