@@ -47,10 +47,12 @@ def scorecards(conn: Connection, org_id: str, weeks: int = 4) -> dict:
                                db.task_runs.c.started_at, db.task_runs.c.finished_at, db.tasks.c.agent_id)
                         .join(db.tasks, db.tasks.c.id == db.task_runs.c.task_id)
                         .where(db.task_runs.c.organization_id == org_id, db.task_runs.c.started_at >= since)
-                        .order_by(db.task_runs.c.started_at).limit(MAX_ROWS)).fetchall()
+                        .order_by(db.task_runs.c.started_at.desc()).limit(MAX_ROWS)).fetchall()  # newest first if capped
+    truncated = len(runs) >= MAX_ROWS
+    runs = list(reversed(runs))
     by_task: dict[str, list] = {}
     for r in runs:
-        by_task.setdefault(r.task_id, []).append(r)
+        by_task.setdefault(r.task_id, [])
         if r.agent_id not in cards:
             continue
         w = _week(r.started_at)
@@ -63,9 +65,16 @@ def scorecards(conn: Connection, org_id: str, weeks: int = 4) -> dict:
             c["failed_runs"] += 1
             m = _mode_for(r.error)
             c["modes"][m] = c["modes"].get(m, 0) + 1
-    # a task counts in the week its last run finished; "first try" = its only run passed
-    tasks = {t.id: t for t in conn.execute(select(db.tasks.c.id, db.tasks.c.status, db.tasks.c.agent_id, db.tasks.c.updated_at)
-                                           .where(db.tasks.c.id.in_(list(by_task)))).fetchall()} if by_task else {}
+    # a task counts in the week its last run finished; "first try" = its only run (ever, not just in the window) passed
+    tasks: dict = {}
+    ids = list(by_task)
+    for i in range(0, len(ids), 500):  # chunked: SQLite caps the number of bound parameters
+        chunk = ids[i:i + 500]
+        tasks.update({t.id: t for t in conn.execute(select(db.tasks.c.id, db.tasks.c.status, db.tasks.c.agent_id, db.tasks.c.updated_at)
+                                                    .where(db.tasks.c.id.in_(chunk))).fetchall()})
+        for r in conn.execute(select(db.task_runs.c.task_id, db.task_runs.c.status).where(db.task_runs.c.task_id.in_(chunk))
+                              .order_by(db.task_runs.c.attempt)).fetchall():
+            by_task[r.task_id].append(r)
     for tid, rs in by_task.items():
         t = tasks.get(tid)
         if t is None or t.agent_id not in cards or t.status not in ("COMPLETED", "FAILED"):
@@ -81,7 +90,7 @@ def scorecards(conn: Connection, org_id: str, weeks: int = 4) -> dict:
             c["failed"] += 1
     for u in conn.execute(select(db.usage_records.c.agent_id, db.usage_records.c.created_at, db.usage_records.c.estimated_cost_usd)
                           .where(db.usage_records.c.organization_id == org_id, db.usage_records.c.created_at >= since)
-                          .limit(MAX_ROWS)).fetchall():
+                          .order_by(db.usage_records.c.created_at.desc()).limit(MAX_ROWS)).fetchall():
         if u.agent_id in cards and (w := _week(u.created_at)) in cards[u.agent_id]:
             cards[u.agent_id][w]["cost_usd"] = round(cards[u.agent_id][w]["cost_usd"] + float(u.estimated_cost_usd or 0), 6)
 
@@ -114,7 +123,7 @@ def scorecards(conn: Connection, org_id: str, weeks: int = 4) -> dict:
                               "avg_run_ms": int(total["busy_ms"] / total["runs"]) if total["runs"] else None},
                     "top_failure": max(modes.items(), key=lambda kv: kv[1])[0] if modes else None})
     out.sort(key=lambda a: -(a["total"]["finished"] + a["total"]["failed"]))
-    return {"weeks": week_keys, "agents": out, "method": "records", "cost_is_estimate": True,
+    return {"weeks": week_keys, "agents": out, "method": "records", "cost_is_estimate": True, "truncated": truncated,
             "trend_rule": f"success rate this week vs last, called only with {MIN_TASKS_FOR_TREND}+ tasks in both weeks"}
 
 

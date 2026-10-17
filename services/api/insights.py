@@ -75,7 +75,7 @@ def audit_verify(p: Principal = Depends(member)) -> dict:
     """Recompute the event chain and report the first place it was altered, if any (services/core/audit.py)."""
     from services.core import audit
     with db.get_engine().connect() as conn:
-        return audit.verify(conn, p.organization_id)
+        return audit.verify_throttled(conn, p.organization_id)
 
 
 @router.get("/audit/missions/{mission_id}")

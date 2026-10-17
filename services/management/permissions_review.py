@@ -89,7 +89,7 @@ def review(conn: Connection, org_id: str, days: int = 30) -> dict:
             called = tool in in_code
             suggest = history_ok and n == 0 and not in_plan and not called
             suggestions += suggest
-            rows.append({"tool": tool, "uses": int(n), "last_used": last, "in_plan": in_plan,
+            rows.append({"id": f"{a.id}:{tool}", "tool": tool, "uses": int(n), "last_used": last, "in_plan": in_plan,
                          "suggestion": "revoke" if suggest else "keep",
                          "in_code": called,
                          "why": ("Unused for %d days, and no plan or pipeline asks for it." % days) if suggest else

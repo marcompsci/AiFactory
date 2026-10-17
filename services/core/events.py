@@ -14,6 +14,7 @@ from sqlalchemy import func, insert, select
 from sqlalchemy.engine import Connection
 
 from . import db
+from .audit import normalize
 from .config import load_seed
 
 ORG_ID = load_seed()["organization_id"]
@@ -53,7 +54,7 @@ def emit(
         schema_version=1,
         correlation_id=correlation_id or mission_id or event_id,
         execution_mode=execution_mode,
-        payload=payload or {},
+        payload=normalize(payload or {}),
         occurred_at=db.utcnow(),
     )
     conn.execute(insert(db.events).values(**row))

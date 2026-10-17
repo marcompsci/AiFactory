@@ -370,7 +370,6 @@ struct BriefCard: View {
                     }
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Daily brief. \(b.s("headline"))")
             }
         }
         .task(id: app.connection == .live) {
@@ -536,11 +535,20 @@ struct AuditExportButton: View {
     private func make() async {
         guard let api = app.api else { return }
         do {
-            let bundle = try await api.json("/api/insights/audit/missions/\(missionId)")
-            let data = try JSONEncoder().encode(bundle)
+            let data = try await api.rawData("/api/insights/audit/missions/\(missionId)")  // the server's exact bytes, so the hash checks out
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("mission-\(missionId.prefix(8))-audit.json")
             try data.write(to: url, options: .atomic)
             file = url
         } catch { failed = true }
+    }
+}
+
+extension APIClient {
+    /// A response's raw bytes (for files that must stay byte-for-byte what the server sent).
+    func rawData(_ path: String) async throws -> Data {
+        let (data, resp) = try await URLSession.shared.data(for: request(path))
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else { throw APIError(status: status, detail: HTTPURLResponse.localizedString(forStatusCode: status)) }
+        return data
     }
 }

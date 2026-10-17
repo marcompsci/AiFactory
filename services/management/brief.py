@@ -24,13 +24,19 @@ def brief(conn: Connection, org_id: str, hours: int = 24) -> dict:
     now = datetime.now(timezone.utc)
     since = (now - timedelta(hours=hours)).isoformat()
     M = db.missions
+    window = (M.c.organization_id == org_id) & (M.c.updated_at >= since)
+    counts = dict(conn.execute(select(M.c.status, func.count()).where(window, M.c.status.in_(["COMPLETED", "FAILED"]))
+                               .group_by(M.c.status)).fetchall())
     finished = conn.execute(select(M.c.id, M.c.title, M.c.status, M.c.outcome, M.c.failure_reason, M.c.execution_mode, M.c.updated_at)
-                            .where(M.c.organization_id == org_id, M.c.status.in_(["COMPLETED", "FAILED"]), M.c.updated_at >= since)
+                            .where(window, M.c.status.in_(["COMPLETED", "FAILED"]))
                             .order_by(M.c.updated_at.desc()).limit(50)).fetchall()
-    objectives = {g.mission_id: g.status for g in conn.execute(
-        select(db.goal_checkpoints.c.mission_id, db.goal_checkpoints.c.status)
-        .where(db.goal_checkpoints.c.organization_id == org_id, db.goal_checkpoints.c.created_at >= since,
-               db.goal_checkpoints.c.status.like("objective_%"))).fetchall()}
+    objectives: dict[str, str] = {}
+    ids = [r.id for r in finished]
+    if ids:  # each mission's latest objective check, whenever it was made
+        for g in conn.execute(select(db.goal_checkpoints.c.mission_id, db.goal_checkpoints.c.status)
+                              .where(db.goal_checkpoints.c.mission_id.in_(ids), db.goal_checkpoints.c.status.like("objective_%"))
+                              .order_by(db.goal_checkpoints.c.created_at)).fetchall():
+            objectives[g.mission_id] = g.status
     completed = [{"id": r.id, "title": r.title, "outcome": r.outcome, "objective": objectives.get(r.id),
                   "simulation": r.execution_mode == "simulation"} for r in finished if r.status == "COMPLETED"]
     failed = [{"id": r.id, "title": r.title, "reason": r.failure_reason, "simulation": r.execution_mode == "simulation"}
@@ -71,18 +77,20 @@ def brief(conn: Connection, org_id: str, hours: int = 24) -> dict:
         db.manager_decisions.c.outcome.in_(["loop_stopped", "looping"]))).scalar() or 0
 
     waiting = approvals + len(recovery) + releases
+    n_done, n_failed = int(counts.get("COMPLETED", 0)), int(counts.get("FAILED", 0))
     parts = []
-    if completed or failed:
-        parts.append(f"{_plural(len(completed), 'mission')} finished" + (f" and {len(failed)} failed" if failed else ""))
+    if n_done or n_failed:
+        parts.append(f"{_plural(n_done, 'mission')} finished" + (f" and {n_failed} failed" if n_failed else ""))
     else:
         parts.append("No missions finished")
     parts.append(f"{_plural(waiting, 'thing')} waiting for you" if waiting else "nothing is waiting for you")
     if near_cap:
         parts.append(f"{', '.join(a['agent'] for a in near_cap)} near the daily cap")
-    headline = "In the last day: " + "; ".join(parts) + "."
+    span = "day" if hours == 24 else "week" if hours == 168 else f"{hours} hours"
+    headline = f"In the last {span}: " + "; ".join(parts) + "."
 
     return {"generated_at": now.isoformat(), "hours": hours, "headline": headline,
-            "completed": completed, "failed": failed, "running": running,
+            "completed": completed, "failed": failed, "running": running, "counts": {"completed": n_done, "failed": n_failed},
             "waiting": {"approvals": approvals, "recovery_plans": recovery, "releases": releases, "total": waiting},
             "spend": spend, "lessons": lessons, "loops_caught": loops,
             "quiet_now": charter.quiet_now(rules), "method": "records"}

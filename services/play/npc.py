@@ -279,9 +279,6 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
     t = raw.lower()
     if not t or re.fullmatch(r"(hi|hello|hey|yo|sup|help|what can you do\??|who are you\??)[!. ]*", t):
         return _intro(agent)
-    if agent.key in MANAGERS and _has(t, "what happened", "brief", "today", "yesterday", "catch me up", "summary", "recap"):
-        from services.management.brief import brief, spoken
-        return Reply(spoken(brief(conn, org)), suggestions=["What needs my approval?", "Show everything in progress"])
     if _has(t, "approv", "pending", "sign off", "waiting for me"):
         return _approvals(conn, org)
     if _has(t, "status", "progress", "working on", "doing", "how's it going", "how is it going", "busy", "update me", "what's up"):
@@ -295,6 +292,10 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str) -> Reply
         return _research(conn, org, user, agent, t, m.group("q"))
     if _BUILD.match(t):
         return _build(conn, org, user, agent, raw)
+    if agent.key in MANAGERS and (_has(t, "what happened", "catch me up", "daily brief", "what did i miss", "recap")
+                                  or re.fullmatch(r"(brief|today|summary|yesterday)\??[!. ]*", t)):
+        from services.management.brief import brief, spoken
+        return Reply(spoken(brief(conn, org)), suggestions=["What needs my approval?", "Show everything in progress"])
     if _has(t, "money", "budget", "spend", "cost", "bill", "tax", "financ", "revenue", "saving"):
         return _finance(conn, org)
     if _has(t, "recommend", "opportunit", "review", "should we", "idea"):

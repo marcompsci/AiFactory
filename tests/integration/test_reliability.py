@@ -186,3 +186,10 @@ def test_scorecards_count_finished_failed_and_first_try(monkeypatch):
         inspector = next(t for t in client.get(f"/api/missions/{bad}").json()["tasks"] if t["key"] == "inspect")
         arch = next(a for a in sc["agents"] if a["agent_id"] == inspector["agent_id"])
         assert arch["weeks"][-1]["finished"] >= 1 and arch["weeks"][-1]["first_try"] >= 1 and arch["total"]["first_try_rate"] == 1.0
+
+
+def test_today_doesnt_hijack_other_requests(client):
+    assert say(client, ATLAS, "What needs my approval today?")["reply"].startswith("Nothing is waiting")
+    assert say(client, ATLAS, "what happened today?")["reply"].startswith("In the last day")
+    assert say(client, ATLAS, "today?")["reply"].startswith("In the last day")
+    assert say(client, ATLAS, "research a summary app on the App Store")["proposal"]["kind"] == "start_research"

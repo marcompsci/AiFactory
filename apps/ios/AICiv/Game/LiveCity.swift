@@ -22,7 +22,7 @@ struct LiveCityView: View {
                 AccessibleCityList(districts: districts) { selection = $0 }
                     .padding(.top, 46).padding(.bottom, 58)
             }
-            CitySceneView(city: city) { selection = $0 }
+            CitySceneView(city: city, paused: voiceOver || listMode) { selection = $0 }
                 .opacity(voiceOver || listMode ? 0 : 1)
                 .allowsHitTesting(!(voiceOver || listMode))
                 .accessibilityHidden(true)
@@ -35,7 +35,10 @@ struct LiveCityView: View {
             HStack {
                 PixelHeader(text: "The city")
                 Spacer()
-                Button { listMode.toggle() } label: { Image(systemName: listMode ? "cube" : "list.bullet") }
+                Button {
+                    listMode.toggle()
+                    UserDefaults.standard.set(listMode, forKey: "cityList")
+                } label: { Image(systemName: listMode ? "cube" : "list.bullet") }
                     .buttonStyle(CityChip())
                     .accessibilityLabel(listMode ? "Show the 3D city" : "Show the city as a list")
                     .opacity(voiceOver ? 0 : 1)
@@ -47,14 +50,7 @@ struct LiveCityView: View {
             VStack {
                 Spacer()
                 HStack(spacing: 8) {
-                    Button { step(-1, districts) } label: { Image(systemName: "chevron.left") }.buttonStyle(CityChip())
-                        .accessibilityLabel("Previous building")
-                    if !districts.isEmpty {
-                        let d = districts[focus % districts.count]
-                        Button { city.fly(to: d.id); selection = .district(d) } label: { Text(d.name).lineLimit(1) }.buttonStyle(CityChip())
-                    }
-                    Button { step(1, districts) } label: { Image(systemName: "chevron.right") }.buttonStyle(CityChip())
-                        .accessibilityLabel("Next building")
+                    if !(voiceOver || listMode) { cameraControls(districts) }
                     Spacer()
                     Button { app.openTab = "city" } label: { Label("Enter", systemImage: "gamecontroller.fill") }
                         .buttonStyle(CityChip(fill: GameStyle.go, ink: GameStyle.ink))
@@ -72,6 +68,18 @@ struct LiveCityView: View {
             case .agent(let id): AgentStatusSheet(agentId: id).presentationDetents([.medium, .large])
             }
         }
+    }
+
+    /// Moving the 3D camera between buildings (hidden in the list view, where there's no camera to move).
+    @ViewBuilder private func cameraControls(_ districts: [District]) -> some View {
+                    Button { step(-1, districts) } label: { Image(systemName: "chevron.left") }.buttonStyle(CityChip())
+                        .accessibilityLabel("Previous building")
+                    if !districts.isEmpty {
+                        let d = districts[focus % districts.count]
+                        Button { city.fly(to: d.id); selection = .district(d) } label: { Text(d.name).lineLimit(1) }.buttonStyle(CityChip())
+                    }
+                    Button { step(1, districts) } label: { Image(systemName: "chevron.right") }.buttonStyle(CityChip())
+                        .accessibilityLabel("Next building")
     }
 
     private func sync(_ districts: [District]) {
@@ -132,6 +140,7 @@ struct CityChip: ButtonStyle {
 
 struct CitySceneView: UIViewRepresentable {
     let city: CityScene
+    var paused = false
     let onSelect: (CitySelection) -> Void
 
     func makeUIView(context: Context) -> SCNView {
@@ -151,7 +160,12 @@ struct CitySceneView: UIViewRepresentable {
         return v
     }
 
-    func updateUIView(_ v: SCNView, context: Context) { context.coordinator.onSelect = onSelect }
+    func updateUIView(_ v: SCNView, context: Context) {
+        context.coordinator.onSelect = onSelect
+        v.rendersContinuously = !paused  // the list view hides the 3D city: stop drawing it to save battery
+        v.isPlaying = !paused
+        city.paused = paused
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(city: city, onSelect: onSelect) }
 
@@ -213,6 +227,7 @@ final class CityScene {
     private var phase: Double = 0
     private var builtFor: [String] = []
     /// Reduce Motion: the belts, beads, bobbing and spinning stay still, and the camera jumps instead of flying.
+    var paused = false
     var reduceMotion = false {
         didSet { scene.rootNode.enumerateChildNodes { n, _ in if n.name == "spin" { n.isPaused = reduceMotion } } }
     }
@@ -593,6 +608,7 @@ final class CityScene {
     }
 
     private func tick() {
+        if paused { return }
         phase += 1.0 / 15
         for p in pulses {  // a bead of light travels each arc, from sender to receiver (parked mid-arc with Reduce Motion)
             let f = reduceMotion ? Double(p.points.count - 1) / 2 : (phase * p.speed).truncatingRemainder(dividingBy: 1) * Double(p.points.count - 1)

@@ -13,6 +13,12 @@ from tests.conftest import mission_status, wait_for
 from tests.integration.test_missions import pending_approval, start
 
 
+@pytest.fixture(autouse=True)
+def fresh_checks():
+    audit._LAST.clear()  # each test checks the log it just made, not a cached result from another test
+    yield
+
+
 def _verify(client):
     r = client.get("/api/insights/audit/verify")
     assert r.status_code == 200, r.text
@@ -38,6 +44,7 @@ def test_editing_an_event_is_caught_where_it_happened(client):
         target = conn.execute(select(db.events.c.sequence).where(db.events.c.event_type == "task.completed")
                               .order_by(db.events.c.sequence)).scalar()
         conn.execute(update(db.events).where(db.events.c.sequence == target).values(payload={"title": "rewritten"}))
+    audit._LAST.clear()
     v = _verify(client)
     assert v["ok"] is False and v["problem"]["sequence"] == target and "changed" in v["problem"]["reason"]
 
@@ -51,6 +58,7 @@ def test_deleting_an_event_is_caught(client):
         conn.execute(delete(db.event_outbox).where(db.event_outbox.c.event_id.in_(
             select(db.events.c.id).where(db.events.c.sequence == target))))
         conn.execute(delete(db.events).where(db.events.c.sequence == target))
+    audit._LAST.clear()
     v = _verify(client)
     assert v["ok"] is False and v["problem"]["sequence"] == target and "deleted" in v["problem"]["reason"]
 
@@ -74,6 +82,7 @@ def test_mission_audit_file(client):
     assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
     b = r.json()
     assert b["format"] == "aiciv.mission-audit.v1" and b["mission"]["id"] == mid and b["chain"]["ok"] is True
+    assert b["chain"]["checked"] == len(b["events"]) and len(b["latest_link"]["hash"]) == 64
     assert b["events"] and all(e["mission_id"] == mid and len(e["chain_hash"]) == 64 for e in b["events"])
     assert b["objective"]["met"] is True and b["trace"]["items"]
     claimed = b.pop("bundle_sha256")
