@@ -309,6 +309,7 @@ class MissionIn(BaseModel):
     budget_usd: float | None = Field(default=None, gt=0, le=50)
     idempotency_key: str | None = Field(default=None, max_length=100)
     kind: str = Field(default="fix_failing_test", pattern="^(fix_failing_test|run_tests)$")  # what the team does with the repository
+    priority: str = Field(default="normal", pattern="^(urgent|normal|low)$")  # which waiting mission starts first
 
 
 @app.post("/api/missions", status_code=201)
@@ -343,6 +344,9 @@ def create_mission(body: MissionIn, p: Principal = Depends(operator)):
                    budget_usd=budget, spent_usd_estimated=0.0, kind=body.kind,
                    idempotency_key=body.idempotency_key, created_by=p.user_id, paused=0)
         conn.execute(insert(db.missions).values(**row))
+        if body.priority != "normal":
+            conn.execute(insert(db.mission_priorities).values(mission_id=mid, organization_id=p.organization_id, priority=body.priority,
+                                                              set_by=p.user_id))
         emit(conn, "mission.created", mission_id=mid, execution_mode=mode,
              payload={"title": row["title"], "prompt": prompt, "budget_usd": row["budget_usd"], "execution_mode": mode})
     state.worker.enqueue(mid)
@@ -379,11 +383,12 @@ def get_mission(mission_id: str, p: Principal = Depends(principal)):
         approvals = _rows(conn.execute(select(db.approvals).where(db.approvals.c.mission_id == mission_id)))
         usage = _rows(conn.execute(select(db.usage_records).where(db.usage_records.c.mission_id == mission_id)))
         objective = reliability.objective_for(conn, mission_id)
+        priority = conn.execute(select(db.mission_priorities.c.priority).where(db.mission_priorities.c.mission_id == mission_id)).scalar() or "normal"
         from services.management import recovery
         recovery_plans = recovery.plans(conn, p.organization_id, mission_id=mission_id)
     return {"mission": dict(m._mapping), "tasks": tasks, "dependencies": deps, "task_runs": runs, "messages": msgs,
             "tool_executions": tools, "artifacts": arts, "approvals": approvals, "usage": usage, "objective": objective,
-            "recovery": recovery_plans}
+            "recovery": recovery_plans, "priority": priority}
 
 
 @app.post("/api/missions/{mission_id}/cancel")
@@ -427,6 +432,26 @@ def resume(mission_id: str, p: Principal = Depends(operator)):
              payload={"from": m.status, "to": m.status, "paused": False})
     state.worker.enqueue(mission_id)
     return {"ok": True}
+
+
+class PriorityIn(BaseModel):
+    priority: str = Field(pattern="^(urgent|normal|low)$")
+
+
+@app.post("/api/missions/{mission_id}/priority")
+def set_priority(mission_id: str, body: PriorityIn, p: Principal = Depends(operator)):
+    """Urgent missions start before normal ones, and normal before low, when more are waiting than can run at once."""
+    with transaction() as conn:
+        m = _mission_or_404(conn, mission_id, p)
+        if conn.execute(select(db.mission_priorities.c.mission_id).where(db.mission_priorities.c.mission_id == mission_id)).first():
+            conn.execute(update(db.mission_priorities).where(db.mission_priorities.c.mission_id == mission_id)
+                         .values(priority=body.priority, set_by=p.user_id, updated_at=db.utcnow()))
+        else:
+            conn.execute(insert(db.mission_priorities).values(mission_id=mission_id, organization_id=p.organization_id,
+                                                              priority=body.priority, set_by=p.user_id))
+        emit(conn, "mission.priority_changed", mission_id=mission_id, execution_mode=m.execution_mode, payload={"priority": body.priority})
+    state.worker.reprioritize(mission_id, body.priority)
+    return {"ok": True, "priority": body.priority, "waiting": state.worker.waiting()}
 
 
 class BudgetIn(BaseModel):

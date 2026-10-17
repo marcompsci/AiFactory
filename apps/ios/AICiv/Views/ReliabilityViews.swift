@@ -792,3 +792,34 @@ struct SchedulesView: View {
         await load()
     }
 }
+
+/// Urgent / normal / low (POST /api/missions/{id}/priority): which waiting mission starts first when all slots are busy.
+struct PriorityPicker: View {
+    @Environment(AppState.self) private var app
+    let missionId: String
+    @State var priority: String
+    @State private var note: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Picker("Priority", selection: $priority) {
+                Text("Urgent").tag("urgent")
+                Text("Normal").tag("normal")
+                Text("Low").tag("low")
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: priority) { _, new in Task { await save(new) } }
+            Text(note ?? "When more missions are waiting than can run at once, urgent ones start first.")
+                .font(.caption2).foregroundStyle(.secondary)
+        }
+    }
+
+    private func save(_ p: String) async {
+        guard let api = app.api else { return }
+        do {
+            let r = try await api.json("/api/missions/\(missionId)/priority", method: "POST", body: ["priority": .string(p)])
+            let waiting = r.get("waiting")?.list.count ?? 0
+            note = waiting > 0 ? "Saved. \(waiting) mission(s) waiting for a free slot." : "Saved."
+        } catch { note = error.localizedDescription }
+    }
+}

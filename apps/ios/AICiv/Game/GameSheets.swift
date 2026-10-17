@@ -240,6 +240,9 @@ struct MissionDetailView: View {
                     .font(.caption).foregroundStyle(.secondary)
                 if let f = mission.failureReason { Text(f).font(.caption).foregroundStyle(Theme.bad) }
                 if let o = detail?.get("objective") { ObjectiveRow(objective: o) }
+                if let d = detail, !["COMPLETED", "FAILED", "CANCELLED"].contains(d.get("mission")?.s("status") ?? "") {
+                    PriorityPicker(missionId: mission.id, priority: d.s("priority").isEmpty ? "normal" : d.s("priority"))
+                }
             }
             let plans = detail?.get("recovery")?.list ?? []
             if !plans.isEmpty {
