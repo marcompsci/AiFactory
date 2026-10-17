@@ -331,3 +331,44 @@ stuck in action loops). See services/management/reliability.py.
 ### Still open
 - Recovery plans cover software-change missions only; research, finance and factory missions are restarted by
   their own pipelines. Quiet hours hold scheduled jobs for the whole organization (one time zone per charter).
+
+## V6.6: Daily brief
+
+- `GET /api/insights/brief`: the last day counted from the records: missions finished and failed (with objective
+  checks), what's waiting for you (approvals, recovery plans, releases), estimated spend today by agent and who is near
+  the charter's daily cap, loops caught, lessons learned, quiet hours. On the Home screen, on the web clinic page,
+  and from Atlas in the City ("what happened today?").
+
+## V6.7: Agent scorecards
+
+- `GET /api/insights/scorecards`: per agent and week: tasks finished and failed, first-try passes, failed runs by
+  MAST kind, time and estimated cost. A trend (improving / steady / slipping) is called only with 3+ tasks in both of
+  the last two weeks. Owner → Agent scorecards, and a "Track record" section on every agent card.
+
+## V6.8: Permission review
+
+- `GET /api/permissions/review`: every tool grant with its uses in the last 30 days, whether a mission plan needs it,
+  and whether a pipeline calls it directly. Grants that are none of those are suggested for revocation, but only
+  once there are 30 days of records. The owner revokes one at a time (after Face ID); a revocation survives restarts
+  (the seed skips it) and is refused at run time; restoring needs a fresh step-up. Owner → Permissions.
+
+## V6.9: Tamper-evident audit log
+
+- Every event is linked to the one before it: `hash = sha256(previous hash + canonical event)`, written in the same
+  transaction, in an append-only table. `GET /api/insights/audit/verify` recomputes the chain and names the first
+  event that was changed, deleted or never chained. `GET /api/insights/audit/missions/{id}` is a mission's audit
+  file (record, trace, checks, recovery plans, chained events, bundle hash). Owner → Audit log; trace → audit file.
+- Events written before this version predate the chain; verification starts at the first chained event.
+
+## V6.10: Accessibility
+
+- The home city has a list view (automatic with VoiceOver, or the list button): every building with who's there and
+  what they're doing, each opening the same sheet as a tap in 3D. Every city control has a VoiceOver label.
+- Reduce Motion: the home city's conveyors, light beads, agent bobbing and spinning crystal stay still and the camera
+  jumps instead of flying; the City game's conveyor stops animating.
+- Pixel fonts follow Dynamic Type (up to 1.6x so the pixel layout holds); the new screens use system text styles.
+
+### Still open
+- The City game (walking, dialogue) is not yet usable with VoiceOver; the home city's list and the sheets are.
+- The audit chain makes tampering evident but someone with database access could rewrite the whole chain; note the
+  latest link from the Audit log screen now and then to catch that.

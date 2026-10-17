@@ -10,12 +10,24 @@ struct LiveCityView: View {
     @State private var city = CityScene()
     @State private var selection: CitySelection?
     @State private var focus = 0
+    @State private var listMode = UserDefaults.standard.bool(forKey: "cityList")  // -cityList YES opens the list view
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
 
     var body: some View {
         let districts = app.districts.isEmpty ? Roster.districts : app.districts
         ZStack(alignment: .top) {
+            if voiceOver || listMode {
+                // the same city as a list: every building and agent, each opening the same sheet as a tap in 3D
+                AccessibleCityList(districts: districts) { selection = $0 }
+                    .padding(.top, 46).padding(.bottom, 58)
+            }
             CitySceneView(city: city) { selection = $0 }
-                .onAppear { sync(districts) }
+                .opacity(voiceOver || listMode ? 0 : 1)
+                .allowsHitTesting(!(voiceOver || listMode))
+                .accessibilityHidden(true)
+                .onAppear { city.reduceMotion = reduceMotion; sync(districts) }
+                .onChange(of: reduceMotion) { city.reduceMotion = reduceMotion }
                 .onChange(of: app.agents) { sync(districts) }
                 .onChange(of: app.packages) { sync(districts) }
                 .onChange(of: app.districts) { sync(districts) }
@@ -23,6 +35,10 @@ struct LiveCityView: View {
             HStack {
                 PixelHeader(text: "The city")
                 Spacer()
+                Button { listMode.toggle() } label: { Image(systemName: listMode ? "cube" : "list.bullet") }
+                    .buttonStyle(CityChip())
+                    .accessibilityLabel(listMode ? "Show the 3D city" : "Show the city as a list")
+                    .opacity(voiceOver ? 0 : 1)
                 Text(app.connection == .live ? (app.executionMode == "simulation" ? "LIVE · SIMULATION" : "LIVE") : "OFFLINE")
                     .font(Pixel.title(10)).padding(.horizontal, 8).padding(.vertical, 4)
                     .background(app.connection == .live ? Theme.ok : Theme.warn, in: Capsule()).foregroundStyle(Theme.ground)
@@ -32,14 +48,18 @@ struct LiveCityView: View {
                 Spacer()
                 HStack(spacing: 8) {
                     Button { step(-1, districts) } label: { Image(systemName: "chevron.left") }.buttonStyle(CityChip())
+                        .accessibilityLabel("Previous building")
                     if !districts.isEmpty {
                         let d = districts[focus % districts.count]
                         Button { city.fly(to: d.id); selection = .district(d) } label: { Text(d.name).lineLimit(1) }.buttonStyle(CityChip())
                     }
                     Button { step(1, districts) } label: { Image(systemName: "chevron.right") }.buttonStyle(CityChip())
+                        .accessibilityLabel("Next building")
                     Spacer()
                     Button { app.openTab = "city" } label: { Label("Enter", systemImage: "gamecontroller.fill") }
                         .buttonStyle(CityChip(fill: GameStyle.go, ink: GameStyle.ink))
+                        .accessibilityLabel("Enter the city game")
+                        .accessibilityHint("Opens the City tab, where you walk around and talk to agents")
                 }
                 .padding(10)
             }
@@ -192,6 +212,10 @@ final class CityScene {
     private var timer: Timer?
     private var phase: Double = 0
     private var builtFor: [String] = []
+    /// Reduce Motion: the belts, beads, bobbing and spinning stay still, and the camera jumps instead of flying.
+    var reduceMotion = false {
+        didSet { scene.rootNode.enumerateChildNodes { n, _ in if n.name == "spin" { n.isPaused = reduceMotion } } }
+    }
     private var agentStates: [String: String] = [:]
     private var flowNodes: [SCNNode] = []
     private var flowKey = ""
@@ -250,7 +274,7 @@ final class CityScene {
     func fly(to id: String) {
         guard let n = districtNodes[id] else { return }
         SCNTransaction.begin()
-        SCNTransaction.animationDuration = 0.6
+        SCNTransaction.animationDuration = reduceMotion ? 0 : 0.6
         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         rig.position = SCNVector3(n.position.x, 0, n.position.z)
         if zoom > 40 { zoom = 34 }
@@ -405,7 +429,9 @@ final class CityScene {
             crystal.firstMaterial = Self.glow(UIColor.white.withAlphaComponent(0.9))
             let cn = SCNNode(geometry: crystal)
             cn.position = SCNVector3(0, Float(h + 1), 0)
+            cn.name = "spin"
             cn.runAction(.repeatForever(.rotateBy(x: 0, y: .pi * 2, z: 0, duration: 12)))
+            cn.isPaused = reduceMotion
             root.addChildNode(cn)
         case "tower":
             box(root, 5, h, 5, at: SCNVector3(0, 0, 0), color: c)
@@ -568,8 +594,8 @@ final class CityScene {
 
     private func tick() {
         phase += 1.0 / 15
-        for p in pulses {  // a bead of light travels each arc, from sender to receiver
-            let f = (phase * p.speed).truncatingRemainder(dividingBy: 1) * Double(p.points.count - 1)
+        for p in pulses {  // a bead of light travels each arc, from sender to receiver (parked mid-arc with Reduce Motion)
+            let f = reduceMotion ? Double(p.points.count - 1) / 2 : (phase * p.speed).truncatingRemainder(dividingBy: 1) * Double(p.points.count - 1)
             let i = min(p.points.count - 2, Int(f)), t = Float(f - Double(i))
             let a = p.points[i], b = p.points[i + 1]
             let x: Float = a.x + (b.x - a.x) * t
@@ -577,7 +603,7 @@ final class CityScene {
             let z: Float = a.z + (b.z - a.z) * t
             p.node.position = SCNVector3(x, y, z)
         }
-        for b in belts {
+        for b in belts where !reduceMotion {
             guard let m = b.node.geometry?.firstMaterial else { continue }
             let t = SCNMatrix4Translate(SCNMatrix4MakeScale(b.scale, 1, 1), Float(-phase * 0.8), 0, 0)
             m.diffuse.contentsTransform = t
@@ -588,7 +614,7 @@ final class CityScene {
             for (_, n) in agentNodes {
                 guard let state = agentStates[n.name ?? ""], ["EXECUTING", "PLANNING", "REVIEWING"].contains(state),
                       let body = n.childNode(withName: "body", recursively: false) else { continue }
-                body.position.y = 2.4 + Float(sin(phase * 6)) * 0.12
+                body.position.y = reduceMotion ? 2.4 : 2.4 + Float(sin(phase * 6)) * 0.12
             }
         }
         // packages along the belts: origin → Nexus Spire → destination, by the server's route clock
@@ -930,5 +956,65 @@ struct AgentStatusSheet: View {
                 score = try? await app.api?.json("/api/insights/scorecards")
             }
         }
+    }
+}
+
+/// The home city as a list, for VoiceOver and for anyone who prefers it: every building with who's there and what
+/// they're doing. Each row opens the same sheet a tap in the 3D city does.
+struct AccessibleCityList: View {
+    @Environment(AppState.self) private var app
+    let districts: [District]
+    let onSelect: (CitySelection) -> Void
+
+    var body: some View {
+        let agents = app.agents.isEmpty ? Roster.bundled : Array(app.agents.values)
+        let live = !app.agents.isEmpty
+        let here = Dictionary(grouping: agents) { live ? ($0.district ?? $0.homeDistrict) : $0.homeDistrict }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(districts) { d in
+                    let people = (here[d.id] ?? []).sorted { $0.name < $1.name }
+                    let busy = people.filter { live && Self.working($0.executionState) }.count
+                    VStack(alignment: .leading, spacing: 4) {
+                        Button { onSelect(.district(d)) } label: {
+                            HStack {
+                                Text(d.name).font(.headline).foregroundStyle(Theme.ink)
+                                Spacer()
+                                Text(Self.summary(people.count, busy, live)).font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .accessibilityLabel("\(d.name). \(Self.summary(people.count, busy, live))")
+                        .accessibilityHint("Shows the work going on in this building")
+                        ForEach(people) { a in
+                            Button { onSelect(.agent(a.id)) } label: {
+                                HStack(spacing: 6) {
+                                    Text(a.name).font(.subheadline)
+                                    Text(a.role).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    Spacer()
+                                    if live { Text(Format.human(a.executionState)).font(.caption).foregroundStyle(Theme.status(a.executionState)) }
+                                }
+                            }
+                            .padding(.leading, 12)
+                            .accessibilityLabel("\(a.name), \(a.role)" + (live ? ", \(Format.human(a.executionState))" : ""))
+                            .accessibilityHint("Shows what \(a.name) is doing")
+                        }
+                    }
+                    .padding(8)
+                    .background(Color(hex: 0x0E1326).opacity(0.85), in: RoundedRectangle(cornerRadius: 6))
+                }
+                if !live {
+                    Text("Offline: agents are shown at their home buildings.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 10)
+        }
+        .background(Pixel.sky)
+    }
+
+    static func working(_ s: String) -> Bool { ["EXECUTING", "ASSIGNED", "PLANNING", "REVIEWING", "WAITING_FOR_TOOL"].contains(s) }
+
+    static func summary(_ n: Int, _ busy: Int, _ live: Bool) -> String {
+        let who = n == 0 ? "nobody here" : "\(n) agent\(n == 1 ? "" : "s")"
+        return live && busy > 0 ? "\(who), \(busy) working" : who
     }
 }

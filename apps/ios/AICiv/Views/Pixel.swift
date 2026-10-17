@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The pixel-art look from the web app, for SwiftUI: hard 2 px edges, a neon rim, dark panels, monospaced caps.
 enum Pixel {
@@ -6,8 +7,14 @@ enum Pixel {
     static let rim = Color(hex: 0x32D8FF).opacity(0.35)
     static let sky = LinearGradient(colors: [Color(hex: 0x0A0D2B), Color(hex: 0x2A1650), Color(hex: 0x4A1F55)], startPoint: .top, endPoint: .bottom)
 
-    static func title(_ size: CGFloat = 13) -> Font { .system(size: size, weight: .heavy, design: .monospaced) }
-    static func mono(_ size: CGFloat = 12) -> Font { .system(size: size, weight: .regular, design: .monospaced) }
+    /// Pixel fonts follow the reader's text size (Dynamic Type), up to 1.6x so the pixel layout still holds.
+    static func title(_ size: CGFloat = 13) -> Font { scaled(size, .heavy) }
+    static func mono(_ size: CGFloat = 12) -> Font { scaled(size, .regular) }
+
+    private static func scaled(_ size: CGFloat, _ weight: UIFont.Weight) -> Font {
+        let base = UIFont.monospacedSystemFont(ofSize: size, weight: weight)
+        return Font(UIFontMetrics(forTextStyle: .body).scaledFont(for: base, maximumPointSize: size * 1.6))
+    }
 
     /// District colours, matching packages/world-engine/src/districts.json.
     static let districtColor: [String: Color] = [

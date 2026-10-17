@@ -336,7 +336,7 @@ final class TownScene: SKScene {
         world.position = CGPoint(x: (-camX * scale * native).rounded() / native, y: (camY * scale * native).rounded() / native)
         backgroundColor = map.id == "town" ? UIColor(red: 0.18, green: 0.42, blue: 0.21, alpha: 1) : UIColor(red: 0.07, green: 0.055, blue: 0.11, alpha: 1)
 
-        if let belt = beltNode, !beltFrames.isEmpty {
+        if let belt = beltNode, !beltFrames.isEmpty, !UIAccessibility.isReduceMotionEnabled {  // Reduce Motion: belt stays still
             beltTimer += 1
             if beltTimer >= 5 { beltTimer = 0; beltIndex = (beltIndex + 1) % beltFrames.count; belt.texture = beltFrames[beltIndex] }
         }
