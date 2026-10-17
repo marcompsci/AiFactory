@@ -55,10 +55,13 @@ struct CityGameView: View {
             game.sync(from: app)
             // CI screenshots: -townStart <map> opens the town at a building's door or inside it
             if let spot = UserDefaults.standard.string(forKey: "townStart") {
-                let at: (String, Double, Double)? = ["town": ("town", 24.5, 20.5), "nexus-spire": ("nexus-spire", 11, 9.2),
-                    "data-observatory": ("data-observatory", 4.5, 6.9), "code-forge": ("code-forge", 8.5, 8.5), "plaza": ("town", 24.5, 13.5),
-                    "sentinel-citadel": ("sentinel-citadel", 8.5, 9.5), "central-bank": ("central-bank", 9.5, 9.5),
-                    "owners-tower": ("owners-tower", 8.5, 8.5)][spot]
+                let spots: [String: (String, Double, Double)] = [
+                    "town": ("town", 24.5, 20.5), "nexus-spire": ("nexus-spire", 11, 9.2),
+                    "data-observatory": ("data-observatory", 4.5, 6.9), "code-forge": ("code-forge", 8.5, 8.5),
+                    "plaza": ("town", 24.5, 13.5), "sentinel-citadel": ("sentinel-citadel", 8.5, 9.5),
+                    "central-bank": ("central-bank", 9.5, 9.5), "owners-tower": ("owners-tower", 8.5, 8.5),
+                ]
+                let at = spots[spot]
                 if let at { game.scene.restore(map: at.0, x: at.1, y: at.2, facing: .up) }
             }
         }
