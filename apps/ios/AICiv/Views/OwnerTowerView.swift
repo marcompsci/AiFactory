@@ -15,6 +15,9 @@ struct OwnerTowerView: View {
                 RecoveryPlansSection()
                 FinanceDecisionsSection()
                 Section("Reports and records") {
+                    NavigationLink { SavedRequestsView() } label: {
+                        Label("Saved requests: start them in one tap", systemImage: "bookmark")
+                    }
                     NavigationLink { WeeklyReportView() } label: {
                         Label("This week: missions, spend and schedules", systemImage: "calendar")
                     }

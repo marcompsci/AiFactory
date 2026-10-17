@@ -469,8 +469,42 @@ stuck in action loops). See services/management/reliability.py.
   contents. Money records and finance events, credentials and server settings are left out. One export a minute per
   person; each export is recorded. `GET /api/export` (owner).
 
+## V6.27: Weekly report in your time zone
+
+- The weekly report counts your local days (the phone sends its time zone; `GET /api/insights/weekly?tz=`), and Atlas
+  uses the City's time zone. Unknown zones fall back to UTC; the zone used is in the report.
+
+## V6.28: Stale sign-in guard
+
+- A schedule also pauses when its creator hasn't signed in for 30 days, or (for a schedule older than 30 days) has
+  never signed in since the roster began. The Team screen lists schedules that will pause, by the same rule.
+
+## V6.29: Saved requests
+
+- Name a request (a test fix, test run or research) and start it in one tap: save from a finished mission's page
+  (keeps its repository, budget and priority) or `POST /api/saved-requests`; start under Owner → Saved requests,
+  `POST /api/saved-requests/{id}/start`, or "start <name>" to anyone in the City (confirm first). It starts as the
+  person who presses start, through the regular functions. Names are unique per organization; at most 50.
+- A mission can only name a repository of its own organization (that check was missing on `POST /api/missions`).
+
+## V6.30: Schedule costs and budgets
+
+- Each schedule shows its estimated cost per run (average of the last 10 runs) and a monthly projection at its cadence.
+  Swipe right → Budget sets each run's mission budget; above the charter's mission cap is refused.
+  `POST /api/schedules/{id}/budget`. Research runs take the budget too.
+
+## V6.31: Compare runs
+
+- A finished mission's page → "Compare with the run before": status, objective, estimated cost, time and steps, side by
+  side, with what changed in plain words. "The run before" is the mission it was started again from or followed, the
+  schedule's previous run, or the latest earlier mission with the same request. `GET /api/missions/{id}/compare`.
+
+## V6.32: Step-by-step movement on the web
+
+- In the web town, Shift+arrow moves one tile and says what's ahead; L looks around. Both are read by screen readers
+  through a live region. The same rules as the iPhone's step pad.
+
 ### Still open
-- Weekly report days are UTC days, not your local days.
-- The roster knows a role only as of each person's latest sign-in; someone demoted who never signs in again keeps
-  their last role there (their schedules keep running until then, or until you pause them).
-- The step pad and Look around are on the iPhone; the web town still uses the keyboard and mouse.
+- The roster knows a role only as of each person's latest sign-in; a demoted owner's schedules run for up to 30 days
+  after their last sign-in unless you pause them.
+- Schedule cost is an average of recent runs; a schedule that hasn't run shows no estimate.

@@ -335,6 +335,23 @@ def _rerun(conn: Connection, org: str, user: str, agent, text: str) -> Reply:
                  "your charter. Confirm to start it again.", proposal=prop)
 
 
+_START_SAVED = re.compile(_LEAD + r"(?:start|run|launch|kick\s+off|do)\s+(?:my\s+|the\s+|our\s+)?(?P<n>.{2,60}?)(?:\s+(?:again|now|please))?[.!?]*$")
+
+
+def _start_saved(conn: Connection, org: str, user: str, agent, t: str) -> Reply | None:
+    m = _START_SAVED.match(t)
+    if not m:
+        return None
+    from services.management import saved
+    name = re.sub(r"\s+saved\s+request$", "", m.group("n").strip())
+    hit = next((r for r in saved.listing(conn, org) if r["name_key"] == saved._key(name)), None)
+    if hit is None:
+        return None
+    prop = _propose(conn, org=org, user=user, agent=agent, kind="start_saved", params={"saved_request_id": hit["id"]},
+                    summary=f"Start your saved request \"{hit['name']}\".")
+    return Reply(f"Your saved request \"{hit['name']}\" is ready. It starts as you, under your charter. Confirm to start it.", proposal=prop)
+
+
 def _search(conn: Connection, org: str, q: str) -> Reply:
     from services.management.search import search
     res = search(conn, org, q)
@@ -397,6 +414,9 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str 
     scheduled = _schedule(conn, org, user, agent, t, tz)
     if scheduled:
         return scheduled
+    started = _start_saved(conn, org, user, agent, t)
+    if started:
+        return started
     if _has(t, "cancel", "stop the", "abort"):
         return _cancel(conn, org, user, agent, t)
     if _AGAIN.search(t):
@@ -413,7 +433,7 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str 
         return _search(conn, org, found.group("q").strip(" ?.!"))
     if agent.key in MANAGERS and (_has(t, "the week", "this week", "weekly", "last week", "past week", "last 7 days", "last seven days")):
         from services.management.weekly import report, spoken as weekly_spoken
-        return Reply(weekly_spoken(report(conn, org)), suggestions=["What happened today?", "What needs my approval?"])
+        return Reply(weekly_spoken(report(conn, org, tz=tz)), suggestions=["What happened today?", "What needs my approval?"])
     if agent.key in MANAGERS and (_has(t, "what happened", "catch me up", "daily brief", "what did i miss", "recap")
                                   or re.fullmatch(r"(brief|today|summary|yesterday)\??[!. ]*", t)):
         from services.management.brief import brief, spoken

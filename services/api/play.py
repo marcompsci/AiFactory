@@ -183,6 +183,15 @@ def _run(pr, p: Principal) -> dict:
         with db.get_engine().connect() as conn:
             m = conn.execute(select(db.missions.c.title, db.missions.c.execution_mode).where(db.missions.c.id == r["mission_id"])).first()
         return {"mission_id": r["mission_id"], "title": m.title, "execution_mode": m.execution_mode, "from_mission_id": pr.params["mission_id"]}
+    if pr.kind == "start_saved":
+        from services.management import saved
+        try:
+            r = saved.start(p, pr.params["saved_request_id"])
+        except saved.SavedError as exc:
+            raise HTTPException(exc.status, str(exc)) from exc
+        with db.get_engine().connect() as conn:
+            m = conn.execute(select(db.missions.c.title, db.missions.c.execution_mode).where(db.missions.c.id == r["mission_id"])).first()
+        return {"mission_id": r["mission_id"], "title": m.title, "execution_mode": m.execution_mode}
     if pr.kind == "cancel_mission":
         main.cancel(pr.params["mission_id"], p)
         return {"mission_id": pr.params["mission_id"], "cancelled": True}

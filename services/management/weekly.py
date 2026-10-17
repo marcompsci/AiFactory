@@ -1,10 +1,12 @@
 """The weekly report (V6.23): the last seven days, day by day, against the seven before. Counted from the records by
 rules, like the daily brief: no model writes it and nothing is invented. Money is the gateway's estimate and is
-labelled as one. Days are UTC days.
+labelled as one. Days are the caller's local days (V6.27: the phone, the web and the City send their time zone; an
+unknown zone falls back to UTC).
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
 from sqlalchemy.engine import Connection
@@ -14,10 +16,18 @@ from services.core import db
 MAX_ROWS = 100_000
 
 
-def _day(v) -> str:
-    if isinstance(v, datetime):
-        return v.astimezone(timezone.utc).date().isoformat()
-    return datetime.fromisoformat(str(v)).astimezone(timezone.utc).date().isoformat()
+def zone(tz: str | None):
+    try:
+        return ZoneInfo(tz or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        return ZoneInfo("UTC")
+
+
+def _day(v, z=timezone.utc) -> str:
+    d = v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.astimezone(z).date().isoformat()
 
 
 def _plural(n: int, word: str) -> str:
@@ -31,12 +41,16 @@ def _change(now_n: float, before: float) -> str:
     return "same as the week before" if pct == 0 else f"{'up' if pct > 0 else 'down'} {abs(pct)}% on the week before"
 
 
-def report(conn: Connection, org_id: str, now: datetime | None = None) -> dict:
+def report(conn: Connection, org_id: str, now: datetime | None = None, tz: str | None = "UTC") -> dict:
+    z = zone(tz)
     now = now or datetime.now(timezone.utc)
-    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    start = today - timedelta(days=6)          # seven UTC days including today
-    prev = start - timedelta(days=7)
-    days = [(start + timedelta(days=i)).date().isoformat() for i in range(7)]
+    local_today = now.astimezone(z).date()
+    first_day = local_today - timedelta(days=6)   # seven local days including today
+    days = [(first_day + timedelta(days=i)).isoformat() for i in range(7)]
+    # local midnights as UTC instants for the queries (zoneinfo picks the right offset on daylight-saving days)
+    start = datetime(first_day.year, first_day.month, first_day.day, tzinfo=z).astimezone(timezone.utc)
+    p_day = first_day - timedelta(days=7)
+    prev = datetime(p_day.year, p_day.month, p_day.day, tzinfo=z).astimezone(timezone.utc)
     per_day = {d: {"date": d, "completed": 0, "failed": 0, "spend_usd": 0.0} for d in days}
 
     M = db.missions
@@ -44,7 +58,7 @@ def report(conn: Connection, org_id: str, now: datetime | None = None) -> dict:
     before = {"completed": 0, "failed": 0, "spend_usd": 0.0}
     for r in conn.execute(select(M.c.status, M.c.updated_at).where(M.c.organization_id == org_id, M.c.updated_at >= prev.isoformat(),
                                                                    M.c.status.in_(["COMPLETED", "FAILED"])).limit(MAX_ROWS)).fetchall():
-        d, key = _day(r.updated_at), r.status.lower()
+        d, key = _day(r.updated_at, z), r.status.lower()
         if d in per_day:
             per_day[d][key] += 1
             week[key] += 1
@@ -53,7 +67,7 @@ def report(conn: Connection, org_id: str, now: datetime | None = None) -> dict:
     U = db.usage_records
     for r in conn.execute(select(U.c.created_at, U.c.estimated_cost_usd).where(U.c.organization_id == org_id,
                                                                               U.c.created_at >= prev.isoformat()).limit(MAX_ROWS)).fetchall():
-        d, usd = _day(r.created_at), float(r.estimated_cost_usd or 0)
+        d, usd = _day(r.created_at, z), float(r.estimated_cost_usd or 0)
         if d in per_day:
             per_day[d]["spend_usd"] += usd
             week["spend_usd"] += usd
@@ -104,7 +118,8 @@ def report(conn: Connection, org_id: str, now: datetime | None = None) -> dict:
             "reruns": ev["mission.rerun"], "followups_started": ev["mission.followup_started"],
             "approvals_decided": {k.lower(): int(v) for k, v in decided.items()}, "top_agents": top,
             "busiest_day": busiest_day["date"] if busiest_day["completed"] + busiest_day["failed"] else None,
-            "is_estimate": True, "method": "records; seven UTC days including today, compared with the seven before"}
+            "is_estimate": True, "tz": getattr(z, "key", "UTC"),
+            "method": "records; seven local days including today, compared with the seven before"}
 
 
 def spoken(r: dict) -> str:

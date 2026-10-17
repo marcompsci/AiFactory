@@ -33,12 +33,13 @@ ACTIVE = ("RESEARCHED", "MANAGER_REVIEW", "ROUTED", "DEPARTMENT_ACCEPTED", "IN_P
           "MANAGER_APPROVAL", "OWNER_APPROVAL", "RELEASE_AUTHORIZED", "REVISION_REQUESTED")
 
 
-def create_mission(conn, *, org_id: str, kind: str, title: str, prompt: str, params: dict, opportunity_id: str, created_by: str) -> str:
+def create_mission(conn, *, org_id: str, kind: str, title: str, prompt: str, params: dict, opportunity_id: str, created_by: str,
+                   budget_usd: float | None = None) -> str:
     seed_project = conn.execute(select(db.projects.c.id)).scalar()
     mid = db.new_id()
     mode = "live" if get_settings().model_available else "simulation"
     conn.execute(insert(db.missions).values(id=mid, organization_id=org_id, project_id=seed_project, repository_id=None, title=title[:120],
-                                            prompt=prompt, status="CREATED", execution_mode=mode, budget_usd=get_settings().default_mission_budget_usd,
+                                            prompt=prompt, status="CREATED", execution_mode=mode, budget_usd=budget_usd or get_settings().default_mission_budget_usd,
                                             spent_usd_estimated=0.0, created_by=created_by, paused=0, kind=kind, opportunity_id=opportunity_id,
                                             params=params))
     emit(conn, "mission.created", mission_id=mid, execution_mode=mode,

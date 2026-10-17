@@ -1169,7 +1169,7 @@ play_proposals = Table(            # an actionable request turned into a structu
     Column("organization_id", String(36), nullable=False),
     Column("user_id", String(36), nullable=False),
     Column("agent_id", String(36), nullable=False),
-    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission | create_schedule | rerun_mission
+    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission | create_schedule | rerun_mission | start_saved
     Column("params", JSON, nullable=False, default=dict),
     Column("summary", Text, nullable=False),
     Column("status", String, nullable=False, default="PENDING"),  # PENDING | CONFIRMED | DECLINED | EXPIRED | FAILED
@@ -1290,6 +1290,42 @@ org_members = Table(
     Column("email", String),
     Column("first_seen", String, nullable=False, default=utcnow),
     Column("last_seen", String, nullable=False, default=utcnow),
+)
+
+# ---------------------------------------------------------------- V6.29 saved requests, V6.30 per-schedule budgets
+saved_requests = Table(
+    "saved_requests", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("name", String, nullable=False),
+    Column("name_key", String, nullable=False),              # lower-cased name: one per organization
+    Column("kind", String, nullable=False),                  # fix_failing_test | run_tests | market_research
+    Column("spec", JSON, nullable=False, default=dict),      # {prompt, params, title, repository_id?, budget_usd?}
+    Column("priority", String, nullable=False, default="normal"),
+    Column("created_by", String(36), nullable=False),
+    Column("uses", Integer, nullable=False, default=0),
+    Column("last_used_at", String),
+    Column("last_mission_id", String(36)),
+    Column("created_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "name_key"),
+)
+
+schedule_runs = Table(             # which mission each schedule run started (for its cost and for comparing runs)
+    "schedule_runs", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("schedule_id", String(36), nullable=False, index=True),
+    Column("mission_id", String(36), nullable=False),
+    Column("started_at", String, nullable=False, default=utcnow),
+)
+
+schedule_budgets = Table(
+    "schedule_budgets", metadata,
+    Column("schedule_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("budget_usd", Float, nullable=False),             # each run's mission budget (the charter's cap still applies)
+    Column("set_by", String(36)),
+    Column("updated_at", String, nullable=False, default=utcnow),
 )
 
 # ---------------------------------------------------------------- V6.9 tamper-evident log: each event linked to the last

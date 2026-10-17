@@ -245,3 +245,30 @@ export function standingSpots(m: GameMap): { x: number; y: number; facing: Dir }
       if (x !== m.spawn.x && !isSolid(m, x, y) && !taken.has(y * m.w + x)) out.push({ x: x - 0.5, y, facing: "down" });
   return out;
 }
+
+
+// ---------------------------------------------------------------- V6.32 step-by-step movement (screen readers)
+export const DIR_NAME: Record<Dir, string> = { up: "north", down: "south", left: "west", right: "east" };
+export const DELTA: Record<Dir, { dx: number; dy: number }> = { up: { dx: 0, dy: -1 }, down: { dx: 0, dy: 1 }, left: { dx: -1, dy: 0 }, right: { dx: 1, dy: 0 } };
+
+/** What someone walking from tile (x, y) toward `dir` meets first within `limit` tiles. Same rules as the iPhone. */
+export function ahead(m: GameMap, x: number, y: number, dir: Dir, people: { name: string; x: number; y: number }[], limit = 5): string {
+  const d = DELTA[dir];
+  for (let i = 1; i <= limit; i++) {
+    const tx = x + d.dx * i, ty = y + d.dy * i;
+    const dist = i === 1 ? "right ahead" : `${i} steps ahead`;
+    const p = people.find((q) => q.x === tx && q.y === ty);
+    if (p) return `${p.name}, ${dist}`;
+    const o = m.interactables.find((q) => q.x === tx && q.y === ty);
+    if (o) return `${o.label}, ${dist}`;
+    const door = m.buildings.find((b) => b.door.x === tx && b.door.y === ty);
+    if (door) return `the door of ${door.name}, ${dist}`;
+    if (m.exits.some((e) => e.x === tx && e.y === ty)) return `the way out, ${dist}`;
+    if (tx < 0 || ty < 0 || tx >= m.w || ty >= m.h) return `the edge of the map, ${dist}`;
+    if (isSolid(m, tx, ty)) {
+      const b = m.buildings.find((q) => tx >= q.x && tx < q.x + q.w && ty >= q.y && ty < q.y + q.h);
+      return b ? `the wall of ${b.name}, ${dist}` : `a wall or furniture, ${dist}`;
+    }
+  }
+  return `clear for ${limit} steps`;
+}

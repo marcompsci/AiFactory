@@ -65,14 +65,16 @@ def team(conn, org_id: str, me: str) -> dict:
     members = [{"user_id": r.user_id, "role": r.role, "mode": r.mode, "email": r.email, "first_seen": r.first_seen,
                 "last_seen": r.last_seen, "you": r.user_id == me, "active_schedules": counts.get(r.user_id, 0)}
                for r in conn.execute(select(M).where(M.c.organization_id == org_id).order_by(M.c.last_seen.desc())).fetchall()]
-    roles = {m["user_id"]: m["role"] for m in members}
+    from services.management.schedules import owner_problem
     check = []
-    for r in conn.execute(select(S.c.id, S.c.title, S.c.created_by).where(S.c.organization_id == org_id, S.c.enabled == 1)).fetchall():
-        role = roles.get(r.created_by)
-        if role != "owner":  # matches the scheduler: not an owner pauses at the next run; unknown keeps running
-            check.append({"schedule_id": r.id, "title": r.title, "created_by": r.created_by,
-                          "why": "its creator hasn't signed in since the roster began, so it keeps running" if role is None
-                          else f"its creator is now {role}, so it pauses at its next run"})
+    for r in conn.execute(select(S).where(S.c.organization_id == org_id, S.c.enabled == 1)).fetchall():
+        d = dict(r._mapping)
+        why = owner_problem(conn, d)
+        if why:  # the same rule the scheduler applies: it will pause at its next run
+            check.append({"schedule_id": d["id"], "title": d["title"], "created_by": d["created_by"], "why": f"{why}, so it pauses at its next run"})
+        elif d["created_by"] not in {m["user_id"] for m in members}:
+            check.append({"schedule_id": d["id"], "title": d["title"], "created_by": d["created_by"],
+                          "why": "its creator hasn't signed in since the roster began; it keeps running until it's 30 days old"})
     return {"members": members, "schedules_to_check": check,
             "note": "Roles are as of each person's latest sign-in. A schedule pauses when its creator's latest sign-in "
-                    "wasn't as an owner."}
+                    "wasn't as an owner, or when they haven't signed in for 30 days."}

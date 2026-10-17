@@ -140,6 +140,9 @@ app.include_router(links_router)
 from services.api.team import router as team_router  # noqa: E402
 
 app.include_router(team_router)
+from services.api.saved import router as saved_router  # noqa: E402
+
+app.include_router(saved_router)
 # AICIV_ALLOW_LAN_ORIGINS=1 (set by scripts/run-local.sh when serving your phone): also accept the city page served from
 # this computer's private-network address on port 3000 (Wi-Fi, Personal Hotspot 172.20.10.x / 192.0.0.x, .local names).
 LAN_ORIGIN_RX = (r"^http://(10(\.\d{1,3}){3}|192\.168(\.\d{1,3}){2}|172\.(1[6-9]|2\d|3[01])(\.\d{1,3}){2}|192\.0\.0\.\d{1,3}"
@@ -335,6 +338,9 @@ def create_mission(body: MissionIn, p: Principal = Depends(operator)):
         org = conn.execute(select(db.organizations).where(db.organizations.c.id == p.organization_id)).first()
         if org.emergency_stopped:
             raise HTTPException(409, "emergency stop is engaged")
+        if body.repository_id and conn.execute(select(db.repositories.c.id).where(
+                db.repositories.c.id == body.repository_id, db.repositories.c.organization_id == p.organization_id)).first() is None:
+            raise HTTPException(404, "repository not found")  # only this organization's repositories
         repo_id = body.repository_id or conn.execute(select(db.repositories.c.id).where(
             db.repositories.c.organization_id == p.organization_id)).scalar()
         budget = body.budget_usd or s.default_mission_budget_usd

@@ -9,7 +9,7 @@ scheduled: test runs and market research.
 V6.19 adds "every weekday" (Monday to Friday), running a schedule now, and skipping its next run. V6.20: a schedule
 that fails three times in a row pauses itself and waits in the owner's inbox (an emergency-stop hold isn't a failure).
 V6.24: before each run the creator's role at their latest sign-in is checked; a creator who is no longer an owner
-pauses the schedule at once.
+pauses the schedule at once. V6.28: so does a creator who hasn't signed in as an owner for 30 days.
 """
 from __future__ import annotations
 
@@ -102,7 +102,45 @@ def get(conn: Connection, org_id: str, sid: str) -> dict | None:
     d["failures"] = h.failures if h else 0
     d["paused_reason"] = h.paused_reason if h else None
     d["paused_at"] = h.paused_at if h else None
+    d["budget_usd"] = conn.execute(select(db.schedule_budgets.c.budget_usd).where(db.schedule_budgets.c.schedule_id == sid)).scalar()
+    d["cost"] = cost(conn, sid, d["cadence"])
     return d
+
+
+RUNS_PER_MONTH = {"daily": 30.4, "weekdays": 21.7, "weekly": 4.35}
+COST_SAMPLE = 10
+
+
+def cost(conn: Connection, sid: str, cadence: str) -> dict:
+    """Estimated AI spend per run (average of the last COST_SAMPLE runs that started a mission) and a monthly
+    projection at this cadence. Estimates from the gateway's usage records, not bills."""
+    from sqlalchemy import func
+    R, U = db.schedule_runs, db.usage_records
+    mids = [r.mission_id for r in conn.execute(select(R.c.mission_id).where(R.c.schedule_id == sid)
+                                               .order_by(R.c.started_at.desc()).limit(COST_SAMPLE)).fetchall()]
+    if not mids:
+        return {"runs_counted": 0, "per_run_usd": None, "monthly_usd": None, "is_estimate": True}
+    total = float(conn.execute(select(func.coalesce(func.sum(U.c.estimated_cost_usd), 0.0)).where(U.c.mission_id.in_(mids))).scalar() or 0)
+    per = total / len(mids)
+    return {"runs_counted": len(mids), "per_run_usd": round(per, 4), "monthly_usd": round(per * RUNS_PER_MONTH.get(cadence, 30.4), 2),
+            "is_estimate": True}
+
+
+def set_budget(conn: Connection, org_id: str, sid: str, budget: float | None, user_id: str) -> dict:
+    """Each run's mission budget (None: the default). The charter's mission cap still applies, so a budget above it is refused."""
+    from . import charter
+    if get(conn, org_id, sid) is None:
+        raise ScheduleError("schedule not found")
+    B = db.schedule_budgets
+    conn.execute(delete(B).where(B.c.schedule_id == sid))
+    if budget is not None:
+        try:
+            charter.check_mission_budget(conn, org_id, budget)
+        except charter.CharterError as exc:
+            raise ScheduleError(str(exc)) from exc
+        conn.execute(insert(B).values(schedule_id=sid, organization_id=org_id, budget_usd=round(float(budget), 2), set_by=user_id))
+    emit(conn, "schedule.changed", org_id=org_id, payload={"schedule_id": sid, "budget_usd": budget})
+    return get(conn, org_id, sid)
 
 
 def listing(conn: Connection, org_id: str) -> list[dict]:
@@ -129,6 +167,8 @@ def remove(conn: Connection, org_id: str, sid: str) -> None:
     if get(conn, org_id, sid) is None:
         raise ScheduleError("schedule not found")
     conn.execute(delete(db.schedule_health).where(db.schedule_health.c.schedule_id == sid))
+    conn.execute(delete(db.schedule_budgets).where(db.schedule_budgets.c.schedule_id == sid))
+    conn.execute(delete(db.schedule_runs).where(db.schedule_runs.c.schedule_id == sid))
     conn.execute(delete(db.mission_schedules).where(db.mission_schedules.c.id == sid))
     emit(conn, "schedule.changed", org_id=org_id, payload={"schedule_id": sid, "deleted": True})
 
@@ -167,6 +207,9 @@ def record_run(conn: Connection, sid: str, *, mission_id: str | None, error: str
         return
     conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == sid).values(
         runs=(s.runs or 0) + (1 if mission_id else 0), last_run_at=db.utcnow(), last_mission_id=mission_id, last_error=error))
+    if mission_id and not conn.execute(select(db.schedule_runs.c.id).where(db.schedule_runs.c.schedule_id == sid,
+                                                                           db.schedule_runs.c.mission_id == mission_id)).first():
+        conn.execute(insert(db.schedule_runs).values(id=db.new_id(), organization_id=s.organization_id, schedule_id=sid, mission_id=mission_id))
     emit(conn, "schedule.ran", mission_id=mission_id, org_id=s.organization_id,
          payload={"schedule_id": sid, "title": s.title, "mission_id": mission_id, "error": error})
     H = db.schedule_health
@@ -207,9 +250,37 @@ def skip_next(conn: Connection, org_id: str, sid: str) -> dict:
     return get(conn, org_id, sid)
 
 
+OWNER_FRESH_DAYS = 30  # a creator not seen signing in as an owner for this long can't keep a schedule running
+
+
+def owner_problem(conn: Connection, s: dict, now: datetime | None = None) -> str | None:
+    """Why this schedule shouldn't run in its creator's name, from the V6.24 roster (None when it may):
+    - their latest sign-in wasn't as an owner;
+    - they haven't signed in for OWNER_FRESH_DAYS (V6.28: a demotion we never saw can't keep it running forever);
+    - they've never signed in since the roster began and the schedule is older than OWNER_FRESH_DAYS."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=OWNER_FRESH_DAYS)
+    row = conn.execute(select(db.org_members.c.role, db.org_members.c.last_seen)
+                       .where(db.org_members.c.organization_id == s["organization_id"],
+                              db.org_members.c.user_id == s["created_by"])).first()
+    if row is not None:
+        if row.role != "owner":
+            return "the person who set it up is no longer an owner"
+        if _ts(row.last_seen) < cutoff:
+            return f"the person who set it up hasn't signed in for {OWNER_FRESH_DAYS} days"
+        return None
+    if s.get("created_at") and _ts(s["created_at"]) < cutoff:
+        return f"no sign-in from the person who set it up in {OWNER_FRESH_DAYS} days, so it can't be confirmed they're still an owner"
+    return None
+
+
+def _ts(v) -> datetime:
+    d = v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
 def creator_still_owner(conn: Connection, s: dict) -> bool | None:
-    """The creator's role at their latest sign-in (V6.24 roster): True/False, or None when they haven't signed in since
-    the roster started (schedules made before V6.24)."""
+    """Kept for callers of V6.24: True/False from the roster, None when the creator isn't in it."""
     role = conn.execute(select(db.org_members.c.role).where(db.org_members.c.organization_id == s["organization_id"],
                                                             db.org_members.c.user_id == s["created_by"])).scalar()
     return None if role is None else role == "owner"
@@ -223,12 +294,14 @@ def start(s: dict, *, slot_key: str, user_id: str | None = None) -> tuple[str | 
     from services.api import main, v4
     from services.core.auth import Principal
     p = Principal(user_id=user_id or s["created_by"], organization_id=s["organization_id"], role="operator", mode="schedule")
+    with db.get_engine().connect() as conn:
+        budget = conn.execute(select(db.schedule_budgets.c.budget_usd).where(db.schedule_budgets.c.schedule_id == s["id"])).scalar()
     try:
         if s["kind"] == "run_tests":
-            m = main.create_mission(main.MissionIn(prompt=s["params"]["prompt"], kind="run_tests", title=s["title"][:120],
+            m = main.create_mission(main.MissionIn(prompt=s["params"]["prompt"], kind="run_tests", title=s["title"][:120], budget_usd=budget,
                                                    idempotency_key=f"schedule:{s['id']}:{slot_key}"[:100]), p)
             return m["id"], None
-        return v4.start_research(v4.ResearchIn(**s["params"]), p)["mission_id"], None
+        return v4.start_research(v4.ResearchIn(**{**s["params"], "budget_usd": budget}), p)["mission_id"], None
     except HTTPException as exc:
         return None, str(exc.detail)[:300]
     except Exception as exc:  # recorded on the schedule; the next slot tries again

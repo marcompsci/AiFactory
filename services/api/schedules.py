@@ -59,6 +59,20 @@ def set_enabled(sid: str, body: EnabledIn, p: Principal = Depends(owner)) -> dic
         raise HTTPException(404, str(exc)) from exc
 
 
+class BudgetIn(BaseModel):
+    budget_usd: float | None = Field(default=None, gt=0, le=50)
+
+
+@router.post("/{sid}/budget")
+def set_budget(sid: str, body: BudgetIn, p: Principal = Depends(owner)) -> dict:
+    """Each run's mission budget (null: the default). Above your charter's mission cap is refused."""
+    try:
+        with transaction() as conn:
+            return schedules.set_budget(conn, p.organization_id, sid, body.budget_usd, p.user_id)
+    except schedules.ScheduleError as exc:
+        raise HTTPException(404 if "not found" in str(exc) else 422, str(exc)) from exc
+
+
 @router.post("/{sid}/skip")
 def skip(sid: str, p: Principal = Depends(owner)) -> dict:
     """Skip the next run only; the one after happens as usual."""

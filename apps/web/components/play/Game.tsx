@@ -6,7 +6,7 @@ import { DEFAULT_PLAYER, type PlayerLook } from "@/lib/play/sprites";
 import { usePlay } from "@/lib/play/state";
 import { useStore } from "@/lib/store";
 import { Dialogue } from "./Dialogue";
-import { Controls, Minimap, Toasts, TopBar } from "./Hud";
+import { Announcer, Controls, Minimap, Toasts, TopBar } from "./Hud";
 import { PackageCard, Panels } from "./Panels";
 import { live, Runner } from "./runner";
 
@@ -51,7 +51,8 @@ export function Game() {
 
   return (
     <main className="fixed inset-0 select-none overflow-hidden bg-[#120E1C]">
-      <canvas ref={ref} className="absolute inset-0 h-full w-full touch-none" style={{ imageRendering: "pixelated" }} aria-label="AI Civilization town. Walk around and talk to your agents." />
+      <canvas ref={ref} className="absolute inset-0 h-full w-full touch-none" style={{ imageRendering: "pixelated" }} aria-label="AI Civilization town. Walk around and talk to your agents. Shift and an arrow key steps one tile and says what's ahead; L looks around." />
+      <Announcer />
       <TopBar />
       <Minimap />
       <Toasts />

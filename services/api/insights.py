@@ -63,11 +63,12 @@ def daily_brief(hours: int = Query(24, ge=1, le=168), p: Principal = Depends(mem
 
 
 @router.get("/weekly")
-def weekly_report(p: Principal = Depends(member)) -> dict:
-    """The last seven days against the seven before, counted from the records (services/management/weekly.py)."""
+def weekly_report(tz: str = Query("UTC", max_length=64), p: Principal = Depends(member)) -> dict:
+    """The last seven local days (your time zone; unknown zones fall back to UTC) against the seven before, counted
+    from the records (services/management/weekly.py)."""
     from services.management.weekly import report
     with db.get_engine().connect() as conn:
-        return report(conn, p.organization_id)
+        return report(conn, p.organization_id, tz=tz)
 
 
 @router.get("/scorecards")

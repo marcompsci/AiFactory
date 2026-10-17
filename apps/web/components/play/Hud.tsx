@@ -222,3 +222,15 @@ function describe(e: EventEnvelope): string | null {
   }
 }
 
+
+
+/** The screen-reader voice for step-by-step movement: Shift+arrow steps one tile, L looks around (V6.32). */
+export function Announcer() {
+  const a = usePlay((s) => s.announcement);
+  return (
+    <div className="sr-only" role="status" aria-live="polite" aria-atomic="true" data-testid="announcer">
+      {/* the key makes a repeated phrase ("Can't go north…") announce again */}
+      <span key={a.seq}>{a.text}</span>
+    </div>
+  );
+}

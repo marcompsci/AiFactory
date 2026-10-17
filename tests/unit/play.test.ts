@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { animFor, beltRoute, dockFor, findPath, moveBody, packagePoint, placeAgents, statusLabel } from "../../apps/web/lib/play/engine";
+import { ahead, animFor, beltRoute, dockFor, DIR_NAME, findPath, moveBody, packagePoint, placeAgents, statusLabel } from "../../apps/web/lib/play/engine";
 import { buildInterior, buildTown, ENTERABLE, isSolid, TOWN_BUILDINGS } from "../../apps/web/lib/play/maps";
 import { paintFrame, outfitFromPlayer, DEFAULT_PLAYER, SPRITE_W, SPRITE_H } from "../../apps/web/lib/play/sprites";
 
@@ -132,5 +132,18 @@ describe("sprites", () => {
     const o = outfitFromPlayer(DEFAULT_PLAYER);
     const l = paintFrame(o, "left", "stand", 0), r = paintFrame(o, "right", "stand", 0);
     expect(r[3]).toBe(l[SPRITE_W - 1 - 3]);
+  });
+});
+
+describe("V6.32 step-by-step movement", () => {
+  it("says what is ahead, like the iPhone", () => {
+    const room = buildInterior("owners-tower")!;
+    const s = room.spawn;
+    expect(ahead(room, s.x, s.y, "up", [{ name: "Atlas", x: s.x, y: s.y - 1 }])).toBe("Atlas, right ahead");
+    expect(ahead(room, s.x, s.y, "up", [], room.h).startsWith("clear")).toBe(false);
+    const town = buildTown();
+    const b = town.buildings.find((q) => q.id === "code-forge")!;
+    expect(ahead(town, b.door.x, b.door.y + 2, "up", [])).toMatch(/Enter Code Forge, 2 steps ahead/);
+    expect(DIR_NAME.left).toBe("west");
   });
 });

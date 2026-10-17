@@ -75,3 +75,24 @@ def cancel_followup(link_id: str, p: Principal = Depends(operator)) -> dict:
         return links.cancel_followup(p.organization_id, link_id, p.user_id)
     except links.LinkError as exc:
         raise _err(exc) from exc
+
+
+@router.get("/missions/{mission_id}/compare")
+def compare(mission_id: str, with_id: str | None = None, p: Principal = Depends(member)) -> dict:
+    """This mission next to the run before it (or `with_id`), counted from the records (services/management/compare.py)."""
+    import uuid
+
+    from services.management.compare import compare as build
+    for v in (mission_id, with_id):
+        if v is not None:
+            try:
+                uuid.UUID(v)
+            except ValueError as exc:
+                raise HTTPException(404, "mission not found") from exc
+    with db.get_engine().connect() as conn:
+        out = build(conn, p.organization_id, mission_id, with_id)
+    if out is None:
+        raise HTTPException(404, "mission not found")
+    if with_id and out["before"] is None:
+        raise HTTPException(404, "the other mission wasn't found")
+    return out

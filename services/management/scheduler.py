@@ -74,10 +74,9 @@ class Scheduler(threading.Thread):
         started = 0
         for s in due:
             with db.get_engine().connect() as conn:
-                owner_ok = schedules.creator_still_owner(conn, s)
-            if owner_ok is False:
+                why = schedules.owner_problem(conn, s)
+            if why:
                 with transaction() as conn:
-                    why = "the person who set it up is no longer an owner"
                     schedules.record_run(conn, s["id"], mission_id=None, error=why, pause_now=f"paused: {why}")
                 continue
             mid, err = schedules.start(s, slot_key=s["slot"])

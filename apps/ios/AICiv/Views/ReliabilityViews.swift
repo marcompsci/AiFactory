@@ -744,6 +744,8 @@ struct SchedulesView: View {
     @State private var list: [JSONValue] = []
     @State private var loaded = false
     @State private var message: String?
+    @State private var budgetFor: String?
+    @State private var budgetText = ""
 
     var body: some View {
         List {
@@ -771,6 +773,7 @@ struct SchedulesView: View {
                     }
                     Text("\(s.get("runs")?.int ?? 0) run(s)" + (s.s("last_error").isEmpty ? "" : " · last try: \(s.s("last_error"))"))
                         .font(.caption2).foregroundStyle(s.s("last_error").isEmpty ? Color.secondary : Theme.warn)
+                    Text(Self.costLine(s)).font(.caption2).foregroundStyle(.secondary)
                 }
                 .swipeActions {
                     Button("Delete", role: .destructive) { Task { await remove(s.s("id")) } }
@@ -780,6 +783,11 @@ struct SchedulesView: View {
                 }
                 .swipeActions(edge: .leading) {
                     Button("Run now") { Task { await post(s.s("id"), "run-now", done: "Started. It's in the journal.") } }.tint(Theme.cyan)
+                    Button("Budget") { budgetFor = s.s("id"); budgetText = s.get("budget_usd")?.double.map { String(format: "%.2f", $0) } ?? "" }
+                        .tint(Theme.gold)
+                }
+                .accessibilityAction(named: "Set a budget per run") {
+                    budgetFor = s.s("id"); budgetText = s.get("budget_usd")?.double.map { String(format: "%.2f", $0) } ?? ""
                 }
                 .accessibilityAction(named: "Run now") { Task { await post(s.s("id"), "run-now", done: "Started. It's in the journal.") } }
                 .accessibilityAction(named: s.get("enabled")?.int == 1 ? "Skip next run" : "Skip next run (resume it first)") {
@@ -787,9 +795,16 @@ struct SchedulesView: View {
                 }
             }
             if let message { Text(message).font(.caption) }
-            Section { } footer: { Text("Each run follows your charter, quiet hours and the emergency stop. Only test runs and research can be scheduled. Three failed runs in a row pause a schedule. Swipe right to run now, left to skip the next run.") }
+            Section { } footer: { Text("Each run follows your charter, quiet hours and the emergency stop. Only test runs and research can be scheduled. Three failed runs in a row pause a schedule. Swipe right to run now or set a budget, left to skip the next run. Costs are estimates.") }
         }
         .navigationTitle("Schedules")
+        .alert("Budget per run", isPresented: Binding(get: { budgetFor != nil }, set: { if !$0 { budgetFor = nil } })) {
+            TextField("Dollars, e.g. 0.50 (empty: default)", text: $budgetText).keyboardType(.decimalPad)
+            Button("Save") { Task { await saveBudget() } }
+            Button("Cancel", role: .cancel) { budgetFor = nil }
+        } message: {
+            Text("Each run's mission budget. Your charter's cap still applies.")
+        }
         .task { await load() }
         .refreshable { await load() }
     }
@@ -809,6 +824,31 @@ struct SchedulesView: View {
     private func toggle(_ id: String, _ on: Bool) async {
         guard let api = app.api else { return }
         do { _ = try await api.json("/api/schedules/\(id)/enabled", method: "POST", body: ["enabled": .bool(on)]) } catch { message = error.localizedDescription }
+        await load()
+    }
+
+    static func costLine(_ s: JSONValue) -> String {
+        let c = s.get("cost")
+        var parts: [String] = []
+        if let per = c?.get("per_run_usd")?.double {
+            let month = c?.get("monthly_usd")?.double ?? 0
+            parts.append(String(format: "About $%.2f a run, ~$%.2f a month (estimated)", per, month))
+        } else {
+            parts.append("No cost yet: it hasn't run")
+        }
+        if let b = s.get("budget_usd")?.double { parts.append(String(format: "budget $%.2f a run", b)) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func saveBudget() async {
+        guard let api = app.api, let id = budgetFor else { return }
+        budgetFor = nil
+        let t = budgetText.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "$", with: "")
+        let value: JSONValue = t.isEmpty ? .null : .number(Double(t) ?? -1)
+        do {
+            _ = try await api.json("/api/schedules/\(id)/budget", method: "POST", body: ["budget_usd": value])
+            message = t.isEmpty ? "Back to the default budget." : "Budget saved."
+        } catch { message = error.localizedDescription }
         await load()
     }
 

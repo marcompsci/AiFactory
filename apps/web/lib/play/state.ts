@@ -37,6 +37,9 @@ interface PlayState {
   /** Bumped when the HUD asks the game to interact with whatever is near (Talk button, E key). */
   interactSeq: number;
   interact: () => void;
+  /** Read out by the screen-reader live region (step-by-step movement, looking around). */
+  announcement: { text: string; seq: number };
+  announce: (text: string) => void;
 }
 
 export const usePlay = create<PlayState>((set) => ({
@@ -61,4 +64,6 @@ export const usePlay = create<PlayState>((set) => ({
   setStick: (x, y) => set({ stick: { x, y } }),
   interactSeq: 0,
   interact: () => set((s) => ({ interactSeq: s.interactSeq + 1 })),
+  announcement: { text: "", seq: 0 },
+  announce: (text) => set((s) => ({ announcement: { text, seq: s.announcement.seq + 1 } })),
 }));

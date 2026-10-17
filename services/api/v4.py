@@ -62,6 +62,7 @@ class ResearchIn(BaseModel):
     source: str = Field(pattern="^(apple_charts|etsy|depop|app_store_connect)$")
     query: str = Field(min_length=2, max_length=80)
     region: str = Field(default="US", pattern="^[A-Za-z]{2}$")
+    budget_usd: float | None = Field(default=None, gt=0, le=50)  # V6.30: a schedule's per-run budget (the charter's cap applies)
 
 
 @router.post("/research", status_code=201)
@@ -71,7 +72,13 @@ def start_research(body: ResearchIn, p: Principal = Depends(operator)):
         if conn.execute(select(db.organizations.c.emergency_stopped).where(db.organizations.c.id == p.organization_id)).scalar():
             raise HTTPException(409, "emergency stop is engaged")
         gm = general_manager(conn)
-        mid = create_mission(conn, org_id=p.organization_id, kind="market_research", title=f"Research '{body.query}' on {body.source.replace('_', ' ')}",
+        if body.budget_usd is not None:
+            from services.management import charter
+            try:
+                charter.check_mission_budget(conn, p.organization_id, body.budget_usd)
+            except charter.CharterError as exc:
+                raise HTTPException(422, str(exc)) from exc
+        mid = create_mission(conn, org_id=p.organization_id, kind="market_research", budget_usd=body.budget_usd, title=f"Research '{body.query}' on {body.source.replace('_', ' ')}",
                              prompt=f"Find a validated app opportunity for '{body.query}' using permitted {body.source} data ({body.region}).",
                              params={"source": body.source, "query": body.query, "region": body.region.upper(), "agent_key": agent_key},
                              opportunity_id=None, created_by=p.user_id)

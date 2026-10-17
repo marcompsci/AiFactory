@@ -12,6 +12,7 @@ struct MissionLinksSection: View {
     @State private var message: String?
     @State private var busy = false
     @State private var topic = ""
+    @State private var saveName = ""
 
     private var status: String { detail?.get("mission")?.s("status") ?? "" }
     private var finished: Bool { ["COMPLETED", "FAILED", "CANCELLED"].contains(status) }
@@ -29,6 +30,20 @@ struct MissionLinksSection: View {
                 Button { Task { await rerun() } } label: { Label("Run again", systemImage: "arrow.clockwise") }
                     .disabled(busy)
                     .accessibilityHint("Starts the same request fresh, under your charter")
+            }
+            if finished {
+                NavigationLink { CompareRunsView(missionId: missionId) } label: {
+                    Label("Compare with the run before", systemImage: "arrow.left.arrow.right")
+                }
+            }
+            if detail?.get("can_rerun")?.bool == true {
+                HStack {
+                    TextField("Name to save this request as", text: $saveName).font(.caption)
+                    Button("Save") { Task { await saveRequest() } }
+                        .buttonStyle(.borderless)
+                        .disabled(saveName.trimmingCharacters(in: .whitespaces).count < 2 || busy)
+                        .accessibilityLabel("Save this request under that name")
+                }
             }
             let follow = links?.get("followups")?.list ?? []
             ForEach(follow) { f in followRow(f) }
@@ -81,6 +96,17 @@ struct MissionLinksSection: View {
             message = r.get("repeat")?.bool == true ? "Already started a moment ago." : "Started again. It's in the journal."
             await app.refresh()
             await reload()
+        } catch { message = error.localizedDescription }
+    }
+
+    private func saveRequest() async {
+        guard let api = app.api else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let r = try await api.json("/api/missions/\(missionId)/save", method: "POST", body: ["name": .string(saveName)])
+            message = "Saved as \"\(r.s("name"))\". Start it from Owner → Saved requests, or ask in the City."
+            saveName = ""
         } catch { message = error.localizedDescription }
     }
 
@@ -162,7 +188,7 @@ struct WeeklyReportView: View {
                         ForEach(top) { a in LabeledContent(a.s("agent"), value: "\(a.get("tasks_completed")?.int ?? 0) tasks") }
                     }
                 }
-                Section { } footer: { Text("Counted from the records; days are UTC. Spend is the gateway's estimate, not a bill.") }
+                Section { } footer: { Text("Counted from the records; days are your phone's days (\(report?.s("tz") ?? "")). Spend is the gateway's estimate, not a bill.") }
             }
         }
         .navigationTitle("This week")
@@ -176,13 +202,14 @@ struct WeeklyReportView: View {
 
     private func load() async {
         guard app.connection == .live, let api = app.api else { return }
-        report = try? await api.json("/api/insights/weekly")
+        let tz = TimeZone.current.identifier.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "UTC"
+        report = try? await api.json("/api/insights/weekly?tz=\(tz)")
     }
 
     static func weekday(_ iso: String) -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
-        f.timeZone = TimeZone(identifier: "UTC")
+        f.timeZone = TimeZone(identifier: "UTC")  // a calendar date, read and printed in the same zone
         guard let d = f.date(from: iso) else { return iso }
         let out = DateFormatter()
         out.dateFormat = "EEE"
@@ -294,5 +321,127 @@ struct RecordsExportView: View {
             file = url
             message = nil
         } catch { message = error.localizedDescription }
+    }
+}
+
+
+/// A mission next to the run before it (GET /api/missions/{id}/compare).
+struct CompareRunsView: View {
+    @Environment(AppState.self) private var app
+    let missionId: String
+    @State private var data: JSONValue?
+    @State private var message: String?
+
+    var body: some View {
+        List {
+            if let d = data {
+                if d.get("before") == nil {
+                    Text(d.s("note")).foregroundStyle(.secondary)
+                } else {
+                    Section("What changed (\(d.s("how")))") {
+                        ForEach(d.get("changes")?.list ?? [], id: \.self) { c in Text(c.str).font(.subheadline) }
+                    }
+                    Section("This run") { runRows(d.get("this")) }
+                    Section("The run before") { runRows(d.get("before")) }
+                    Section { } footer: { Text("Counted from the records. Cost is the gateway's estimate, not a bill.") }
+                }
+            }
+            if let message { Text(message).font(.caption).foregroundStyle(Theme.warn) }
+        }
+        .navigationTitle("Compare runs")
+        .task { await load() }
+    }
+
+    @ViewBuilder private func runRows(_ r: JSONValue?) -> some View {
+        let steps = r?.get("steps")
+        let dur = r?.get("duration_s")?.int
+        LabeledContent("Status", value: (r?.s("status") ?? "").lowercased())
+        LabeledContent("Objective", value: Self.objective(r?.s("objective") ?? ""))
+        LabeledContent("Estimated cost", value: String(format: "$%.2f", r?.get("cost_usd")?.double ?? 0))
+        LabeledContent("Time taken", value: Self.duration(dur))
+        LabeledContent("Steps", value: "\(steps?.get("completed")?.int ?? 0) of \(steps?.get("total")?.int ?? 0) done, \(steps?.get("failed")?.int ?? 0) failed")
+    }
+
+    static func duration(_ s: Int?) -> String {
+        guard let s else { return "still going" }
+        if s < 60 { return "\(s)s" }
+        return "\(s / 60)m \(s % 60)s"
+    }
+
+    static func objective(_ s: String) -> String {
+        s.isEmpty ? "not checked" : s.replacingOccurrences(of: "objective_", with: "").replacingOccurrences(of: "_", with: " ")
+    }
+
+    private func load() async {
+        guard let api = app.api else { return }
+        do { data = try await api.json("/api/missions/\(missionId)/compare") } catch { message = error.localizedDescription }
+    }
+}
+
+/// Requests you've named, ready to start (GET/POST /api/saved-requests).
+struct SavedRequestsView: View {
+    @Environment(AppState.self) private var app
+    @State private var list: [JSONValue] = []
+    @State private var loaded = false
+    @State private var message: String?
+
+    var body: some View {
+        List {
+            if loaded && list.isEmpty {
+                Text("Nothing saved yet. On a finished mission's page, type a name and tap Save. Then start it here, or ask anyone in the City \"start <name>\".")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            ForEach(list) { r in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(r.s("name")).font(.subheadline.bold())
+                        Text(Self.detail(r)).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Start") { Task { await start(r.s("id")) } }
+                        .buttonStyle(.borderedProminent).tint(Theme.cyan)
+                        .accessibilityLabel("Start \(r.s("name"))")
+                }
+                .swipeActions { Button("Delete", role: .destructive) { Task { await remove(r.s("id")) } } }
+            }
+            if let message { Text(message).font(.caption) }
+            Section { } footer: { Text("A saved request starts as you, under your charter, like starting it by hand.") }
+        }
+        .navigationTitle("Saved requests")
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    static func detail(_ r: JSONValue) -> String {
+        let kind: String
+        switch r.s("kind") {
+        case "run_tests": kind = "Test run"
+        case "market_research": kind = "Research"
+        default: kind = "Test fix"
+        }
+        let uses = r.get("uses")?.int ?? 0
+        return "\(kind) · \(r.s("priority")) priority · started \(uses) time(s)"
+    }
+
+    private func load() async {
+        guard app.connection == .live, let api = app.api else { return }
+        list = (try? await api.json("/api/saved-requests"))?.get("saved_requests")?.list ?? []
+        loaded = true
+    }
+
+    private func start(_ id: String) async {
+        guard let api = app.api else { return }
+        do {
+            let r = try await api.json("/api/saved-requests/\(id)/start", method: "POST")
+            message = r.get("repeat")?.bool == true ? "Already started a moment ago." : "Started. It's in the journal."
+            await app.refresh()
+        } catch { message = error.localizedDescription }
+        await load()
+    }
+
+    private func remove(_ id: String) async {
+        guard let api = app.api else { return }
+        do { _ = try await api.json("/api/saved-requests/\(id)", method: "DELETE") } catch { message = error.localizedDescription }
+        await load()
     }
 }

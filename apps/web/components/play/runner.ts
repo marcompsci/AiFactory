@@ -7,7 +7,7 @@
 import { useStore } from "@/lib/store";
 import { buildingSprite, paintGroundLayer, propSprites, type Sprite } from "@/lib/play/art";
 import {
-  animFor, facingFor, findPath, moveBody, nearest, packagePoint, placeAgents, statusLabel, WALK_SPEED,
+  ahead, animFor, DELTA, DIR_NAME, facingFor, findPath, moveBody, nearest, packagePoint, placeAgents, statusLabel, WALK_SPEED,
   type Anim, type PackagePoint, type Placed, type Vec,
 } from "@/lib/play/engine";
 import { buildInterior, buildTown, isSolid, TILE, type Dir, type GameMap } from "@/lib/play/maps";
@@ -58,6 +58,14 @@ export class Runner {
     const onKey = (e: KeyboardEvent, on: boolean) => {
       if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
       const k = e.key.toLowerCase();
+      const STEP: Record<string, Dir> = { arrowup: "up", arrowdown: "down", arrowleft: "left", arrowright: "right" };
+      if (e.shiftKey && STEP[k]) {  // Shift+arrow: one tile, then say what's ahead (screen readers)
+        e.preventDefault();
+        this.keys.delete(k);
+        if (on && !e.repeat) this.step(STEP[k]);
+        return;
+      }
+      if (on && k === "l" && !e.repeat) { e.preventDefault(); this.lookAround(); return; }
       if (["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "a", "s", "d"].includes(k)) {
         e.preventDefault();
         if (on) this.keys.add(k); else this.keys.delete(k);
@@ -170,6 +178,38 @@ export class Runner {
     const blocked = new Set(this.placed.map((p) => Math.floor(p.y) * map.w + Math.floor(p.x)));
     this.path = findPath(map, { x: live.x, y: live.y }, to, blocked);
     this.pathGoal = this.path.length ? goal : null;
+  }
+
+  private peopleTiles() {
+    return this.placed.map((p) => ({ name: p.agent.name, x: Math.floor(p.x), y: Math.floor(p.y) }));
+  }
+
+  /** One tile in a direction, then say what's ahead. */
+  step(d: Dir) {
+    const st = usePlay.getState();
+    if (st.talkingTo || st.panel || this.fade) return;
+    const { map } = this.here;
+    const tx = Math.floor(live.x), ty = Math.floor(live.y);
+    const nx = tx + DELTA[d].dx, ny = ty + DELTA[d].dy;
+    const people = this.peopleTiles();
+    live.facing = d;
+    if (isSolid(map, nx, ny) || people.some((p) => p.x === nx && p.y === ny)) {
+      st.announce(`Can't go ${DIR_NAME[d]}: ${ahead(map, tx, ty, d, people, 1)}.`);
+      return;
+    }
+    this.path = [{ x: nx + 0.5, y: ny + 0.5 }];
+    this.pathGoal = null;
+    const name = DIR_NAME[d];
+    st.announce(`${name[0].toUpperCase()}${name.slice(1)}. Ahead: ${ahead(map, nx, ny, d, people)}.`);
+  }
+
+  /** What's in each direction from here. */
+  lookAround() {
+    const { map } = this.here;
+    const tx = Math.floor(live.x), ty = Math.floor(live.y);
+    const people = this.peopleTiles();
+    const dirs: Dir[] = ["up", "right", "down", "left"];
+    usePlay.getState().announce(dirs.map((d) => `${DIR_NAME[d]}: ${ahead(map, tx, ty, d, people)}`).join(". ") + ".");
   }
 
   private interact() {
