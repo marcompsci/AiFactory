@@ -170,3 +170,19 @@ def test_collaboration_network_comes_from_real_handoffs(client):
     impl = next(t for t in detail["tasks"] if t["key"] == "implement")
     partners = net["partners"][impl["agent_id"]]
     assert partners and all(p["agent_id"] != impl["agent_id"] for p in partners)
+
+
+def test_scorecards_count_finished_failed_and_first_try(monkeypatch):
+    with live_client(monkeypatch, FakeGateway(patch=EVIL)) as client:
+        bad = start(client)
+        wait_for(lambda: mission_status(client, bad)["status"] == "FAILED")
+        sc = client.get("/api/insights/scorecards").json()
+        assert sc["method"] == "records" and len(sc["weeks"]) == 4 and sc["weeks"] == sorted(sc["weeks"])
+        impl = next(t for t in client.get(f"/api/missions/{bad}").json()["tasks"] if t["key"] == "implement")
+        dev = next(a for a in sc["agents"] if a["agent_id"] == impl["agent_id"])
+        this = dev["weeks"][-1]
+        assert this["failed"] == 1 and this["failed_runs"] == 2 and this["modes"] == {"FM-1.2": 2}
+        assert dev["top_failure"] == "FM-1.2" and dev["trend"] == "not enough data"
+        inspector = next(t for t in client.get(f"/api/missions/{bad}").json()["tasks"] if t["key"] == "inspect")
+        arch = next(a for a in sc["agents"] if a["agent_id"] == inspector["agent_id"])
+        assert arch["weeks"][-1]["finished"] >= 1 and arch["weeks"][-1]["first_try"] >= 1 and arch["total"]["first_try_rate"] == 1.0

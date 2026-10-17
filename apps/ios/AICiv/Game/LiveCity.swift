@@ -848,6 +848,7 @@ struct AgentStatusSheet: View {
     let agentId: String
     @State private var data: JSONValue?
     @State private var net: JSONValue?
+    @State private var score: JSONValue?
 
     var body: some View {
         let a = app.agents[agentId] ?? Roster.bundled.first { $0.id == agentId }
@@ -891,6 +892,9 @@ struct AgentStatusSheet: View {
                             Text("Written from my own task runs; each cites the run it came from. Hints, not facts.")
                         }
                     }
+                    if let card = (score?.get("agents")?.list ?? []).first(where: { $0.s("agent_id") == agentId }) {
+                        Section("Track record (4 weeks)") { ScorecardRow(card: card) }
+                    }
                     let partners = net?.get("partners")?.get(agentId)?.list ?? []
                     if !partners.isEmpty {
                         Section("Works most with") {
@@ -923,6 +927,7 @@ struct AgentStatusSheet: View {
             .task {
                 data = try? await app.api?.json("/api/agents/\(agentId)")
                 net = try? await app.api?.json("/api/insights/collaboration")
+                score = try? await app.api?.json("/api/insights/scorecards")
             }
         }
     }

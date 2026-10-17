@@ -60,3 +60,11 @@ def daily_brief(hours: int = Query(24, ge=1, le=168), p: Principal = Depends(mem
     from services.management.brief import brief
     with db.get_engine().connect() as conn:
         return brief(conn, p.organization_id, hours)
+
+
+@router.get("/scorecards")
+def agent_scorecards(weeks: int = Query(4, ge=2, le=26), p: Principal = Depends(member)) -> dict:
+    """Each agent's reliability week by week, counted from task runs (services/management/scorecards.py)."""
+    from services.management.scorecards import scorecards
+    with db.get_engine().connect() as conn:
+        return scorecards(conn, p.organization_id, weeks)

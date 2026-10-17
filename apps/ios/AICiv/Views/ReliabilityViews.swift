@@ -383,3 +383,91 @@ struct BriefCard: View {
         }
     }
 }
+
+/// Week-by-week reliability for every agent (GET /api/insights/scorecards).
+struct ScorecardsView: View {
+    @Environment(AppState.self) private var app
+    @State private var data: JSONValue?
+
+    var body: some View {
+        List {
+            if let d = data {
+                let agents = d.get("agents")?.list ?? []
+                if agents.isEmpty { Text("No task runs yet in these weeks.").foregroundStyle(.secondary) }
+                ForEach(agents) { a in ScorecardRow(card: a) }
+                Section { } footer: { Text("Counted from task runs. Trend: \(d.s("trend_rule")). Costs are estimates.") }
+            } else if app.connection != .live {
+                Text("Connect to your Mac and sign in to see scorecards.").foregroundStyle(.secondary)
+            } else {
+                ProgressView()
+            }
+        }
+        .navigationTitle("Agent scorecards")
+        .task { data = try? await app.api?.json("/api/insights/scorecards") }
+    }
+}
+
+struct ScorecardRow: View {
+    let card: JSONValue
+
+    var body: some View {
+        let t = card.get("total")
+        let weeks = card.get("weeks")?.list ?? []
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(card.s("agent")).bold()
+                Text(card.s("role")).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Spacer()
+                Text(card.s("trend")).font(.caption2.bold()).foregroundStyle(Self.trendColor(card.s("trend")))
+            }
+            HStack(alignment: .bottom, spacing: 4) {
+                ForEach(Array(weeks.enumerated()), id: \.offset) { _, w in
+                    let rate = w.get("success_rate")?.double
+                    VStack(spacing: 2) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Self.barColor(rate))
+                            .frame(width: 22, height: Self.barHeight(rate))
+                        Text(String(w.s("week").suffix(5))).font(.system(size: 8)).foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Self.weekLabel(w.s("week"), rate))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(t?.get("finished")?.int ?? 0) done · \(t?.get("failed")?.int ?? 0) failed").font(.caption)
+                    if let f = t?.get("first_try_rate")?.double {
+                        Text("\(Int(f * 100))% first try").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if !card.s("top_failure").isEmpty {
+                        Text("most often: \(card.s("top_failure"))").font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    static func barColor(_ rate: Double?) -> Color {
+        guard let rate else { return Color.gray.opacity(0.3) }
+        if rate >= 0.8 { return Theme.ok }
+        return rate >= 0.5 ? Theme.warn : Theme.bad
+    }
+
+    static func barHeight(_ rate: Double?) -> CGFloat {
+        let r: Double = rate ?? 0
+        return max(3, CGFloat(r * 30))
+    }
+
+    static func weekLabel(_ week: String, _ rate: Double?) -> String {
+        guard let rate else { return "Week of \(week): no tasks" }
+        return "Week of \(week): \(Int(rate * 100)) percent of tasks finished"
+    }
+
+    static func trendColor(_ t: String) -> Color {
+        switch t {
+        case "improving": return Theme.ok
+        case "slipping": return Theme.bad
+        case "steady": return Theme.cyan
+        default: return .secondary
+        }
+    }
+}

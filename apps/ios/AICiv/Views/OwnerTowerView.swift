@@ -17,6 +17,9 @@ struct OwnerTowerView: View {
                     NavigationLink { FailureClinicView() } label: {
                         Label("Failure clinic: why agents failed, and what they learned", systemImage: "stethoscope")
                     }
+                    NavigationLink { ScorecardsView() } label: {
+                        Label("Agent scorecards: reliability week by week", systemImage: "chart.bar.xaxis")
+                    }
                     NavigationLink { CharterView() } label: {
                         Label("Your charter: caps and quiet hours only you can change", systemImage: "scroll")
                     }
