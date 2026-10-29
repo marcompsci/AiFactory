@@ -98,7 +98,7 @@ export function StatsBar() {
       <div className="pixel-panel pointer-events-auto flex items-center gap-1 overflow-x-auto px-2 py-1.5 scroll-thin">
         <h1 className="pixel-title mr-2 shrink-0 text-[13px] text-cyan lg:hidden">AI Civ</h1>
         <span className="mr-1 flex shrink-0 items-center gap-1.5 text-xs text-ink-2" role="status">
-          <Dot color={st.color} pulse={status === "live"} />
+          <Dot color={st.color} />
           {st.text}
           {status !== "demo" && mode === "simulation" ? <span className="rounded bg-warn/15 px-1.5 text-[10px] text-warn" title="No model key on the server. Tools run for real; agent text comes from labeled templates.">Sim</span> : null}
         </span>

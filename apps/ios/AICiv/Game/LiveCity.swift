@@ -134,7 +134,7 @@ struct CityChip: ButtonStyle {
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(fill, in: RoundedRectangle(cornerRadius: 6))
             .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.cyan.opacity(0.4)))
-            .opacity(configuration.isPressed ? 0.7 : 1)
+            .pressFeedback(configuration.isPressed)
     }
 }
 
@@ -862,7 +862,7 @@ struct DistrictActivitySheet: View {
                     let recent = d.get("recent")?.list ?? []
                     if !recent.isEmpty {
                         Section("Recently finished") {
-                            ForEach(recent) { t in Text("\(t.s("title")) · \(t.s("agent")) · \(t.s("status").lowercased())").font(.caption) }
+                            ForEach(recent) { t in Text("\(t.s("title")) · \(t.s("agent")) · \(Format.human(t.s("status")).lowercased())").font(.caption) }
                         }
                     }
                 } else if failed {
@@ -924,7 +924,7 @@ struct AgentStatusSheet: View {
                     }
                     let done = tasks.filter { ["COMPLETED", "FAILED"].contains($0.s("status")) }.prefix(5)
                     if !done.isEmpty {
-                        Section("Recently") { ForEach(Array(done)) { t in Text("\(t.s("title")) · \(t.s("status").lowercased())").font(.caption) } }
+                        Section("Recently") { ForEach(Array(done)) { t in Text("\(t.s("title")) · \(Format.human(t.s("status")).lowercased())").font(.caption) } }
                     }
                     let lessons = d.get("lessons")?.list ?? []
                     if !lessons.isEmpty {

@@ -1,13 +1,15 @@
 """Task handlers for factory_sync missions."""
 from __future__ import annotations
 
+from services.core.text import plural
+
 from services.orchestrator.handlers import TaskEnv
 
 
 def claude_sync(env: TaskEnv) -> dict:
     r = env.tool("sync_claude_code")
-    env.say(f"Checked in with Claude Code: {r['count']} recent session(s), {r['completed_tasks']} finished task(s), "
-            f"{r['memory_files']} memory file(s) shared with the team.", to_key="architect", kind="handoff")
+    env.say(f"Checked in with Claude Code: {plural(r['count'], 'recent session')}, {plural(r['completed_tasks'], 'finished task')}, "
+            f"{plural(r['memory_files'], 'memory file')} shared with the team.", to_key="architect", kind="handoff")
     return {"count": r["count"]}
 
 
@@ -19,8 +21,8 @@ def github_sync(env: TaskEnv) -> dict:
 
 def codex_sync(env: TaskEnv) -> dict:
     r = env.tool("sync_codex")
-    env.say(f"Checked in with Codex: {r['count']} recent session(s), {r['completed_tasks']} finished step(s), "
-            f"{r['memory_files']} AGENTS.md file(s) shared with the team.", to_key="architect", kind="handoff")
+    env.say(f"Checked in with Codex: {plural(r['count'], 'recent session')}, {plural(r['completed_tasks'], 'finished step')}, "
+            f"{plural(r['memory_files'], 'AGENTS.md file')} shared with the team.", to_key="architect", kind="handoff")
     return {"count": r["count"]}
 
 

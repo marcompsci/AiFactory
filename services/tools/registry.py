@@ -12,6 +12,8 @@ Each call writes a tool_executions row and tool.* events.
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import json
 import re
 import shutil
@@ -512,7 +514,7 @@ def _summarize(name: str, result: dict) -> str:
     if name == "run_tests":
         return result.get("summary_line", "")
     if name == "inspect_diff":
-        return f"{result.get('files_changed', 0)} file(s) changed"
+        return f"{plural(int(result.get('files_changed', 0) or 0), 'file')} changed"
     if name == "inspect_repository":
         return f"{result.get('file_count')} files"
     if name == "publish_lab_change":

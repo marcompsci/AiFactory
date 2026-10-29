@@ -43,7 +43,7 @@ export function TopBar() {
       <div className="glass pointer-events-auto flex items-center gap-3 rounded-2xl px-3 py-2">
         <h1 className="font-display text-[13px] font-bold tracking-tight">AI Civilization</h1>
         <span className="flex items-center gap-1.5 text-xs text-ink-2" role="status">
-          <Dot color={st.color} pulse={status === "live"} />
+          <Dot color={st.color} />
           {st.text}
         </span>
         {status !== "demo" && mode === "simulation" ? (
@@ -140,14 +140,18 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
   const setSheet = useStore((s) => s.setSheet);
   const approvals = useStore((s) => s.world.pendingApprovals.length + s.world.ownerQueue.length + (s.demoApproval ? 1 : 0));
   const running = useStore((s) => Object.values(s.world.agents).filter((a) => a.execState === "EXECUTING").length);
-  const height = { peek: "var(--sheet-peek)", half: "52dvh", full: "calc(100dvh - 72px)" }[sheet];
+  // The sheet is always its full height and slides (transform, on the GPU) to show more or less of itself, instead of
+  // animating its height (layout on every frame). Its scroll area is padded by the hidden part, so the end of the list
+  // stays reachable at every snap point.
+  const full = "calc(100dvh - 72px)";
+  const offset = { peek: `calc(${full} - var(--sheet-peek))`, half: `calc(${full} - 52dvh)`, full: "0px" }[sheet];
   const cycle = () => setSheet(sheet === "peek" ? "half" : sheet === "half" ? "full" : "peek");
 
   return (
     <aside
       aria-label="Command center"
-      className="glass pixel-panel fixed inset-x-0 bottom-0 z-40 flex flex-col rounded-t-2xl pb-[env(safe-area-inset-bottom)] transition-[height] duration-300 lg:inset-y-2 lg:left-auto lg:right-2 lg:!h-auto lg:w-[424px] lg:rounded"
-      style={{ height }}
+      className="glass pixel-panel fixed inset-x-0 bottom-0 z-40 flex translate-y-[var(--sheet-offset)] flex-col rounded-t-2xl pb-[env(safe-area-inset-bottom)] transition-transform duration-[280ms] ease-[var(--ease-drawer)] motion-reduce:transition-none lg:inset-y-2 lg:left-auto lg:right-2 lg:!h-auto lg:w-[424px] lg:translate-y-0 lg:rounded"
+      style={{ height: full, ["--sheet-offset" as string]: offset }}
     >
       <button type="button" onClick={cycle} className="mx-auto mt-2 h-1.5 w-12 shrink-0 rounded-full bg-white/20 lg:hidden" aria-label={`Resize panel (now ${sheet})`} />
       <div className="flex items-center gap-1 overflow-x-auto px-3 pt-2" role="tablist">
@@ -158,17 +162,17 @@ export function Dock({ onReconnect }: { onReconnect: () => void }) {
             type="button"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`relative shrink-0 rounded-xl px-2.5 py-2 text-[13px] ${tab === t.id ? "bg-white/10 text-ink" : "text-ink-2 hover:text-ink"}`}
+            className={`relative shrink-0 rounded-xl px-2.5 py-2 text-[13px] transition-[transform,color,background-color] duration-150 ease-out ${tab === t.id ? "bg-white/10 text-ink" : "text-ink-2 hover:text-ink"}`}
           >
             {t.label}
             {t.id === "approvals" && approvals ? (
-              <span className="ml-1.5 rounded-full bg-warn px-1.5 text-[11px] font-semibold text-ground">{approvals}</span>
+              <span className="ml-1.5 rounded-full bg-warn px-1.5 text-[11px] font-semibold tabular-nums text-ground">{approvals}</span>
             ) : null}
-            {t.id === "agents" && running ? <span className="ml-1.5 text-[11px]" style={{ color: STATUS_COLOR.RUNNING }}>{running} working</span> : null}
+            {t.id === "agents" && running ? <span className="ml-1.5 text-[11px] tabular-nums" style={{ color: STATUS_COLOR.RUNNING }}>{running} working</span> : null}
           </button>
         ))}
       </div>
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3" role="tabpanel">
+      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(1rem+var(--sheet-offset))] pt-3 lg:pb-4" role="tabpanel">
         {tab === "overview" ? <OverviewTab /> : null}
         {tab === "game" ? <GamePanel /> : null}
         {tab === "lab" ? <AppLabPanel /> : null}

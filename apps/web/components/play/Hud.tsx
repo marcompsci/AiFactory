@@ -200,13 +200,17 @@ export function Toasts() {
   }, [feed]);
   useEffect(() => {
     if (!toast) return;
-    const id = window.setTimeout(() => force((n) => n + 1), 4200);
-    return () => window.clearTimeout(id);
+    // re-render when it starts leaving (4 s) and once it has left (+140 ms exit)
+    const a = window.setTimeout(() => force((n) => n + 1), 4000);
+    const b = window.setTimeout(() => force((n) => n + 1), 4160);
+    return () => { window.clearTimeout(a); window.clearTimeout(b); };
   }, [toast]);
-  if (!toast || Date.now() - toast.at > 4000) return null;
+  const age = toast ? Date.now() - toast.at : Infinity;
+  if (!toast || age > 4150) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-[calc(max(10px,env(safe-area-inset-top))+60px)] z-30 flex justify-center px-4">
-      <div className="px-panel max-w-md px-4 py-2 text-center text-sm text-[#f3e9d2]">{toast.text}</div>
+      {/* keyed by time, so a new message enters fresh instead of swapping text in place */}
+      <div key={toast.at} className={`px-panel max-w-md px-4 py-2 text-center text-sm text-[#f3e9d2] ${age > 4000 ? "toast-out" : "toast-in"}`}>{toast.text}</div>
     </div>
   );
 }

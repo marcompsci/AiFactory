@@ -14,8 +14,8 @@ import { live } from "./runner";
 
 function Sheet({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:items-center sm:p-6" onClick={onClose}>
-      <div className="px-panel flex max-h-[86dvh] w-full max-w-2xl flex-col" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
+    <div className="backdrop-in fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:items-center sm:p-6" onClick={onClose}>
+      <div className="px-panel sheet-in flex max-h-[86dvh] w-full max-w-2xl flex-col" role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b-2 border-[#f3e9d2]/25 px-4 py-2">
           <h2 className="font-pixel text-lg text-[#f3e9d2]">{title}</h2>
           <button type="button" onClick={onClose} className="px-btn rounded-md bg-[#2a2246] px-3 py-1 text-sm text-[#f3e9d2]">Close</button>

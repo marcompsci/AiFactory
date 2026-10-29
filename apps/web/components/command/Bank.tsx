@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { ApiError, bank, type Json } from "@/lib/api";
-import { ago, human, money, PACKAGE_COLORS } from "@/lib/format";
+import { ago, human, money, PACKAGE_COLORS, plural } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { InvestigationCard } from "./Investigation";
 import { Button, Dot, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
@@ -113,7 +113,7 @@ function Overview({ d }: { d: Json }) {
         <Pill color="#5BF2A5">{d.reconciliation.matched} reconciled</Pill>
         <Pill color="#FFBD69">{d.reconciliation.unreconciled} unreconciled</Pill>
         {d.reconciliation.needs_review ? <Pill color="#FF6178">{d.reconciliation.needs_review} need review</Pill> : null}
-        {stale.length ? <Pill color="#FF6178">{stale.length} source(s) stale</Pill> : <Pill color="#5BF2A5">sources fresh</Pill>}
+        {stale.length ? <Pill color="#FF6178">{plural(stale.length, "source")} stale</Pill> : <Pill color="#5BF2A5">sources fresh</Pill>}
         {(d.coverage.gaps ?? []).map((g: string) => <Pill key={g} color="#8FA8FF">not connected: {human(g).toLowerCase()}</Pill>)}
       </div>
       <ul className="space-y-1 text-xs">

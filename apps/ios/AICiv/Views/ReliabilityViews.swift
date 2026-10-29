@@ -771,7 +771,7 @@ struct SchedulesView: View {
                         Text("Why: \(s.s("paused_reason"))")
                             .font(.caption2).foregroundStyle(Theme.warn)
                     }
-                    Text("\(s.get("runs")?.int ?? 0) run(s)" + (s.s("last_error").isEmpty ? "" : " · last try: \(s.s("last_error"))"))
+                    Text(Plural.of(s.get("runs")?.int ?? 0, "run") + (s.s("last_error").isEmpty ? "" : " · last try: \(s.s("last_error"))"))
                         .font(.caption2).foregroundStyle(s.s("last_error").isEmpty ? Color.secondary : Theme.warn)
                     Text(Self.costLine(s)).font(.caption2).foregroundStyle(.secondary)
                 }
@@ -900,7 +900,7 @@ struct PriorityPicker: View {
         do {
             let r = try await api.json("/api/missions/\(missionId)/priority", method: "POST", body: ["priority": .string(p)])
             let waiting = r.get("waiting")?.list.count ?? 0
-            note = waiting > 0 ? "Saved. \(waiting) mission(s) waiting for a free slot." : "Saved."
+            note = waiting > 0 ? "Saved. \(Plural.of(waiting, "mission")) waiting for a free slot." : "Saved."
             saved = p
         } catch {
             note = error.localizedDescription

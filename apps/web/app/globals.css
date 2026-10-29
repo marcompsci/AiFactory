@@ -17,11 +17,56 @@
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
   --font-pixel: "Pixelify Sans", "Unbounded", ui-sans-serif, system-ui, sans-serif;
+  /* Motion (Emil Kowalski's curves): the built-in CSS easings are too weak to feel intentional. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);       /* things entering, press feedback */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);   /* things moving on screen */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);    /* the bottom sheet (iOS-like) */
 }
 
 :root {
   color-scheme: dark;
   --sheet-peek: 168px;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent; /* no grey flash on tap; every control has its own :active state */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* iOS zooms into any input under 16px and never zooms back out. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Controls fire on tap without the double-tap wait, and a long press doesn't select their label. */
+button,
+[role="button"],
+[role="tab"],
+a {
+  touch-action: manipulation;
+}
+button,
+[role="button"],
+[role="tab"] {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Every button answers the press, the moment the finger lands (Emil Kowalski: scale 0.97 on :active, ease-out).
+   In the base layer so a component's own transition list still wins; Tailwind's scale/translate utilities use their own
+   properties, so this composes with them instead of replacing them. */
+@layer base {
+  button {
+    transition: transform 140ms var(--ease-out);
+  }
+  button:not(:disabled):active,
+  [role="button"]:active {
+    transform: scale(0.97);
+  }
 }
 
 html,
@@ -92,12 +137,76 @@ body {
   animation: approval-pulse 1.8s ease-in-out infinite;
 }
 
+/* A slow, quiet breath for "working" dots: lets you see activity without the constant flash of a ping. */
+@keyframes dot-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.dot-breathe {
+  animation: dot-breathe 2.4s ease-in-out infinite;
+}
+
+/* Toasts come down from the top and leave the way they came, faster than they arrived. */
+.toast-in {
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+  @starting-style {
+    transform: translateY(-8px) scale(0.97);
+    opacity: 0;
+  }
+}
+.toast-out {
+  transform: translateY(-6px) scale(0.98);
+  opacity: 0;
+  transition: transform 140ms var(--ease-out), opacity 140ms var(--ease-out);
+}
+
+/* Sheets rise a little from the bottom; modals settle in from 97% (never from nothing), centred because they belong to
+   no single trigger; backdrops fade. Enter only: closing is instant, which is what a dismiss should feel like. */
+.sheet-in {
+  transition: transform 260ms var(--ease-drawer), opacity 200ms var(--ease-out);
+  @starting-style {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+.modal-in {
+  transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+  @starting-style {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+.backdrop-in {
+  transition: opacity 200ms var(--ease-out);
+  @starting-style {
+    opacity: 0;
+  }
+}
+
+/* Reduced motion means gentler, not none: movement goes, fades and colour changes stay. */
 @media (prefers-reduced-motion: reduce) {
-  .approval-pulse {
+  .approval-pulse,
+  .dot-breathe {
     animation: none;
   }
-  * {
-    transition-duration: 0ms !important;
+  .toast-in,
+  .toast-out,
+  .sheet-in,
+  .modal-in {
+    transform: none !important;
+    @starting-style {
+      transform: none;
+    }
+  }
+  *,
+  *::before,
+  *::after {
+    transition-property: opacity, color, background-color, border-color !important;
   }
 }
 
@@ -105,9 +214,9 @@ body {
 .pixel-panel {
   background: rgb(10 16 34 / 0.92);
   border: 2px solid rgb(50 216 255 / 0.35);
+  /* crisp edges, no glow: when every panel glows nothing stands out (the neon is kept for the district signs) */
   box-shadow:
     0 0 0 2px rgb(7 11 24),
-    0 0 18px rgb(50 216 255 / 0.18),
     inset 0 0 0 1px rgb(166 107 255 / 0.18);
   border-radius: 4px;
   image-rendering: pixelated;
@@ -215,7 +324,8 @@ body {
   font-family: var(--font-pixel);
   border: 2px solid #1d1626;
   box-shadow: inset 0 -3px 0 rgb(0 0 0 / 0.25), 0 2px 0 #1d1626;
-  transition: transform 60ms ease;
+  /* press is instant (the key going down); release eases back */
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out);
 }
-.px-btn:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.25); }
+.px-btn:active { transform: translateY(2px); box-shadow: inset 0 -1px 0 rgb(0 0 0 / 0.25); transition-duration: 0ms; }
 .font-pixel { font-family: var(--font-pixel); }

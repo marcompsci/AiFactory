@@ -201,7 +201,7 @@ def test_provider_failure_fails_mission_honestly(monkeypatch):
     with live_client(monkeypatch, FakeGateway(fail=True)) as client:
         mid = start(client)
         m = wait_for(lambda: (s := mission_status(client, mid))["status"] in ("FAILED", "COMPLETED") and s)
-        assert m["status"] == "FAILED" and "failed after 2 attempt(s)" in m["failure_reason"]  # retried, then gave up
+        assert m["status"] == "FAILED" and "failed after 2 attempts" in m["failure_reason"]  # retried, then gave up
         detail = client.get(f"/api/missions/{mid}").json()
         assert not [a for a in detail["artifacts"] if a["kind"] == "patch"]
 

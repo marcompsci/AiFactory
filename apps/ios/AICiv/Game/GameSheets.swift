@@ -162,9 +162,10 @@ struct DialogueView: View {
         defer { busy = false }
         do {
             if yes { _ = try await api.confirmProposal(id) } else { try await api.declineProposal(id) }
+            if yes { Haptics.success() }
             apply(try await api.conversation(agent.id))
             await app.refresh()
-        } catch { self.error = describe(error) }
+        } catch { Haptics.warning(); self.error = describe(error) }
     }
 
     private func describe(_ e: Error) -> String {

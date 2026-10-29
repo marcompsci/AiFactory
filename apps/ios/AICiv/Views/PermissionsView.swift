@@ -18,7 +18,7 @@ struct PermissionsView: View {
             } else if let d = data {
                 Section {
                     Text(d.get("enough_history")?.bool == true
-                         ? "\(d.get("suggestions")?.int ?? 0) grant(s) unused for \(d.get("days")?.int ?? 30) days that no plan or pipeline needs."
+                         ? "\(Plural.of(d.get("suggestions")?.int ?? 0, "grant")) unused for \(d.get("days")?.int ?? 30) days that no plan or pipeline needs."
                          : "Suggestions start after \(d.get("days")?.int ?? 30) days of records.")
                         .font(.subheadline)
                     Toggle("Show every grant", isOn: $showAll)

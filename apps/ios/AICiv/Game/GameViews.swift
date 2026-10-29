@@ -9,6 +9,7 @@ struct CityGameView: View {
     @State private var showSignIn = false
     @State private var showNearby = false
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -27,13 +28,17 @@ struct CityGameView: View {
                 if let t = game.toast, Date().timeIntervalSince(t.at) < 4 {
                     Text(t.text).font(Pixel.mono(13)).foregroundStyle(GameStyle.cream).multilineTextAlignment(.center)
                         .padding(.horizontal, 14).padding(.vertical, 8).gamePanel().padding(.horizontal, 24)
-                        .transition(.opacity)
+                        .id(t.at)  // a new message enters fresh instead of swapping text in place
+                        .transition(.fromEdge(.top, reduce: reduceMotion))
                         .task(id: t.at) { try? await Task.sleep(nanoseconds: 4_100_000_000); if game.toast?.at == t.at { game.toast = nil } }
                 }
-                if let id = game.packageId, let pk = game.packages.first(where: { $0.id == id }) { PackageCard(pkg: pk) { game.packageId = nil } }
+                if let id = game.packageId, let pk = game.packages.first(where: { $0.id == id }) {
+                    PackageCard(pkg: pk) { game.packageId = nil }.transition(.fromEdge(.top, reduce: reduceMotion))
+                }
                 Spacer()
                 if game.talkingTo == nil && (voiceOver || showNearby) {
                     NearbyPanel(game: game) { showNearby = false }
+                        .transition(.fromEdge(.bottom, reduce: reduceMotion))
                 }
                 if game.talkingTo == nil {
                     HStack {
@@ -49,8 +54,13 @@ struct CityGameView: View {
             }
             if let id = game.talkingTo, let a = game.agent(id) {
                 VStack { Spacer(); DialogueView(game: game, agent: a) }
+                    .transition(.fromEdge(.bottom, reduce: reduceMotion))
             }
         }
+        .animation(Motion.ui(reduce: reduceMotion), value: game.toast?.at)
+        .animation(Motion.ui(reduce: reduceMotion), value: showNearby)
+        .animation(Motion.ui(reduce: reduceMotion), value: game.packageId)
+        .animation(Motion.ui(reduce: reduceMotion), value: game.talkingTo)
         .background(Color(hex: 0x120E1C))
         .sheet(item: $game.panel) { panel in
             switch panel {
@@ -160,7 +170,7 @@ struct GameTopBar: View {
                 Button { game.panel = .approvals } label: {
                     Image(systemName: "bell.fill").overlay(alignment: .topTrailing) {
                         if waiting > 0 {
-                            Text("\(waiting)").font(.system(size: 10, weight: .bold)).padding(3).background(Theme.warn, in: Circle()).foregroundStyle(GameStyle.ink).offset(x: 9, y: -9)
+                            Text("\(waiting)").font(.system(size: 10, weight: .bold)).monospacedDigit().padding(3).background(Theme.warn, in: Circle()).foregroundStyle(GameStyle.ink).offset(x: 9, y: -9)
                         }
                     }
                 }.accessibilityLabel("Approvals, \(waiting) waiting")
@@ -189,7 +199,8 @@ struct GameIconButton: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.system(size: 17)).foregroundStyle(GameStyle.cream)
             .frame(width: 40, height: 40).contentShape(Rectangle())
-            .opacity(configuration.isPressed ? 0.6 : 1)
+            .opacity(configuration.isPressed ? 0.75 : 1)
+            .pressFeedback(configuration.isPressed, scale: 0.9)  // small icons need a bigger dip to be seen
     }
 }
 

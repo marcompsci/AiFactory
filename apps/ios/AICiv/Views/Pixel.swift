@@ -33,7 +33,7 @@ struct PixelPanel: ViewModifier {
             .background(Pixel.panel, in: RoundedRectangle(cornerRadius: 4))
             .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(color, lineWidth: 2))
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color.black.opacity(0.8), lineWidth: 1).padding(-2))
-            .shadow(color: color.opacity(0.35), radius: 8)
+        // no glow: when every panel glows, nothing stands out. The neon is saved for the district signs.
     }
 }
 
@@ -123,11 +123,20 @@ enum Money {
 }
 
 enum Ago {
+    /// Relative while it's recent ("5 min. ago"), then a plain date: "3 weeks ago" is harder to place than "Oct 6".
     static func text(_ iso: String) -> String {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let d = f.date(from: iso) ?? ISO8601DateFormatter().date(from: iso)
         guard let d else { return "" }
-        return RelativeDateTimeFormatter().localizedString(for: d, relativeTo: Date())
+        let age = Date().timeIntervalSince(d)
+        if age < 45 { return "just now" }
+        if age < 7 * 86400 {
+            let r = RelativeDateTimeFormatter()
+            r.unitsStyle = .abbreviated
+            return r.localizedString(for: d, relativeTo: Date())
+        }
+        let sameYear = Calendar.current.isDate(d, equalTo: Date(), toGranularity: .year)
+        return d.formatted(sameYear ? .dateTime.month(.abbreviated).day() : .dateTime.month(.abbreviated).day().year())
     }
 }

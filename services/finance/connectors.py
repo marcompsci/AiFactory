@@ -8,6 +8,8 @@ are listed, show up as coverage gaps, and cannot be authorized.
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import csv
 import gzip
 import io
@@ -429,7 +431,7 @@ def app_store_batch(credential: str, days: int = 7, client: httpx.Client | None 
             out.transactions.append(RawTxn(_iso(day), total, f"App Store proceeds {day}", "USD", f"asc:{day}", None, "Apple",
                                            "revenue", "revenue"))
     if skipped_currency:
-        out.errors.append(f"{skipped_currency} non-USD report row(s) not converted (no exchange rate source authorized)")
+        out.errors.append(f"{plural(skipped_currency, 'non-USD report row')} not converted (no exchange rate source authorized)")
     out.covered_from = _iso(today - timedelta(days=days + 1))
     out.covered_to = _iso(today - timedelta(days=2))
     return out

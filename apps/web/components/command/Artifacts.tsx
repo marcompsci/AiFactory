@@ -21,8 +21,8 @@ export function ArtifactViewer({ id, onClose }: { id: string; onClose: () => voi
   const a = q.data;
   const isDiff = a && (a.kind === "diff" || a.kind === "patch");
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ground/70 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Artifact" onClick={onClose}>
-      <div className="glass flex max-h-[88dvh] w-full max-w-3xl flex-col rounded-t-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="backdrop-in fixed inset-0 z-50 flex items-end justify-center bg-ground/70 p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label="Artifact" onClick={onClose}>
+      <div className="glass sheet-in flex max-h-[88dvh] w-full max-w-3xl flex-col rounded-t-2xl sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b border-line px-4 py-3">
           <div className="min-w-0">
             <div className="text-xs text-violet">{a ? human(a.kind) : "Artifact"}</div>

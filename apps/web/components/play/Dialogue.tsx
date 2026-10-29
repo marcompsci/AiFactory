@@ -21,7 +21,7 @@ export function Dialogue() {
   if (!agentId || !agent) return null;
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center p-2 pb-[max(8px,env(safe-area-inset-bottom))] sm:p-4" role="dialog" aria-label={`Talking to ${agent.name}`}>
-      <div className="px-panel flex max-h-[62dvh] w-full max-w-2xl flex-col overflow-hidden">
+      <div className="px-panel sheet-in flex max-h-[62dvh] w-full max-w-2xl flex-col overflow-hidden">
         <div className="flex items-center gap-3 border-b-2 border-[#f3e9d2]/25 px-3 py-2">
           <Portrait look={agent.look} size={44} fallback={agent.color} name={agent.name} />
           <div className="min-w-0 flex-1">

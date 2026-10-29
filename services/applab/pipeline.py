@@ -16,6 +16,8 @@ re-checks that approval at the tool boundary.
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import logging
 import os
 from datetime import datetime, timedelta, timezone
@@ -230,7 +232,7 @@ class AppLabPipeline:
         set_status(conn, c.id, "AWAITING_OWNER", "the General Manager's briefing reached the Owner's Tower")
         repo = L.repo_row(conn, c.repository_id)
         lemit(conn, "lab.proposals_ready", {"cycle_id": c.id, "repository_id": c.repository_id, "repo": repo.full_name, "count": waiting,
-                                            "label": f"{waiting} App Lab proposal(s) for your review", "data_mode": c.data_mode},
+                                            "label": f"{plural(waiting, 'App Lab proposal')} for your review", "data_mode": c.data_mode},
               simulated=c.data_mode == "simulated")
         return 1
 
@@ -266,7 +268,7 @@ class AppLabPipeline:
         if briefing is None:
             ok = sum(1 for r in reviews.values() if r["verdict"] == "recommend")
             briefing = (("[simulation · templated text] " if c.data_mode == "simulated" else "")
-                        + f"{ok} of {len(reviews)} proposal(s) passed my review for {repo.full_name}. Nothing reaches GitHub until you "
+                        + f"{ok} of {plural(len(reviews), 'proposal')} passed my review for {repo.full_name}. Nothing reaches GitHub until you "
                           "approve the exact change; approved changes go to a separate branch as a draft pull request (or to Claude Code as "
                           "an issue), never to the default branch.")
         with transaction() as conn:

@@ -23,12 +23,23 @@ export function human(s: string | null | undefined): string {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+/** Relative while it's recent, then a plain date: "340 days ago" is harder to read than "Nov 22". */
 export function ago(iso: string): string {
   const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
-  if (s < 60) return `${Math.floor(s)}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 45) return "just now";  // a seconds counter ticking in a list is noise
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return new Date(iso).toLocaleDateString();
+  if (s < 7 * 86400) return `${Math.floor(s / 86400)}d ago`;
+  const d = new Date(iso);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
+}
+
+const RULES = new Intl.PluralRules("en-US");
+
+/** "1 file", "3 files" (never "3 file(s)"). Irregular plurals pass their own word. */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${RULES.select(n) === "one" ? one : many}`;
 }
 
 /** "in 2h 10m" for a time in the future (e.g. when a usage window resets). */
@@ -225,9 +236,9 @@ export function describe(e: EventEnvelope, agents: Record<string, WorldAgent>): 
     case "game.score_recorded":
       return { who, text: `scored in the money game (${human(s("kind")).toLowerCase()}${p.verified ? ", verified" : ", simulated"})`, tone: "#FFD36B" };
     case "factory.synced":
-      return { who, text: s("kind") === "claude_code" ? `checked Claude Code: ${p.sessions ?? 0} session(s), ${p.completed_tasks ?? 0} finished task(s)`
-        : s("kind") === "codex" ? `checked Codex: ${p.sessions ?? 0} session(s), ${p.completed_tasks ?? 0} finished step(s)`
-        : `checked GitHub: ${p.pulls ?? 0} pull request(s), ${p.runs ?? 0} Actions run(s)`, tone: s("kind") === "codex" ? "#5EEAD4" : "#FF8A5C" };
+      return { who, text: s("kind") === "claude_code" ? `checked Claude Code: ${plural(Number(p.sessions ?? 0), "session")}, ${plural(Number(p.completed_tasks ?? 0), "finished task")}`
+        : s("kind") === "codex" ? `checked Codex: ${plural(Number(p.sessions ?? 0), "session")}, ${plural(Number(p.completed_tasks ?? 0), "finished step")}`
+        : `checked GitHub: ${plural(Number(p.pulls ?? 0), "pull request")}, ${plural(Number(p.runs ?? 0), "Actions run")}`, tone: s("kind") === "codex" ? "#5EEAD4" : "#FF8A5C" };
     case "usage.budget_updated":
       return { who, text: `updated the plan meters: ${p.plan ? `agents on the ${s("plan")} plan${p.model ? ` (${s("model")})` : ""}` : "no plan has usage left"}${p.owner_active ? ", you're using Claude so agents use the smallest model" : ""}`, tone: "#5EEAD4" };
     case "knowledge.consulted":

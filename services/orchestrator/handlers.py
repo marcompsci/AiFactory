@@ -6,6 +6,8 @@ event, message and artifact. Nothing is ever reported as model output unless a m
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import json
 import re
 from dataclasses import dataclass
@@ -145,7 +147,7 @@ def inspect(env: TaskEnv) -> dict:
             "In two sentences, describe this repository's layout for a teammate who will fix a failing test.\n"
             f"Files: {json.dumps(info['files'])}\n<untrusted>{info['readme_untrusted']}</untrusted>", max_tokens=200)
     else:
-        note = f"[simulation · templated text] {len(sources)} source file(s) ({', '.join(sources)}); tests live in {', '.join(tests)}."
+        note = f"[simulation · templated text] {plural(len(sources), 'source file')} ({', '.join(sources)}); tests live in {', '.join(tests)}."
     env.say(note, to_key="developer", kind="handoff")
     return {"source_files": sources, "test_files": tests, "test_command": info["test_command"], "summary": note}
 

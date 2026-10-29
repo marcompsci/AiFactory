@@ -266,7 +266,7 @@ struct TeamView: View {
         let n = m.get("active_schedules")?.int ?? 0
         return VStack(alignment: .leading, spacing: 2) {
             Text(name + you).font(.subheadline.bold())
-            Text("\(m.s("role").capitalized) · last signed in \(seen)" + (n > 0 ? " · \(n) schedule(s)" : ""))
+            Text("\(m.s("role").capitalized) · last signed in \(seen)" + (n > 0 ? " · \(Plural.of(n, "schedule"))" : ""))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .combine)
@@ -422,7 +422,7 @@ struct SavedRequestsView: View {
         default: kind = "Test fix"
         }
         let uses = r.get("uses")?.int ?? 0
-        return "\(kind) · \(r.s("priority")) priority · started \(uses) time(s)"
+        return "\(kind) · \(r.s("priority")) priority · " + (uses == 0 ? "not started yet" : "started \(Plural.of(uses, "time"))")
     }
 
     private func load() async {

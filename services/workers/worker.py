@@ -7,6 +7,8 @@ missions. In a multi-instance deployment, swap the in-process queue for Redis (s
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import heapq
 import itertools
 import logging
@@ -117,7 +119,7 @@ class MissionWorker:
                 conn.execute(update(db.agent_positions).where(db.agent_positions.c.agent_id == p.agent_id).values(movement_state="STATIONARY"))
             missions = conn.execute(select(db.missions.c.id).where(db.missions.c.status.in_(ACTIVE), db.missions.c.paused == 0)).fetchall()
             if interrupted or missions:
-                emit(conn, "agent.message", payload={"kind": "status", "body": f"Worker recovered {len(missions)} mission(s) after restart."})
+                emit(conn, "agent.message", payload={"kind": "status", "body": f"Worker recovered {plural(len(missions), 'mission')} after restart."})
         ids = [m.id for m in missions]
         for mid in ids:
             self.enqueue(mid)

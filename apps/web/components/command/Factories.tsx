@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { factories, type Json } from "@/lib/api";
-import { ago, human, until } from "@/lib/format";
+import { ago, human, until, plural } from "@/lib/format";
 import { Button, Dot, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
 
 /** The Claude Code Factory and the GitHub Factory: read-only, opt-in, owner/admin only. */
@@ -40,7 +40,7 @@ export function FactoriesPanel() {
         {!cx.linked ? <Empty>Off. Turn it on to show your recent Codex sessions and finished plan steps here and in the city, and to share AGENTS.md with the team. The plan meter works either way.</Empty> : null}
         {cx.linked && cx.data ? (
           <>
-            <p className="text-xs text-ink-3">Read {ago(cx.synced_at)} · {cx.data.sessions.length} session(s) · {cx.data.completed_recent} finished step(s){cx.data.by_agents ? ` · ${cx.data.by_agents} run by the agents` : ""}</p>
+            <p className="text-xs text-ink-3">Read {ago(cx.synced_at)} · {plural(cx.data.sessions.length, "session")} · {plural(cx.data.completed_recent, "finished step")}{cx.data.by_agents ? ` · ${cx.data.by_agents} run by the agents` : ""}</p>
             <ul className="space-y-2">
               {cx.data.sessions.slice(0, 8).map((s: Json) => (
                 <li key={s.id} className="rounded-lg border border-line p-2 text-sm">
@@ -59,7 +59,7 @@ export function FactoriesPanel() {
               ))}
             </ul>
             {cx.data.memory.length ? (
-              <Section title="Shared memory (AGENTS.md)" aside={`${cx.data.memory.length} file(s)`}>
+              <Section title="Shared memory (AGENTS.md)" aside={plural(cx.data.memory.length, "file")}>
                 <ul className="space-y-1 text-xs">
                   {cx.data.memory.map((m: Json) => (
                     <li key={m.label} className="rounded border border-line p-2">
@@ -81,7 +81,7 @@ export function FactoriesPanel() {
         {!cc.linked ? <Empty>Off. Turn it on to show your recent Claude Code sessions and finished tasks here and in the city. Only session titles, task names and memory notes are read; secrets are scrubbed.</Empty> : null}
         {cc.linked && cc.data ? (
           <>
-            <p className="text-xs text-ink-3">Read {ago(cc.synced_at)} · {cc.data.sessions.length} session(s) · {cc.data.completed_recent} finished task(s)</p>
+            <p className="text-xs text-ink-3">Read {ago(cc.synced_at)} · {plural(cc.data.sessions.length, "session")} · {plural(cc.data.completed_recent, "finished task")}</p>
             <ul className="space-y-2">
               {cc.data.sessions.slice(0, 8).map((s: Json) => (
                 <li key={s.id} className="rounded-lg border border-line p-2 text-sm">
@@ -99,7 +99,7 @@ export function FactoriesPanel() {
                 </li>
               ))}
             </ul>
-            <Section title="Shared memory" aside={`${cc.data.memory.length} file(s)`}>
+            <Section title="Shared memory" aside={plural(cc.data.memory.length, "file")}>
               <ul className="space-y-1 text-xs">
                 {cc.data.memory.map((m: Json) => (
                   <li key={m.label} className="rounded border border-line p-2">

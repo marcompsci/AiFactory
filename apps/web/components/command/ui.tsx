@@ -16,15 +16,17 @@ export function Button({ variant = "quiet", className = "", ...rest }: ButtonHTM
     <button
       type="button"
       {...rest}
-      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm transition-[transform,background-color,filter,opacity] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
     />
   );
 }
 
+/** A status dot. `pulse` means "something is happening right now": a slow breath, not a ping, so a screen full of
+ * busy agents doesn't flash. A normal state (connected, idle) stays still. */
 export function Dot({ color, pulse = false }: { color: string; pulse?: boolean }) {
   return (
     <span className="relative inline-flex size-2 shrink-0">
-      {pulse ? <span className="absolute inset-0 animate-ping rounded-full opacity-60 motion-reduce:hidden" style={{ background: color }} /> : null}
+      {pulse ? <span className="dot-breathe absolute -inset-[3px] rounded-full" style={{ background: color }} /> : null}
       <span className="relative inline-flex size-2 rounded-full" style={{ background: color }} />
     </span>
   );

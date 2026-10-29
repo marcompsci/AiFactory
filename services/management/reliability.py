@@ -15,6 +15,8 @@ Where the ideas come from:
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import json
 import re
 from datetime import datetime, timedelta, timezone
@@ -233,7 +235,7 @@ def check_objective(conn: Connection, mission_id: str) -> dict:
             problems.append(f"'{t.title}' finished without {', '.join(missing)}")
         v = t.validation or {}
         if v.get("all_tests_pass") and (out.get("failed") or 0) > 0:
-            problems.append(f"'{t.title}' finished with {out.get('failed')} failing test(s)")
+            problems.append(f"'{t.title}' finished with {plural(int(out.get('failed') or 0), 'failing test')}")
     if not checked:
         problems.append("No steps finished, so nothing could be checked.")
     status = "objective_not_met" if problems else "objective_partly_met" if decided else "objective_met"
@@ -276,7 +278,7 @@ def learn_from_mission(conn: Connection, mission_id: str) -> int:
             text = (f"{LESSON_PREFIX}on \"{t.title}\" ({t.key}), retrying the same way failed {len(failed)} times with "
                     f"\"{_short(first.error)}\". Change the approach or ask for help instead of retrying.")
         else:
-            text = (f"{LESSON_PREFIX}on \"{t.title}\" ({t.key}), {len(failed)} attempt(s) failed with \"{_short(failed[-1].error)}\". "
+            text = (f"{LESSON_PREFIX}on \"{t.title}\" ({t.key}), {plural(len(failed), 'attempt')} failed with \"{_short(failed[-1].error)}\". "
                     "Flag this early next time.")
         if conn.execute(select(db.memory_entries.c.id).where(db.memory_entries.c.agent_id == t.agent_id,
                                                              db.memory_entries.c.content == text)).first():

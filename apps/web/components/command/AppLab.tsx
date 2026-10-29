@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { lab, type Json } from "@/lib/api";
 import { githubSigninToken } from "@/lib/auth";
-import { ago, human } from "@/lib/format";
+import { ago, human, plural } from "@/lib/format";
 import { StepUpDialog } from "./Bank";
 import { Button, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
 
@@ -31,7 +31,7 @@ export function AppLabPanel() {
       </p>
       <Repositories repos={d.repositories} ambient={d.ambient_allowed} />
       {waiting.length ? (
-        <Section title="Waiting for you" aside={`${waiting.length} proposal(s)`}>
+        <Section title="Waiting for you" aside={plural(waiting.length, "proposal")}>
           {waiting.map((p: Json) => <ProposalCard key={p.id} id={p.id} />)}
         </Section>
       ) : null}
@@ -188,7 +188,7 @@ export function ProposalCard({ id }: { id: string }) {
         <div className="min-w-0 flex-1">
           <h4 className="font-semibold">{p.title}</h4>
           <p className="text-xs text-ink-3">
-            {q.data!.repository.full_name} · {p.route === "patch" ? `patch, ${p.files.length} file(s)` : "task for Claude Code"} · risk {p.risk}
+            {q.data!.repository.full_name} · {p.route === "patch" ? `patch, ${plural(p.files.length, "file")}` : "task for Claude Code"} · risk {p.risk}
             {p.authored_by ? ` · ${p.authored_by}` : ""}
           </p>
         </div>

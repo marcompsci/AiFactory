@@ -272,6 +272,7 @@ struct LabProposalView: View {
         }
         do {
             try await api.labDecide(id, decision: decision, payloadHash: p.s("payload_hash"), stepUp: stepUp)
+            if decision == "APPROVE" { Haptics.success() }
             message = decision == "APPROVE" ? "Approved. The developer is publishing it now." : "Saved."
             code = ""
             needsCode = false

@@ -1,6 +1,8 @@
 """Task handlers for App Lab missions. The repository's contents are untrusted input to any model call."""
 from __future__ import annotations
 
+from services.core.text import plural
+
 import json
 import re
 
@@ -19,7 +21,7 @@ def _param(env: TaskEnv, key: str) -> str:
 
 def lab_research(env: TaskEnv) -> dict:
     r = env.tool("research_design_insights", cycle_id=_param(env, "cycle_id"))
-    env.say(f"Collected {r['count']} design pattern(s) people engage with, pay for and play ({r['data_mode']} evidence). Sending them to "
+    env.say(f"Collected {plural(r['count'], 'design pattern')} people engage with, pay for and play ({r['data_mode']} evidence). Sending them to "
             "the App Lab at Code Forge.", to_key="developer", kind="handoff")
     return {"count": r["count"]}
 
@@ -59,8 +61,8 @@ def lab_analyze(env: TaskEnv) -> dict:
                          model=env.agent.model_name)
                 refined += 1
     if mem.get("count"):
-        env.say(f"Pulled {mem['count']} note(s) from Claude Code's memory about how this project is built.", kind="status")
-    env.say(f"Read {scan['file_count']} files at {scan['base_sha'][:8]} (read-only) and drafted {r['count']} proposal(s)"
+        env.say(f"Pulled {plural(mem['count'], 'note')} from Claude Code's memory about how this project is built.", kind="status")
+    env.say(f"Read {scan['file_count']} files at {scan['base_sha'][:8]} (read-only) and drafted {plural(r['count'], 'proposal')}"
             + (f", {refined} tailored by {env.agent.model_name}" if refined else " from templates") + ". Sending them to the General Manager.",
             to_key="general_manager", kind="handoff")
     return {"proposals": r["count"], "refined": refined, "patched": patched}

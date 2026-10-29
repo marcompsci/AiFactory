@@ -9,6 +9,8 @@ agent works one task at a time (`max_concurrent_tasks`), enforced with per-agent
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import json
 import logging
 import threading
@@ -235,7 +237,7 @@ class MissionRunner:
         by_id = {t.id: t for t in tasks}
         failed = [t for t in tasks if t.status == "FAILED"]
         if failed:
-            self._fail(f"task '{failed[0].key}' failed after {failed[0].attempt} attempt(s)")
+            self._fail(f"task '{failed[0].key}' failed after {plural(failed[0].attempt, 'attempt')}")
             return "FAILED"
         ready = [t for t in tasks
                  if (t.status == "PENDING" and all(by_id[d].status in DONE for d in deps.get(t.id, ())))

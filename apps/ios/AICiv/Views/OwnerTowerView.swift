@@ -135,9 +135,10 @@ struct MissionApprovalsSection: View {
         defer { busy = nil }
         do {
             try await api.decideApproval(a.id, grant: grant)
+            if grant { Haptics.success() }
             error = nil
             await app.refresh()
-        } catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
+        } catch { Haptics.warning(); self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
     }
 }
 
@@ -276,9 +277,11 @@ struct ReleaseReviewView: View {
         defer { busy = false }
         do {
             try await api.decide(opportunityId, decision: decision, digest: digest, note: note.isEmpty ? nil : note)
+            if decision == .approve { Haptics.success() }
             await app.refresh()
             dismiss()
         } catch {
+            Haptics.warning()
             self.error = error.localizedDescription
         }
     }

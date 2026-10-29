@@ -2,6 +2,8 @@
 work, never the money (THREAT_MODEL F9). Model calls see only the redacted view (F8)."""
 from __future__ import annotations
 
+from services.core.text import plural
+
 import json
 
 from sqlalchemy import select, update
@@ -46,7 +48,7 @@ def research_costs(env: TaskEnv) -> dict:
             pkt = P.get(conn, pid)
             conn.execute(update(db.cost_review_packets).where(db.cost_review_packets.c.id == pid)
                          .values(recommendation={**(pkt.recommendation or {}), "research_note": note, "research_note_model": env.agent.model_name}))
-    env.say(f"Researched {r['count']} option(s) from authorized sources ({r['data_mode']} data). Findings are going back to the bank.",
+    env.say(f"Researched {plural(r['count'], 'option')} from authorized sources ({r['data_mode']} data). Findings are going back to the bank.",
             to_key="savings_strategist", kind="handoff")
     return {"count": r["count"], "data_mode": r["data_mode"]}
 
@@ -111,7 +113,7 @@ def _inv(env: TaskEnv) -> str:
 
 def alt_research(env: TaskEnv) -> dict:
     r = env.tool("investigate_alternatives", investigation_id=_inv(env))
-    env.say(f"Found {r['count']} candidate(s) from authorized sources ({r['data_mode']} data); sending the shortlist to the bank.",
+    env.say(f"Found {plural(r['count'], 'candidate')} from authorized sources ({r['data_mode']} data); sending the shortlist to the bank.",
             to_key="savings_strategist", kind="handoff")
     return {"count": r["count"]}
 

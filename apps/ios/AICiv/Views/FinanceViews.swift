@@ -168,8 +168,10 @@ struct FinanceDecisionView: View {
         do {
             try await api.decidePacket(packetId, PacketDecisionRequest(decision: decision, approvalId: nil, payloadHash: nil,
                                                                         note: note.isEmpty ? nil : note, deferDays: deferDays))
+            if decision == "ACKNOWLEDGE" { Haptics.success() }
             dismiss()
         } catch {
+            Haptics.warning()
             self.error = error.localizedDescription
         }
     }

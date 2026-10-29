@@ -6,6 +6,8 @@ decides anything: each item links to the screen where you decide it.
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -58,7 +60,7 @@ def inbox(conn: Connection, org_id: str) -> dict:
     from .permissions_review import review
     pr = review(conn, org_id)
     if pr["suggestions"]:
-        items.append({"kind": "permissions", "id": "permissions", "title": f"{pr['suggestions']} unused tool grant(s) to review",
+        items.append({"kind": "permissions", "id": "permissions", "title": f"{plural(pr['suggestions'], 'unused tool grant')} to review",
                       "detail": "Least-privilege review", "mission_id": None, "created_at": None, "expires_at": None})
     for i in items:
         i["age_minutes"] = _age_min(i["created_at"], now)

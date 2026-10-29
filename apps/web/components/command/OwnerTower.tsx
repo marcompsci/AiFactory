@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api, bank, type Json } from "@/lib/api";
-import { human, money, usd } from "@/lib/format";
+import { human, money, usd, plural } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { ApprovalQueue } from "./Activity";
 import { StepUpDialog } from "./Bank";
@@ -209,7 +209,7 @@ export function FinancialDecisions() {
       {waiting.map((p: Json) => <CostDecision key={p.id} id={p.id} />)}
       {payments.map((a: Json) => <PaymentDecision key={a.id} a={a} />)}
       {deferred.length ? (
-        <p className="text-xs text-ink-3">{deferred.length} deferred cost review(s); reopen them from the Bank tab or wait for their deferral to end.</p>
+        <p className="text-xs text-ink-3">{plural(deferred.length, "deferred cost review")}; reopen them from the Bank tab or wait for their deferral to end.</p>
       ) : null}
     </Section>
   );

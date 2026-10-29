@@ -8,6 +8,8 @@ Confirm every date with the IRS or your state, or with your tax professional.
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import csv
 import hashlib
 import io
@@ -111,12 +113,12 @@ def estimate(conn: Connection, org: str, tax_year: int | None = None, jurisdicti
     uncertainty = []
     unc = sum(1 for r in rows if r.category_key == "uncategorized")
     if unc:
-        uncertainty.append(f"{unc} uncategorized transaction(s) are excluded from deductions until reviewed")
+        uncertainty.append(f"{plural(unc, 'uncategorized transaction')} {'is' if unc == 1 else 'are'} excluded from deductions until reviewed")
     if partial:
         uncertainty.append("phone/internet counted at an assumed 50% business use; set the real share with your professional")
     needs = sum(1 for r in rows if r.reconciliation_status != "MATCHED")
     if needs:
-        uncertainty.append(f"{needs} transaction(s) not yet reconciled")
+        uncertainty.append(f"{plural(needs, 'transaction')} not yet reconciled")
     modes = {r.data_mode for r in rows}
     if "simulated" in modes:
         uncertainty.append("SIMULATED data: these figures describe test data, not your business")

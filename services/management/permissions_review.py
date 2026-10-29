@@ -7,6 +7,8 @@ skips it), and restoring one (loosening) needs a fresh step-up. Every change is 
 """
 from __future__ import annotations
 
+from services.core.text import plural
+
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -93,7 +95,7 @@ def review(conn: Connection, org_id: str, days: int = 30) -> dict:
                          "suggestion": "revoke" if suggest else "keep",
                          "in_code": called,
                          "why": ("Unused for %d days, and no plan or pipeline asks for it." % days) if suggest else
-                                f"Used {n} time(s) in {days} days." if n else
+                                f"Used {plural(n, 'time')} in {days} days." if n else
                                 "A mission plan needs it." if in_plan else
                                 "A pipeline calls it directly." if called else
                                 f"Unused so far; suggestions start after {days} days of records."})
