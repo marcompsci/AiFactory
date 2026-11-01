@@ -569,3 +569,32 @@ The factory now holds your to-do list and does the work on it when you ask.
   each due time, and Siri / Shortcuts: "Add a task in AI Civ" and "What's on my list in AI Civ".
 - **V6.52 Website.** The same list, quick add and review in the command sheet's Tasks tab; the weekly report counts the
   tasks you finished.
+
+## V6.53–V6.67: A natural, futuristic home city (iPhone)
+
+The Home city keeps its layout, signs, bubbles and camera modes, with a new look (`Game/CityArt.swift`):
+
+- **V6.53 Rendering.** Full resolution with 4× multisampling instead of the half-resolution pixel look; HDR with
+  softer bloom, a light vignette and filmic contrast.
+- **V6.54 Light and shadow.** A low warm sun casting soft shadows, screen-space ambient occlusion, a cool fill and a
+  violet rim; everything is physically based and reflects the sky.
+- **V6.55 Sky.** A smooth dusk gradient, a glowing low sun, soft cloud banks lit warm from below, stars thinning
+  toward the horizon.
+- **V6.56 Atmosphere.** Distance haze for the far islands and the skyline.
+- **V6.57 Islands.** Organic, irregular rock in layers (meadow, soil, stone, shadowed base) with a domed meadow.
+- **V6.58 Nature.** Pines, broadleaf trees, the odd glowing tree, bushes and boulders, kept off decks and roads.
+- **V6.59 Buildings.** Glass-and-metal façades with lit windows, rounded corners, quieter neon trim, roof caps, and
+  antennas with blinking aircraft lights; glass domes.
+- **V6.60 Roads.** Paved roads with dashed centre lines, glowing curbs and street lamps with pools of light; a ring
+  road round the plaza.
+- **V6.61 Cars.** Hover cars with canopies, headlights, tail lights, underglow and light trails, in four flight lanes,
+  banking into the curve; ground cars on the ring road.
+- **V6.62 Agents.** 3D characters from each agent's look (skin, hair, top and accent, trousers, shoes) with a glowing
+  visor and a soft shadow; they turn to face where they walk, swing arms and legs, work with their hands at a desk,
+  and breathe when idle.
+- **V6.63 Plaza.** A holographic globe monument with rings over a reflecting pool, and lamps.
+- **V6.64 Water.** Waterfalls end in mist and a glow pool.
+- **V6.65 Conveyors.** Glass tubes over the belts.
+- **V6.66 Life.** Drifting light motes, delivery drones between the towers, a glass-and-crystal Knowledge Base.
+- **V6.67 Comfort.** A light mode (no shadows, occlusion or particles, half the plants) switches on when the phone runs
+  hot, or with `-cityQuality low`; Reduce Motion stills limbs, cars, drones, the globe and blinking.

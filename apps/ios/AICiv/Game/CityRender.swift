@@ -69,6 +69,14 @@ final class CityScene {
     private var falls: [SCNMaterial] = []
     private var islets: [(node: SCNNode, y: Float)] = []
     private var cars: [(node: SCNNode, r: Float, h: Float, speed: Float, phase: Float, dir: Float)] = []
+    private var groundCars: [(node: SCNNode, r: Float, speed: Float, phase: Float)] = []
+    private var drones: [(node: SCNNode, center: SIMD3<Float>, r: Float, speed: Float, phase: Float)] = []
+    private var blinks: [SCNNode] = []
+    private var globe: SCNNode?
+    private var sun = SCNNode()
+    /// High: full resolution, soft shadows, ambient occlusion and particles. Low (set when the phone runs hot, or
+    /// with -cityQuality low): no shadows, occlusion or particles.
+    private(set) var lowQuality = UserDefaults.standard.string(forKey: "cityQuality") == "low"
     private var phase: Double = 0
     private var last = Date()
     nonisolated(unsafe) private var timer: Timer?
@@ -78,24 +86,47 @@ final class CityScene {
 
     init() {
         scene.background.contents = Self.sky
+        scene.lightingEnvironment.contents = Self.sky   // glass and metal reflect the dusk sky
+        scene.lightingEnvironment.intensity = 1.1
+        scene.fogColor = UIColor(hex: 0x2A1E4A)          // haze: far islands and the skyline fade into the dusk
+        scene.fogStartDistance = 480
+        scene.fogEndDistance = 1100
+        scene.fogDensityExponent = 1.3
         let cam = SCNCamera()
         cam.fieldOfView = 45
         cam.projectionDirection = .vertical
         cam.zNear = 0.5
-        cam.zFar = 1400
+        cam.zFar = 1600
         cam.wantsHDR = true
         cam.wantsExposureAdaptation = false
-        cam.exposureOffset = 0
-        cam.bloomIntensity = 0.9
-        cam.bloomThreshold = 0.75
-        cam.bloomBlurRadius = 6
+        cam.exposureOffset = -0.15
+        cam.bloomIntensity = 0.65
+        cam.bloomThreshold = 0.85
+        cam.bloomBlurRadius = 10
+        cam.vignettingIntensity = 0.35
+        cam.vignettingPower = 0.9
+        cam.saturation = 1.08
+        cam.contrast = 0.06
         cameraNode.camera = cam
         scene.rootNode.addChildNode(cameraNode)
         lights()
         buildSkyline()
         buildIslets()
         buildCars()
+        buildDrones()
         scene.rootNode.addChildNode(beltRoot)
+        let motes = SCNNode()
+        motes.name = "motes"
+        motes.position = SCNVector3(0, 22, 0)
+        motes.addParticleSystem(CityArt.motes())
+        scene.rootNode.addChildNode(motes)
+        applyQuality()
+        NotificationCenter.default.addObserver(forName: ProcessInfo.thermalStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                let state = ProcessInfo.processInfo.thermalState
+                if (state == .serious || state == .critical) && self?.lowQuality == false { self?.setLowQuality(true) }
+            }
+        }
         let o = overview()
         eye = o.eye
         target = o.target
@@ -219,6 +250,7 @@ final class CityScene {
         pads = [:]
         deskTops = [:]
         bankFloors = []
+        blinks = []
         anchors = anchors.filter { !$0.key.hasPrefix("sign:") && !$0.key.hasPrefix("bubble:") && !$0.key.hasPrefix("board:") }
         districts = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         districtList = list
@@ -229,7 +261,9 @@ final class CityScene {
             let dn = SCNNode()
             dn.name = "district:\(d.id)"
             dn.position = SCNVector3(Float(d.x), 0, Float(d.z))
-            buildIsland(dn, r: WorldMap.islandRadius(d), depth: 16 + Double(i % 3) * 6, seed: Double(i) * 1.7)
+            let toPlaza: Float = d.x == 0 && d.z == 0 ? 0 : Float(atan2(-d.x, -d.z))
+            buildIsland(dn, r: WorldMap.islandRadius(d), depth: 16 + Double(i % 3) * 6, seed: Double(i) * 1.7,
+                        clear: Float(WorldMap.deckSize(d) / 2), road: toPlaza)
             buildDeck(dn, d)
             buildDistrict(dn, d)
             root.addChildNode(dn)
@@ -256,7 +290,27 @@ final class CityScene {
         anchors[id] = n
     }
 
+    /// A low warm sun from the far side (soft shadows), a cool sky fill, a violet rim, and the sky itself for
+    /// reflections (scene.lightingEnvironment).
     private func lights() {
+        let l = SCNLight()
+        l.type = .directional
+        l.color = UIColor(hex: 0xFFD2A0)
+        l.intensity = 1900
+        l.castsShadow = true
+        l.shadowMode = .deferred
+        l.shadowSampleCount = 8
+        l.shadowRadius = 3.5
+        l.shadowMapSize = CGSize(width: 2048, height: 2048)
+        l.shadowColor = UIColor(white: 0, alpha: 0.5)
+        l.automaticallyAdjustsShadowProjection = false
+        l.orthographicScale = 130
+        l.zNear = 10
+        l.zFar = 520
+        sun.light = l
+        sun.simdPosition = SIMD3<Float>(-120, 150, -170)
+        sun.simdLook(at: SIMD3<Float>(0, 0, 10), up: SIMD3<Float>(0, 1, 0), localFront: SIMD3<Float>(0, 0, -1))
+        scene.rootNode.addChildNode(sun)
         func add(_ type: SCNLight.LightType, _ color: UInt32, _ intensity: CGFloat, from p: SIMD3<Float>? = nil) {
             let n = SCNNode()
             n.light = SCNLight()
@@ -269,48 +323,93 @@ final class CityScene {
             }
             scene.rootNode.addChildNode(n)
         }
-        add(.ambient, 0xB7C3FF, 620)
-        add(.directional, 0x8FE3FF, 420, from: SIMD3<Float>(0, 100, 0))        // the website's hemisphere light, sky half
-        add(.directional, 0x3A2A5E, 260, from: SIMD3<Float>(0, -100, 0))       // …and its ground half
-        add(.directional, 0xFFD9A8, 1250, from: SIMD3<Float>(40, 80, 60))      // the warm key light
-        add(.directional, 0xA66BFF, 380, from: SIMD3<Float>(-60, 40, -40))     // the violet rim light
+        add(.ambient, 0x6F78B8, 260)
+        add(.directional, 0x7FB8FF, 520, from: SIMD3<Float>(60, 90, 140))   // cool fill from the camera's side
+        add(.directional, 0xA66BFF, 420, from: SIMD3<Float>(-80, 30, 60))   // violet rim
     }
 
+    func setLowQuality(_ low: Bool) {
+        lowQuality = low
+        applyQuality()
+    }
+
+    private func applyQuality() {
+        sun.light?.castsShadow = !lowQuality
+        cameraNode.camera?.screenSpaceAmbientOcclusionIntensity = lowQuality ? 0 : 0.8
+        cameraNode.camera?.screenSpaceAmbientOcclusionRadius = 2.5
+        cameraNode.camera?.screenSpaceAmbientOcclusionBias = 0.05
+        scene.rootNode.childNode(withName: "motes", recursively: false)?.isHidden = lowQuality
+        for d in drones { d.node.isHidden = lowQuality }
+    }
+
+    /// The plaza: pale stone in the middle with the monument and its pool, a ring road with lane markings and
+    /// glowing curbs, ground cars on it, and lamps.
     private func buildPlaza(_ root: SCNNode) {
-        buildIsland(root, r: WorldMap.plazaRadius + 3, depth: 20, seed: 0.7)
-        let disc = SCNCylinder(radius: CGFloat(WorldMap.plazaRadius + 1.5), height: 0.03)
-        disc.radialSegmentCount = 48
-        disc.firstMaterial = Self.lit(0x0B1224)
-        let dn = SCNNode(geometry: disc)
-        dn.position.y = 0.015
-        root.addChildNode(dn)
-        let ring = SCNTube(innerRadius: CGFloat(WorldMap.plazaRadius - 0.25), outerRadius: CGFloat(WorldMap.plazaRadius + 0.25), height: 0.02)
-        ring.radialSegmentCount = 64
-        ring.firstMaterial = Self.glow(0x32D8FF, alpha: 0.55)
+        buildIsland(root, r: WorldMap.plazaRadius + 3.6, depth: 22, seed: 0.7, clear: 0, road: nil, flora: false)
+        let stone = SCNNode(geometry: SCNCylinder(radius: CGFloat(WorldMap.plazaRadius - 0.2), height: 0.06))
+        stone.geometry?.firstMaterial = CityArt.pbr(0x3A3F55, rough: 0.55, metal: 0.1)
+        (stone.geometry as? SCNCylinder)?.radialSegmentCount = 64
+        stone.position.y = 0.33
+        root.addChildNode(stone)
+        let roadRing = SCNNode(geometry: SCNTube(innerRadius: CGFloat(WorldMap.plazaRadius - 0.1), outerRadius: CGFloat(WorldMap.plazaRadius + 3.2), height: 0.08))
+        roadRing.geometry?.firstMaterial = CityArt.pbr(0x1B1F2A, rough: 0.85, metal: 0.05)
+        (roadRing.geometry as? SCNTube)?.radialSegmentCount = 72
+        roadRing.position.y = 0.3
+        root.addChildNode(roadRing)
+        let lanes = SCNNode()
+        for i in 0..<44 {
+            let a = Float(i) / 44 * 2 * .pi
+            let dash = SCNNode(geometry: SCNBox(width: 0.1, height: 0.02, length: 0.8, chamferRadius: 0))
+            dash.geometry?.firstMaterial = Self.glow(0xE8EEFF, alpha: 0.5)
+            let r = Float(WorldMap.plazaRadius) + 1.55
+            dash.position = SCNVector3(sin(a) * r, 0.35, cos(a) * r)
+            dash.eulerAngles.y = a + .pi / 2
+            lanes.addChildNode(dash)
+        }
+        root.addChildNode(lanes.flattenedClone())
+        let outer = SCNNode(geometry: SCNTube(innerRadius: CGFloat(WorldMap.plazaRadius + 3.1), outerRadius: CGFloat(WorldMap.plazaRadius + 3.3), height: 0.14))
+        outer.geometry?.firstMaterial = Self.glow(0x32D8FF, alpha: 0.5)
+        (outer.geometry as? SCNTube)?.radialSegmentCount = 72
+        outer.position.y = 0.36
+        root.addChildNode(outer)
+        let ring = SCNTube(innerRadius: CGFloat(WorldMap.plazaRadius - 0.25), outerRadius: CGFloat(WorldMap.plazaRadius), height: 0.16)
+        ring.radialSegmentCount = 72
+        ring.firstMaterial = Self.glow(0x32D8FF, alpha: 0.8)
         let rn = SCNNode(geometry: ring)
-        rn.position.y = 0.04
+        rn.position.y = 0.36
         root.addChildNode(rn)
         plazaRing = rn
+        let m = CityArt.monument()
+        m.position.y = 0.33
+        root.addChildNode(m)
+        globe = m.childNode(withName: "globe", recursively: true)
+        for i in 0..<6 {  // lamps round the inside of the ring
+            let a = Float(i) / 6 * 2 * .pi + 0.26
+            let r = Float(WorldMap.plazaRadius) - 1.2
+            let lamp = CityArt.lamp(at: SIMD3<Float>(sin(a) * r, 0.33, cos(a) * r), facing: 1)
+            lamp.eulerAngles.y = a - .pi / 2
+            root.addChildNode(lamp)
+        }
+        groundCars = []
+        let paints: [UInt32] = [0xE9EEF6, 0x2B3550, 0xC23B4E, 0x3C7CF0, 0xF4D58D, 0x1C1F2A]
+        for i in 0..<6 {
+            let car = CityArt.hoverCar(paint: paints[i], glow: i % 2 == 0 ? 0x32D8FF : 0xFF6FD8)
+            car.scale = SCNVector3(0.75, 0.75, 0.75)
+            root.addChildNode(car)
+            let lane: Float = i % 2 == 0 ? 0.8 : 2.3
+            let speed: Float = i % 2 == 0 ? 0.32 : -0.27
+            groundCars.append((car, Float(WorldMap.plazaRadius) + lane, speed, Float(i) * 1.05))
+        }
     }
 
-    /// A faceted rock island: a grassy disc on an inverted, jagged cone (PixelWorld.tsx Island).
-    private func buildIsland(_ parent: SCNNode, r: Double, depth: Double, seed: Double) {
-        let cone = Self.jaggedCone(radius: Float(r), height: Float(depth), seed: Float(seed))
-        cone.firstMaterial = Self.lit(0x54456E)
-        let cn = SCNNode(geometry: cone)
-        cn.position.y = Float(-depth / 2 - 0.35)
-        cn.eulerAngles = SCNVector3(Float.pi, Float(seed), 0)
-        parent.addChildNode(cn)
-        let grass = Self.prism(top: Float(r * 1.02), bottom: Float(r * 0.98), height: 0.5, segments: 9)
-        grass.firstMaterial = Self.lit(0x3F9E64)
-        let gn = SCNNode(geometry: grass)
-        gn.position.y = -0.2
-        parent.addChildNode(gn)
-        let dark = Self.prism(top: Float(r * 0.98), bottom: Float(r * 0.9), height: 0.7, segments: 9)
-        dark.firstMaterial = Self.lit(0x3A2F52)
-        let dk = SCNNode(geometry: dark)
-        dk.position.y = -0.75
-        parent.addChildNode(dk)
+    /// A floating island (CityArt.island) with its trees, bushes and rocks.
+    private func buildIsland(_ parent: SCNNode, r: Double, depth: Double, seed: Double, clear: Float = 0, road: Float? = nil, flora: Bool = true) {
+        let rock = CityArt.island(radius: Float(r), depth: Float(depth), seed: Float(seed))
+        rock.eulerAngles.y = Float(seed)
+        parent.addChildNode(rock)
+        if flora {
+            parent.addChildNode(CityArt.flora(radius: Float(r), clear: clear, road: road, seed: "\(seed)", density: lowQuality ? 0.5 : 1))
+        }
     }
 
     /// The district's raised stone deck: tiled floor, glowing rim, a wall of screens, desks with monitors, corner trees.
@@ -320,7 +419,7 @@ final class CityScene {
         let c = Self.color(d)
         let h = Float(W / 2)
         let slab = SCNBox(width: CGFloat(W), height: 3.4, length: CGFloat(W), chamferRadius: 0)
-        slab.firstMaterial = Self.lit(0x4A3C6E)
+        slab.firstMaterial = CityArt.pbr(0x3E3A55, rough: 0.6, metal: 0.15)
         let sn = SCNNode(geometry: slab)
         sn.position.y = -1.7
         dn.addChildNode(sn)
@@ -371,9 +470,11 @@ final class CityScene {
                 i += 1
             }
         }
-        let crowns: [UInt32] = [0x2F8F5B, 0x3AA66A, 0xC25BD6, 0xFF7AB8, 0x2A7D6B]
-        for (j, p) in [(-h + 1.6, -h + 1.6), (h - 1.6, -h + 1.6), (-h + 1.6, h - 1.6), (h - 1.6, h - 1.6)].enumerated() {
-            dn.addChildNode(Self.tree(x: p.0, z: p.1, s: 1 + Float(j % 2) * 0.3, color: crowns[(j + d.id.count) % crowns.count]))
+        var rng = WorldMap.Rng("deck" + d.id)
+        for p in [(-h + 1.6, -h + 1.6), (h - 1.6, -h + 1.6), (-h + 1.6, h - 1.6), (h - 1.6, h - 1.6)] {
+            let t = CityArt.tree(&rng, scale: 0.9)
+            t.position = SCNVector3(p.0, 0, p.1)
+            dn.addChildNode(t)
         }
     }
 
@@ -386,23 +487,19 @@ final class CityScene {
         pn.position.y = 0.06
         dn.addChildNode(pn)
         pads[d.id] = pn
-        let body: UInt32 = d.color.uppercased() == "#F4D58D" ? 0x2A2414 : 0x0D1528
+        let warm = d.color.uppercased() == "#F4D58D"
         for t in WorldMap.towers(d) {
-            let n = SCNNode()
+            let n = CityArt.tower(t, color: c, warm: warm)
             n.position = SCNVector3(Float(t.pos.x), Float(t.pos.y), Float(t.pos.z))
             n.eulerAngles.y = Float(t.rot)
-            let (geo, edges) = Self.towerGeometry(t)
-            geo.firstMaterial = Self.lit(body, roughMetal: true)
-            n.addChildNode(SCNNode(geometry: geo))
-            edges.firstMaterial = Self.glow(c, alpha: 0.85)
-            n.addChildNode(SCNNode(geometry: edges))
             dn.addChildNode(n)
+            if let b = n.childNode(withName: "blink", recursively: true) { blinks.append(b) }
         }
         for w in d.workstations ?? [] {
             let wn = SCNNode()
             wn.position = SCNVector3(Float(w.offset[0]), 0, Float(w.offset[2]))
             let desk = SCNBox(width: 2.2, height: 1, length: 1.1, chamferRadius: 0)
-            desk.firstMaterial = Self.lit(0x121C33, roughMetal: true)
+            desk.firstMaterial = CityArt.pbr(0x232B40, rough: 0.35, metal: 0.7)
             let dk = SCNNode(geometry: desk)
             dk.position.y = 0.5
             wn.addChildNode(dk)
@@ -443,24 +540,17 @@ final class CityScene {
         }
     }
 
+    /// A paved road from the plaza's ring road to the district's gate, with lamps.
     private func buildWalkway(_ root: SCNNode, _ d: District) {
         let g = WorldMap.gate(d)
         let len = hypot(g.x, g.z)
-        let walk = len - WorldMap.plazaRadius
+        let start = WorldMap.plazaRadius + 3.2
+        let walk = len - start
         guard walk > 0.5 else { return }
-        let mid = (WorldMap.plazaRadius + walk / 2) / len
-        let n = SCNNode()
-        n.position = SCNVector3(Float(g.x * mid), 0.35, Float(g.z * mid))
+        let mid = (start + walk / 2) / len
+        let n = CityArt.road(length: Float(walk), color: Self.color(d))
+        n.position = SCNVector3(Float(g.x * mid), 0.2, Float(g.z * mid))
         n.eulerAngles.y = Float(atan2(g.x, g.z))
-        let deck = SCNBox(width: 2.4, height: 0.3, length: CGFloat(walk), chamferRadius: 0)
-        deck.firstMaterial = Self.lit(0x0F1A30, roughMetal: true)
-        n.addChildNode(SCNNode(geometry: deck))
-        for x in [-1.25, 1.25] as [Float] {
-            let rail = SCNNode(geometry: SCNBox(width: 0.08, height: 0.08, length: CGFloat(walk), chamferRadius: 0))
-            rail.geometry?.firstMaterial = Self.glow(Self.color(d))
-            rail.position = SCNVector3(x, 0.2, 0)
-            n.addChildNode(rail)
-        }
         root.addChildNode(n)
     }
 
@@ -486,13 +576,11 @@ final class CityScene {
         kb.name = "kb"
         kb.position = SCNVector3(0, 34, 16)
         kb.scale = SCNVector3(1.5, 1.5, 1.5)
-        let rock = Self.prism(top: 9, bottom: 0.01, height: 9, segments: 7)
-        rock.firstMaterial = Self.lit(0x3B2F5C)
-        let rn = SCNNode(geometry: rock)
-        rn.position.y = -5
+        let rn = CityArt.island(radius: 9, depth: 9, seed: 4.2)
+        rn.position.y = -0.8
         kb.addChildNode(rn)
         let deck = Self.prism(top: 9.2, bottom: 9.2, height: 0.8, segments: 7)
-        deck.firstMaterial = Self.lit(0x1A1F3D)
+        deck.firstMaterial = CityArt.pbr(0x2A2F4D, rough: 0.4, metal: 0.4)
         let dk = SCNNode(geometry: deck)
         dk.position.y = -0.4
         kb.addChildNode(dk)
@@ -502,7 +590,7 @@ final class CityScene {
         kb.addChildNode(ring)
         for (x, c) in [(Float(-3.2), UInt32(0x9BE7FF)), (3.2, 0xC9A3FF)] {
             let wing = SCNNode(geometry: SCNBox(width: 4, height: 5.2, length: 4, chamferRadius: 0))
-            wing.geometry?.firstMaterial = Self.lit(0x141B33)
+            wing.geometry?.firstMaterial = CityArt.glass(c, alpha: 0.45, glow: 0.12)
             wing.position = SCNVector3(x, 2.6, 0)
             kb.addChildNode(wing)
             for y in [0.9, 2.1, 3.3, 4.5] as [Float] {
@@ -513,7 +601,7 @@ final class CityScene {
             }
         }
         let core = SCNNode(geometry: Self.octahedron(1.9))
-        core.geometry?.firstMaterial = Self.glow(0xE6F7FF)
+        core.geometry?.firstMaterial = CityArt.glass(0xBFF3FF, alpha: 0.8, glow: 0.9)
         core.position.y = 8.2
         kb.addChildNode(core)
         kbRing = SCNNode()
@@ -567,10 +655,17 @@ final class CityScene {
             let sn = SCNNode(geometry: sheet)
             sn.position.y = Float(-height / 2 - 0.2)
             n.addChildNode(sn)
-            let pool = SCNNode(geometry: SCNCylinder(radius: CGFloat(width * 0.9), height: 0.02))
-            pool.geometry?.firstMaterial = Self.glow(0x5FD8FF, alpha: 0.25)
+            let pool = SCNNode(geometry: SCNPlane(width: CGFloat(width * 3), height: CGFloat(width * 3)))
+            pool.geometry?.firstMaterial = CityArt.light(0x5FD8FF, image: CityArt.dot, alpha: 0.55)
+            pool.eulerAngles.x = -.pi / 2
             pool.position.y = Float(-height - 0.2)
             n.addChildNode(pool)
+            if !lowQuality {
+                let mist = SCNNode()
+                mist.position.y = Float(-height - 0.2)
+                mist.addParticleSystem(CityArt.mist(width: Float(width)))
+                n.addChildNode(mist)
+            }
             root.addChildNode(n)
         }
     }
@@ -581,28 +676,36 @@ final class CityScene {
             let n = SCNNode()
             n.position = SCNVector3(s.0, s.1, s.2)
             buildIsland(n, r: Double(s.3), depth: Double(s.3) * 2.2, seed: Double(i) * 3.1)
-            let pine = SCNNode(geometry: Self.prism(top: 0.01, bottom: s.3 * 0.35, height: 2.6, segments: 5))
-            pine.geometry?.firstMaterial = Self.lit(0x1F6B4A)
-            pine.position.y = 1.2
-            n.addChildNode(pine)
             scene.rootNode.addChildNode(n)
             islets.append((n, s.1))
         }
     }
 
+    /// Hover cars in flight lanes at several heights, each banking into its turn.
     private func buildCars() {
-        let colors: [UInt32] = [0xFF6178, 0x32D8FF, 0xF4D58D, 0xA66BFF, 0x5BF2A5]
+        let paints: [UInt32] = [0xE9EEF6, 0x22283A, 0xC23B4E, 0x3C7CF0, 0xF4D58D, 0x6E7A96, 0x0E0F14]
+        let glows: [UInt32] = [0x32D8FF, 0xFF6FD8, 0x5BF2A5, 0xFFBD69, 0xA66BFF]
         for i in 0..<28 {
-            let car = SCNNode(geometry: SCNBox(width: 0.9, height: 0.45, length: 1.8, chamferRadius: 0))
-            car.geometry?.firstMaterial = Self.lit(colors[i % colors.count])
-            let light = SCNNode(geometry: SCNBox(width: 0.8, height: 0.12, length: 0.12, chamferRadius: 0))
-            light.geometry?.firstMaterial = Self.glow(0xFFF6C8)
-            let dir: Float = i % 2 == 1 ? 1 : -1
-            light.position.z = 0.9 * dir
-            car.addChildNode(light)
+            let car = CityArt.hoverCar(paint: paints[i % paints.count], glow: glows[i % glows.count])
             scene.rootNode.addChildNode(car)
-            cars.append((car, 26 + Float(i % 5) * 11, 16 + Float(i % 4) * 5, 0.06 + Float(i % 6) * 0.02,
-                         (Float(i) * 2.399).truncatingRemainder(dividingBy: 2 * .pi), dir))
+            let lane = i % 4
+            let radius = 30 + Float(lane) * 12 + Float(i % 3) * 1.6
+            let height = 15 + Float(lane) * 6
+            let speed = 0.05 + Float(i % 5) * 0.012
+            let start = (Float(i) * 2.399).truncatingRemainder(dividingBy: 2 * .pi)
+            let dir: Float = lane % 2 == 0 ? 1 : -1
+            cars.append((car, radius, height, speed, start, dir))
+        }
+    }
+
+    /// Delivery drones circling between the towers.
+    private func buildDrones() {
+        let spots: [SIMD3<Float>] = [SIMD3(-40, 22, -20), SIMD3(40, 26, -24), SIMD3(0, 30, -50), SIMD3(-56, 20, 20), SIMD3(52, 24, 18), SIMD3(0, 18, 40)]
+        for (i, c) in spots.enumerated() {
+            let d = CityArt.drone()
+            scene.rootNode.addChildNode(d)
+            let speed: Float = i % 2 == 0 ? 0.5 : -0.42
+            drones.append((d, c, 7 + Float(i % 3) * 3, speed, Float(i) * 1.3))
         }
     }
 
@@ -668,7 +771,7 @@ final class CityScene {
             g.position = SCNVector3((a.x + b.x) / 2, a.y - 0.2, (a.z + b.z) / 2)
             g.eulerAngles.y = atan2(b.x - a.x, b.z - a.z)
             let base = SCNNode(geometry: SCNBox(width: 0.9, height: 0.18, length: CGFloat(len), chamferRadius: 0))
-            base.geometry?.firstMaterial = Self.lit(0x0C1426, roughMetal: true)
+            base.geometry?.firstMaterial = CityArt.pbr(0x1A2236, rough: 0.4, metal: 0.7)
             base.opacity = s.status == "DOWN" ? 0.45 : 1
             g.addChildNode(base)
             var rails: [SCNNode] = []
@@ -685,6 +788,7 @@ final class CityScene {
             slats.position.y = 0.1
             slats.isHidden = s.status != "UP"
             g.addChildNode(slats)
+            if s.status != "DOWN" { g.addChildNode(CityArt.tube(length: len)) }
             beltRoot.addChildNode(g)
             belts[s.id] = (rails, slats, len)
         }
@@ -809,20 +913,18 @@ final class CityScene {
         let n = SCNNode()
         n.name = "agent:\(a.id)"
         n.simdPosition = SIMD3<Float>(Float(p.x), 0, Float(p.z))
-        let body = SCNNode(geometry: SCNPlane(width: 1.9, height: 2.85))
-        body.name = "body"
-        body.position.y = 1.42
-        let b = SCNBillboardConstraint()
-        b.freeAxes = .Y
-        body.constraints = [b]
-        n.addChildNode(body)
+        let fig = CityArt.figure(a.avatar.look, fallback: a.avatar.color, visor: Self.hex(a.avatar.color))
+        fig.name = "figure"
+        fig.scale = SCNVector3(0.95, 0.95, 0.95)
+        n.addChildNode(fig)
         let ring = SCNNode(geometry: SCNTube(innerRadius: 0.75, outerRadius: 0.9, height: 0.01))
         ring.name = "ring"
-        ring.position.y = 0.03
+        ring.position.y = 0.05
+        ring.castsShadow = false
         n.addChildNode(ring)
-        let cube = SCNNode(geometry: SCNBox(width: 0.6, height: 0.6, length: 0.6, chamferRadius: 0))
+        let cube = SCNNode(geometry: SCNBox(width: 0.6, height: 0.6, length: 0.6, chamferRadius: 0.08))
         cube.name = "carry"
-        cube.geometry?.firstMaterial = Self.glow(0x5BF2A5, alpha: 0.7)
+        cube.geometry?.firstMaterial = CityArt.glass(0x5BF2A5, alpha: 0.7, glow: 0.9)
         cube.position.y = 3.4
         cube.eulerAngles = SCNVector3(0.4, 0.6, 0)
         cube.isHidden = true
@@ -830,6 +932,7 @@ final class CityScene {
         let hit = SCNNode(geometry: SCNCylinder(radius: 1.4, height: 3.6))
         hit.geometry?.firstMaterial = Self.glow(0x000000, alpha: 0.001)
         hit.position.y = 1.8
+        hit.castsShadow = false
         n.addChildNode(hit)
         let head = SCNNode()
         head.position.y = 3.1
@@ -841,32 +944,61 @@ final class CityScene {
     }
 
     private var lastStyle: [String: String] = [:]
+    private var facing: [String: Float] = [:]
 
+    /// Walk, work and idle motion for a 3D agent: legs and arms swing as it walks and it turns to face where it's
+    /// going; at a desk it works with its hands; standing, it breathes.
     private func styleAgent(_ n: SCNNode, _ a: Agent, state: String, walking: Bool, heading: Double) {
         let working = ["EXECUTING", "PLANNING", "REVIEWING", "WAITING_FOR_TOOL"].contains(state)
-        let dir: Dir = !walking ? .down : abs(sin(heading)) > abs(cos(heading)) ? (sin(heading) > 0 ? .right : .left) : (cos(heading) > 0 ? .down : .up)
-        let pose: Pose = walking ? .walk : working ? .work : .stand
-        let frame = walking ? Int(phase * 8) % 2 : working ? Int(phase * 3) % 2 : 0
         let carrying = app?.world.carrying[a.id] != nil
-        let styleKey = "\(dir)\(pose)\(frame)\(state)\(carrying)\(followId == a.id)"
-        if let body = n.childNode(withName: "body", recursively: false) {
-            let seed = Double(a.id.unicodeScalars.first?.value ?? 0)
-            let walkBob = Float(abs(sin(phase * 10))) * 0.18
-            let idleBob = reduceMotion ? 0 : Float(sin(phase * 2 + seed)) * 0.05
-            body.position.y = 1.42 + (walking ? walkBob : idleBob)
-            if lastStyle[a.id] != styleKey {
-                let outfit = a.avatar.look.map { PixelSprites.outfit($0) } ?? PixelSprites.outfit(PlayerLook(shirt: a.avatar.color))
-                if let img = PixelSprites.image(outfit, dir, pose, frame) {
-                    let m = body.geometry?.firstMaterial ?? SCNMaterial()
-                    m.diffuse.contents = img
-                    m.diffuse.magnificationFilter = .nearest
-                    m.lightingModel = .constant
-                    m.isDoubleSided = true
-                    m.transparencyMode = .aOne
-                    body.geometry?.firstMaterial = m
-                }
-            }
+        guard let fig = n.childNode(withName: "figure", recursively: false),
+              let rig = fig.childNode(withName: "rig", recursively: false) else { return }
+        let seed = Double(a.id.unicodeScalars.first?.value ?? 0)
+        let t = phase + seed
+        if walking {
+            let target = Float(heading)
+            var cur = facing[a.id] ?? target
+            var diff = target - cur
+            while diff > .pi { diff -= 2 * .pi }
+            while diff < -.pi { diff += 2 * .pi }
+            cur += diff * 0.25
+            facing[a.id] = cur
+            rig.eulerAngles.y = cur
         }
+        let legL = rig.childNode(withName: "legL", recursively: false)
+        let legR = rig.childNode(withName: "legR", recursively: false)
+        let torso = rig.childNode(withName: "torso", recursively: false)
+        let armL = torso?.childNode(withName: "armL", recursively: false)
+        let armR = torso?.childNode(withName: "armR", recursively: false)
+        var legSwing: Float = 0, armLx: Float = 0, armRx: Float = 0, lift: Float = 0, bob: Float = 0
+        if reduceMotion {
+            // still: no swing or bob
+        } else if walking {
+            let swing = Float(sin(t * 9)) * 0.6
+            legSwing = swing
+            armLx = -swing * 0.8
+            armRx = swing * 0.8
+            lift = Float(abs(sin(t * 9))) * 0.07
+        } else if working {
+            armLx = -1.0 + Float(sin(t * 7)) * 0.12
+            armRx = -1.0 + Float(sin(t * 7 + 1.7)) * 0.12
+            bob = Float(sin(t * 2)) * 0.02
+        } else {
+            armLx = Float(sin(t * 1.3)) * 0.05
+            armRx = -armLx
+            bob = Float(sin(t * 1.6)) * 0.03
+        }
+        if carrying {
+            armLx = -1.3
+            armRx = -1.3
+        }
+        legL?.eulerAngles.x = legSwing
+        legR?.eulerAngles.x = -legSwing
+        armL?.eulerAngles.x = armLx
+        armR?.eulerAngles.x = armRx
+        rig.position.y = lift
+        torso?.position.y = bob
+        let styleKey = "\(state)\(carrying)\(followId == a.id)"
         if lastStyle[a.id] != styleKey {
             lastStyle[a.id] = styleKey
             let ring = n.childNode(withName: "ring", recursively: false)
@@ -936,11 +1068,30 @@ final class CityScene {
                 m.emission.contentsTransform = t
             }
         }
-        for c in cars {
+        for c in cars {  // nose along the direction of travel, banked into the curve
             let a = c.phase + (reduceMotion ? 0 : Float(phase) * c.speed * c.dir)
-            c.node.position = SCNVector3(cos(a) * c.r, c.h + sin(a * 3) * 0.6, sin(a) * c.r)
-            c.node.eulerAngles.y = -a + (c.dir > 0 ? 0 : .pi)
+            c.node.position = SCNVector3(cos(a) * c.r, c.h + sin(a * 3) * 0.5, sin(a) * c.r)
+            let tx = -sin(a) * c.dir, tz = cos(a) * c.dir
+            c.node.eulerAngles = SCNVector3(0, atan2(tx, tz), -0.22 * c.dir)
         }
+        for g in groundCars {
+            let a = g.phase + (reduceMotion ? 0 : Float(phase) * g.speed)
+            let dir: Float = g.speed >= 0 ? 1 : -1
+            g.node.position = SCNVector3(sin(a) * g.r, 0.85, cos(a) * g.r)
+            g.node.eulerAngles.y = atan2(cos(a) * dir, -sin(a) * dir)
+        }
+        if !lowQuality {
+            for d in drones {
+                let a = d.phase + (reduceMotion ? 0 : Float(phase) * d.speed)
+                let y = d.center.y + Float(sin(phase * 1.3 + Double(d.phase))) * 0.6
+                d.node.position = SCNVector3(d.center.x + cos(a) * d.r, y, d.center.z + sin(a) * d.r)
+                d.node.eulerAngles.y = -a
+            }
+        }
+        let on = reduceMotion || Int(phase * 1.2) % 2 == 0  // aircraft lights blink about once a second
+        for b in blinks { b.isHidden = !on }
+        for d in drones { d.node.childNode(withName: "blink", recursively: false)?.isHidden = !on }
+        if !reduceMotion { globe?.eulerAngles.y = Float(phase * 0.25) }
     }
 
     // MARK: materials and geometry
@@ -952,8 +1103,9 @@ final class CityScene {
     static func lit(_ c: UInt32, roughMetal: Bool = false) -> SCNMaterial {
         let m = SCNMaterial()
         m.diffuse.contents = UIColor(hex: c)
-        m.lightingModel = roughMetal ? .blinn : .lambert
-        if roughMetal { m.specular.contents = UIColor(white: 0.35, alpha: 1); m.shininess = 0.45 }
+        m.lightingModel = .physicallyBased
+        m.roughness.contents = NSNumber(value: roughMetal ? 0.35 : 0.8)
+        m.metalness.contents = NSNumber(value: roughMetal ? 0.6 : 0)
         return m
     }
 
@@ -990,12 +1142,14 @@ final class CityScene {
         }()
         let m = SCNMaterial()
         m.diffuse.contents = img
-        m.diffuse.magnificationFilter = .nearest
-        m.diffuse.minificationFilter = .nearest
+        m.diffuse.magnificationFilter = .linear
+        m.diffuse.mipFilter = .linear
         m.diffuse.wrapS = .repeat
         m.diffuse.wrapT = .repeat
         m.diffuse.contentsTransform = SCNMatrix4MakeScale(6, 6, 1)
-        m.lightingModel = .lambert
+        m.lightingModel = .physicallyBased
+        m.roughness.contents = NSNumber(value: 0.35)
+        m.metalness.contents = NSNumber(value: 0.2)
         return m
     }
 
@@ -1064,7 +1218,7 @@ final class CityScene {
 
     /// The website's dusk sky dome as a latitude/longitude image: navy overhead, violet, a warm band at the horizon,
     /// dark below, and a scatter of stars.
-    static let sky: UIImage = skyImage()
+    static let sky: UIImage = CityArt.sky()
 
     static func skyImage() -> UIImage {
         let w = 1024, h = 512

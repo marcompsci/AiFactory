@@ -53,9 +53,10 @@ struct CitySceneView: UIViewRepresentable {
         v.scene = city.scene
         v.pointOfView = city.cameraNode
         v.backgroundColor = UIColor(hex: 0x121A44)
-        v.antialiasingMode = .none
-        v.contentScaleFactor = UserDefaults.standard.bool(forKey: "citySharp") ? UIScreen.main.scale : 0.5
-        v.layer.magnificationFilter = .nearest
+        // V6.53: full resolution with smoothed edges (the light mode renders a little softer to stay cool)
+        v.antialiasingMode = city.lowQuality ? .none : .multisampling4X
+        v.contentScaleFactor = city.lowQuality ? min(2, UIScreen.main.scale) : UIScreen.main.scale
+        v.isJitteringEnabled = false
         v.preferredFramesPerSecond = 30
         v.rendersContinuously = true
         v.isPlaying = true
