@@ -244,7 +244,9 @@ def _done_text(kind: str, r: dict) -> str:
     if kind == "add_task":
         return f"Added \"{r.get('title', 'it')}\" to your list. Say \"do the … task\" when you want the team on it."
     if kind == "do_task":
-        return f"The team is on \"{r.get('title', 'your task')}\". The result comes back to your list for review."
+        from services.core.config import get_settings
+        sim = "" if get_settings().model_available else " No AI model is connected, so the result will be a labelled template."
+        return f"The team is on \"{r.get('title', 'your task')}\". The result comes back to your list for review.{sim}"
     if kind == "cancel_mission":
         return "Done: the mission is cancelled. Anything already running stops at its next step."
     sim = " It's running in simulation because no AI model is connected, so treat its output as a rehearsal." if r.get("execution_mode") == "simulation" else ""

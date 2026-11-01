@@ -147,11 +147,18 @@ def test_compare_a_schedule_run_with_the_previous_one(client):
     s = _sched(client)
     a = client.post(f"/api/schedules/{s['id']}/run-now").json()["mission_id"]
     _finished(client, a)
-    with transaction() as conn:
-        conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == s["id"]).values(last_run_at="2020-01-01T00:00:00+00:00"))
-    b = client.post(f"/api/schedules/{s['id']}/run-now").json()["mission_id"]
+    b = a
+    for _ in range(3):  # past the double-tap window (another thread may touch the schedule in between: try again)
+        with transaction() as conn:
+            conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == s["id"]).values(last_run_at="2020-01-01T00:00:00+00:00"))
+        r = client.post(f"/api/schedules/{s['id']}/run-now").json()
+        if not r.get("repeat") and r["mission_id"] != a:
+            b = r["mission_id"]
+            break
+    assert b != a
     _finished(client, b)
     c = client.get(f"/api/missions/{b}/compare").json()
+    assert c["before"] is not None, c
     assert c["before"]["id"] == a and c["how"] == "the schedule's previous run"
 
 

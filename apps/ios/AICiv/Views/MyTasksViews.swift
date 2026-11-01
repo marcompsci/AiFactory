@@ -303,6 +303,7 @@ struct TaskDetailView: View {
                             }
                             Toggle("Due date", isOn: Binding(get: { hasDue }, set: { on in
                                 hasDue = on
+                                if on && due <= Date() { due = Self.nextFivePM() }  // a fresh due date starts ahead, never already overdue
                                 Task { await edit(on ? ["due_at": ISO8601DateFormatter().string(from: due)] : ["clear_due": true]) }
                             }))
                             if hasDue {
@@ -383,6 +384,12 @@ struct TaskDetailView: View {
         } footer: {
             Text("Do it starts one run under your charter, with the task's budget or the default. Nothing is sent, bought or published without you.")
         }
+    }
+
+    static func nextFivePM(after now: Date = Date()) -> Date {
+        let cal = Calendar.current
+        let today = cal.date(bySettingHour: 17, minute: 0, second: 0, of: now) ?? now.addingTimeInterval(3600)
+        return today > now ? today : cal.date(byAdding: .day, value: 1, to: today) ?? today
     }
 
     private func markdown(_ s: String) -> AttributedString {

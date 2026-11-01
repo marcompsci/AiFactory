@@ -11,8 +11,12 @@ from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-_WD = r"(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?|wednesday|thursday|tuesday|saturday"
+FULL_WD = r"monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+ABBR_WD = r"mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun"  # only after "by", "on"…: "buy sun screen" isn't a date
+_WD = rf"{FULL_WD}|{ABBR_WD}"
 MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+MONTH_RX = (r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?"
+            r"|nov(?:ember)?|dec(?:ember)?")
 DEFAULT_HOUR = 17  # a date without a time means "by the end of the working day"
 
 KIND_WORDS = {
@@ -32,6 +36,35 @@ def _zone(tz: str | None) -> ZoneInfo:
 def _weekday_index(word: str) -> int:
     w = word[:3]
     return [d[:3] for d in WEEKDAYS].index(w)
+
+
+def _month_day(cut, low: str, now: datetime):
+    """"nov 14", "November 14th", "11/14", optionally after a weekday ("fri nov 14"). A date that doesn't exist
+    ("feb 30") is left in the text, so you see it wasn't understood."""
+    pat = (rf"\s(?:(?:by|on|for|due) )?(?:(?:{_WD}),? )?(?P<mon>{MONTH_RX})\.? (?P<day>\d{{1,2}})(?:st|nd|rd|th)?\b(?=\s)",
+           rf"\s(?:(?:by|on|for|due) )?(?:(?:{_WD}),? )?(?P<mon>1[0-2]|0?[1-9])/(?P<day>\d{{1,2}})(?=\s)")
+    for rx in pat:
+        m = re.search(rx, low)
+        if not m:
+            continue
+        mon = m.group("mon")
+        month = int(mon) if mon.isdigit() else MONTHS.index(mon[:3]) + 1
+        try:
+            d = now.date().replace(month=month, day=int(m.group("day")))
+        except ValueError:
+            for year in (now.year + 1, now.year + 2, now.year + 3, now.year + 4):  # feb 29 in a later leap year
+                try:
+                    d = now.date().replace(year=year, month=month, day=int(m.group("day")))
+                    break
+                except ValueError:
+                    d = None
+            if d is None:
+                return None
+        if d < now.date():
+            d = d.replace(year=d.year + 1) if not (d.month == 2 and d.day == 29) else d
+        cut(re.escape(m.group(0)))
+        return d
+    return None
 
 
 def kind_of(text: str) -> str:
@@ -81,60 +114,58 @@ def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dic
 
     # a time of day: "at 5pm", "by 9:30am", "at 17:30", "tonight", "this morning"
     at: time | None = None
-    m = cut(r"\s(?:at|by|@)\s?(\d{1,2})(?::(\d{2}))?\s?(am|pm)(?=\s)") or cut(r"\s(\d{1,2})(?::(\d{2}))?\s?(am|pm)(?=\s)")
+    m = (cut(r"\s(?:at|by|@)\s?(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?(am|pm)(?=\s)")
+         or cut(r"\s(1[0-2]|0?[1-9])(?::([0-5]\d))?\s?(am|pm)(?=\s)"))
     if m:
-        h = int(m.group(1)) % 12 + (12 if m.group(3) == "pm" else 0)
-        if 0 <= h <= 23 and int(m.group(2) or 0) < 60:
-            at = time(h, int(m.group(2) or 0))
+        at = time(int(m.group(1)) % 12 + (12 if m.group(3) == "pm" else 0), int(m.group(2) or 0))
     else:
         m = cut(r"\s(?:at|by)\s([01]?\d|2[0-3]):([0-5]\d)(?=\s)")
         if m:
             at = time(int(m.group(1)), int(m.group(2)))
     day = None
+    soft = False  # a day said without a time ("today", "every day"): if 5pm has passed, it means the end of today
     if cut(r"\s(?:by |for )?tonight(?=\s)"):
         day, at = now.date(), at or time(20, 0)
-    elif cut(r"\s(?:by |for )?this (morning)(?=\s)"):
+        soft = True
+    elif cut(r"\s(?:by |for )?this morning(?=\s)"):
         day, at = now.date(), at or time(11, 0)
+        soft = True
     elif cut(r"\s(?:by |for |due )?(?:end of (?:the )?day|eod|today)(?=\s)"):
-        day = now.date()
+        day, soft = now.date(), at is None
     elif cut(r"\s(?:by |for |due )?tomorrow(?=\s)"):
         day = now.date() + timedelta(days=1)
-    elif cut(r"\s(?:by |for |due )?(?:next week|end of (?:the )?week|eow)(?=\s)"):
-        ahead = (4 - now.weekday()) % 7 if "end" in low or "eow" in low else (7 - now.weekday()) % 7 or 7
-        day = now.date() + timedelta(days=ahead)
-    else:
-        m = cut(r"\s(?:by |on |for |due |this |next )?in (\d{1,2}) (day|days|week|weeks)(?=\s)")
-        if m:
-            n = int(m.group(1)) * (7 if m.group(2).startswith("week") else 1)
-            day = now.date() + timedelta(days=n)
+    elif m := cut(r"\s(?:by |for |due )?(next week|end of (?:the )?week|eow)(?=\s)"):
+        if m.group(1) == "next week":
+            ahead = (7 - now.weekday()) % 7 or 7  # next Monday
         else:
-            m = cut(rf"\s(?:by |on |for |due |this |next )?({_WD})(?=\s)")
+            ahead = (4 - now.weekday()) % 7  # this Friday (today, on a Friday)
+        day, soft = now.date() + timedelta(days=ahead), at is None
+    elif m := cut(r"\s(?:by |on |for |due |this |next )?in (\d{1,2}) (day|days|week|weeks)(?=\s)"):
+        day = now.date() + timedelta(days=int(m.group(1)) * (7 if m.group(2).startswith("week") else 1))
+    else:
+        day = _month_day(cut, low, now)
+        if day is None:
+            m = cut(rf"\s(?:(?:by|on|for|due|this|next) )?({FULL_WD})(?=\s)") or cut(rf"\s(?:by|on|for|due|this|next) ({ABBR_WD})\.?(?=\s)")
             if m:
                 ahead = (_weekday_index(m.group(1)) - now.weekday()) % 7
-                if ahead == 0 and (at is None or at <= now.time()):
-                    ahead = 7
+                if ahead == 0 and (at or time(DEFAULT_HOUR, 0)) <= now.time():
+                    ahead = 7  # "friday" said on a Friday evening means next Friday
                 day = now.date() + timedelta(days=ahead)
-            else:
-                m = (cut(r"\s(?:by |on |for |due )?(" + "|".join(MONTHS) + r")[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)?(?=\s)")
-                     or cut(r"\s(?:by |on |for |due )?(\d{1,2})/(\d{1,2})(?=\s)"))
-                if m:
-                    try:
-                        month = MONTHS.index(m.group(1)[:3]) + 1 if not m.group(1).isdigit() else int(m.group(1))
-                        d = now.date().replace(month=month, day=int(m.group(2)))
-                        if d < now.date():
-                            d = d.replace(year=d.year + 1)
-                        day = d
-                    except ValueError:
-                        day = None
     if day is None and weekly_day is not None:
         ahead = (weekly_day - now.weekday()) % 7
         day = now.date() + timedelta(days=ahead)
+        if ahead == 0 and (at or time(DEFAULT_HOUR, 0)) <= now.time():
+            day += timedelta(days=7)
     if day is None and at is not None:  # only a time: today if it's still ahead, otherwise tomorrow
         day = now.date() if at > now.time() else now.date() + timedelta(days=1)
     if day is None and out["repeat"] in ("daily", "weekdays"):
         day = now.date()
+        if (at or time(DEFAULT_HOUR, 0)) <= now.time():
+            day += timedelta(days=1)  # every day, starting with the next one still ahead
     if day is not None:
         when = datetime.combine(day, at or time(DEFAULT_HOUR, 0), tzinfo=zone)
+        if soft and when <= now:
+            when = datetime.combine(now.date(), time(23, 59), tzinfo=zone)  # "today" after 5pm: by the end of today
         if out["repeat"] == "weekdays":
             while when.weekday() >= 5:
                 when += timedelta(days=1)

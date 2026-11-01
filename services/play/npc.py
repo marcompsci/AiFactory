@@ -445,8 +445,11 @@ def _task_do(conn: Connection, org: str, user: str, agent, t: str) -> Reply | No
     prop = _propose(conn, org=org, user=user, agent=agent, kind="do_task", params={"task_id": hit["id"]},
                     summary=f"Hand \"{hit['title']}\" to the agents.")
     budget = f" with its ${hit['budget_usd']:.2f} budget" if hit.get("budget_usd") else " with the default mission budget"
+    from services.core.config import get_settings
+    sim = "" if get_settings().model_available else (" No AI model is connected, so they'll bring back a labelled template "
+                                                     "showing the shape of the result, not finished work.")
     return Reply(f"I can hand \"{hit['title']}\" to the agents{budget}. They plan it, do it and bring you the result to review; "
-                 "nothing is sent or bought. Confirm to start.", proposal=prop)
+                 f"nothing is sent or bought.{sim} Confirm to start.", proposal=prop)
 
 
 def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str = "UTC") -> Reply:

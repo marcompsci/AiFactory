@@ -13,6 +13,8 @@ create table my_tasks (
   repository_id uuid references repositories(id) on delete set null,
   mission_id uuid references missions(id) on delete set null,
   runs integer not null default 0,
+  starting_at timestamptz,
+  repeat_of uuid unique references my_tasks(id) on delete set null,
   created_by uuid not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

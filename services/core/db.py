@@ -1326,6 +1326,8 @@ my_tasks = Table(
     Column("repository_id", String(36)),
     Column("mission_id", String(36)),                             # the latest run working on it
     Column("runs", Integer, nullable=False, default=0),
+    Column("starting_at", String),                                # set while Do it is starting a run (the claim)
+    Column("repeat_of", String(36)),                              # the finished task this repeat was queued from
     Column("created_by", String(36), nullable=False),
     Column("created_at", String, nullable=False, default=utcnow),
     Column("updated_at", String, nullable=False, default=utcnow),

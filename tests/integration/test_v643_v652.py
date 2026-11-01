@@ -150,3 +150,63 @@ def test_the_weekly_report_counts_finished_tasks(client):
     client.post(f"/api/my-tasks/{t['id']}/done")
     r = client.get("/api/insights/weekly").json()
     assert r["tasks_done"] == 1 and "you finished 1 task from your list" in r["headline"]
+
+
+# ---------------------------------------------------------------- review fixes
+
+def test_capture_edge_cases():
+    mon9 = datetime(2026, 11, 2, 17, 0, tzinfo=timezone.utc)   # Monday 9am in LA
+    eve = datetime(2026, 11, 3, 2, 30, tzinfo=timezone.utc)    # Monday 6:30pm in LA
+    fri9 = datetime(2026, 11, 6, 17, 0, tzinfo=timezone.utc)   # Friday 9am in LA
+    assert parse("wrap up eow", LA, mon9)["due_label"] == "Fri 5:00 PM"
+    assert parse("send invoice next week", LA, mon9)["due_at"] == "2026-11-10T01:00:00+00:00"  # next Monday, not Friday
+    assert parse("call mom today", LA, eve)["due_label"] == "today 11:59 PM"  # never due in the past
+    assert parse("gym every day", LA, eve)["due_label"] == "tomorrow 5:00 PM"
+    assert parse("pay rent by friday", LA, fri9)["due_label"] == "today 5:00 PM"
+    for words in ("decide 2 options for dinner", "buy sun screen", "review the market 5 picks"):
+        t = parse(words, LA, mon9)
+        assert t["due_at"] is None and t["title"].lower() == words, words
+    assert parse("renew on feb 30", LA, mon9)["title"] == "Renew on feb 30"  # not a date: left as typed
+    t = parse("fri nov 14 dentist", LA, mon9)
+    assert t["title"] == "Dentist" and t["due_at"] == "2026-11-15T01:00:00+00:00"
+    assert parse("call at 13pm", LA, mon9)["due_at"] is None
+
+
+def test_finishing_twice_queues_one_repeat_and_drop_stops_the_run(client):
+    t = client.post("/api/my-tasks", json={"text": "stretch every day", "tz": LA}).json()
+    client.post(f"/api/my-tasks/{t['id']}/done")
+    client.post(f"/api/my-tasks/{t['id']}/reopen")
+    client.post(f"/api/my-tasks/{t['id']}/done")
+    opens = [x for x in client.get("/api/my-tasks").json()["tasks"] if x["stage"] == "open"]
+    assert len(opens) == 1
+    w = client.post("/api/my-tasks", json={"title": "Research note-taking apps"}).json()
+    run = client.post(f"/api/my-tasks/{w['id']}/do").json()["mission_id"]
+    client.post(f"/api/my-tasks/{w['id']}/drop")
+    assert _finished(client, run)["status"] in ("CANCELLED", "COMPLETED")
+    assert client.get("/api/my-tasks/urn:uuid:" + w["id"]).status_code == 404
+
+
+def test_a_second_press_while_starting_is_refused(client, monkeypatch):
+    from services.management import mytasks
+    t = client.post("/api/my-tasks", json={"title": "Write the launch post"}).json()
+    seen = {}
+    real = mytasks._start
+
+    def slow(p, r, note):  # press again while the first press is still starting
+        seen["second"] = client.post(f"/api/my-tasks/{t['id']}/do").status_code
+        return real(p, r, note)
+
+    monkeypatch.setattr(mytasks, "_start", slow)
+    assert client.post(f"/api/my-tasks/{t['id']}/do").status_code == 200
+    assert seen["second"] == 409
+    with db.get_engine().connect() as conn:
+        n = conn.execute(select(db.missions.c.id).where(db.missions.c.kind == "personal_task")).fetchall()
+    assert len(n) == 1
+
+
+def test_the_default_budget_follows_the_charter_cap(client):
+    r = client.put("/api/charter", json={"mission_budget_cap_usd": 0.5, "note": "tight"})
+    assert r.status_code == 200, r.text
+    t = client.post("/api/my-tasks", json={"title": "Plan the week"}).json()
+    s = client.post(f"/api/my-tasks/{t['id']}/do").json()
+    assert client.get(f"/api/missions/{s['mission_id']}").json()["mission"]["budget_usd"] == 0.5

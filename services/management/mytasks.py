@@ -30,6 +30,7 @@ KINDS = ("code", "research", "write", "personal")
 PRIORITIES = ("urgent", "normal", "low")
 REPEATS = ("none", "daily", "weekdays", "weekly")
 MAX_OPEN = 500
+STARTING_TIMEOUT = __import__("datetime").timedelta(minutes=2)
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
 PRIORITY_RANK = {"urgent": 0, "normal": 1, "low": 2}
 
@@ -44,11 +45,18 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _row(conn: Connection, org: str, tid: str):
+def _canonical(tid: str) -> bool:
+    """Only the plain lower-case form of an id: other spellings uuid.UUID accepts ("urn:uuid:…", "{…}") are spelled
+    differently in the table, and Postgres would refuse some of them with an error."""
     try:
-        uuid.UUID(str(tid))
-    except ValueError as exc:
-        raise TaskError("task not found", 404) from exc
+        return str(uuid.UUID(str(tid))) == str(tid)
+    except ValueError:
+        return False
+
+
+def _row(conn: Connection, org: str, tid: str):
+    if not _canonical(tid):
+        raise TaskError("task not found", 404)
     r = conn.execute(select(db.my_tasks).where(db.my_tasks.c.id == tid, db.my_tasks.c.organization_id == org)).first()
     if r is None:
         raise TaskError("task not found", 404)
@@ -96,10 +104,8 @@ def _clean(fields: dict) -> dict:
 def _check_repo(conn: Connection, org: str, repo: str | None) -> None:
     if not repo:
         return
-    try:
-        uuid.UUID(str(repo))
-    except ValueError as exc:
-        raise TaskError("that repository isn't one of yours", 404) from exc
+    if not _canonical(repo):
+        raise TaskError("that repository isn't one of yours", 404)
     ok = conn.execute(select(db.repositories.c.id).where(db.repositories.c.id == repo, db.repositories.c.organization_id == org)).first()
     if ok is None:
         raise TaskError("that repository isn't one of yours", 404)
@@ -233,28 +239,52 @@ def complete(p: Principal, tid: str, tz: str | None = "UTC") -> dict:
     """Mark a task done (the owner's call, never the agents'). A repeating task queues its next occurrence."""
     T = db.my_tasks
     nxt_id = None
+    with db.get_engine().connect() as conn:
+        _stop_run(p, _row(conn, p.organization_id, tid))
     with transaction() as conn:
         r = _row(conn, p.organization_id, tid)
-        if r.status == "DONE":
-            return {"task": get(conn, p.organization_id, tid), "next": None}
         now = _now().isoformat()
-        conn.execute(update(T).where(T.c.id == tid).values(status="DONE", done_at=now, updated_at=now))
-        if r.repeat != "none":
+        changed = conn.execute(update(T).where(T.c.id == tid, T.c.status != "DONE").values(status="DONE", done_at=now, updated_at=now)).rowcount
+        if not changed:
+            return {"task": get(conn, p.organization_id, tid), "next": None}
+        already = conn.execute(select(T.c.id).where(T.c.repeat_of == tid)).first()  # done, reopened, done again: one repeat
+        if r.repeat != "none" and already is None:
             nxt_id = db.new_id()
             conn.execute(insert(T).values(id=nxt_id, organization_id=r.organization_id, title=r.title, notes=r.notes, kind=r.kind,
                                           priority=r.priority, status="OPEN", due_at=capture.next_due(r.due_at, r.repeat, tz),
                                           repeat=r.repeat, budget_usd=r.budget_usd, repository_id=r.repository_id, runs=0,
-                                          created_by=p.user_id, created_at=now, updated_at=now))
+                                          repeat_of=tid, created_by=p.user_id, created_at=now, updated_at=now))
         emit(conn, "my_task.completed", org_id=p.organization_id,
              payload={"task_id": tid, "title": r.title, "next_task_id": nxt_id, "had_run": bool(r.mission_id)})
     with db.get_engine().connect() as conn:
         return {"task": get(conn, p.organization_id, tid), "next": get(conn, p.organization_id, nxt_id) if nxt_id else None}
 
 
+def _stop_run(p: Principal, r) -> None:
+    """A task you finish, drop or delete takes its run with it: a run still going is cancelled, so nothing keeps
+    working (or spending) on something you've set aside."""
+    if not r.mission_id:
+        return
+    with db.get_engine().connect() as conn:
+        st = conn.execute(select(db.missions.c.status).where(db.missions.c.id == r.mission_id)).scalar()
+    if st and st not in TERMINAL:
+        from fastapi import HTTPException
+
+        from services.api import main
+        try:
+            main.cancel(r.mission_id, p)
+        except HTTPException as exc:
+            if exc.status_code != 409:  # 409: it finished on its own in the meantime
+                raise
+
+
 def set_status(p: Principal, tid: str, status: str) -> dict:
     """Reopen (OPEN) or drop (DROPPED) a task."""
     if status not in ("OPEN", "DROPPED"):
         raise TaskError("a task can be reopened or dropped")
+    if status == "DROPPED":
+        with db.get_engine().connect() as conn:
+            _stop_run(p, _row(conn, p.organization_id, tid))
     with transaction() as conn:
         r = _row(conn, p.organization_id, tid)
         conn.execute(update(db.my_tasks).where(db.my_tasks.c.id == tid).values(status=status, done_at=None, updated_at=_now().isoformat()))
@@ -264,6 +294,8 @@ def set_status(p: Principal, tid: str, status: str) -> dict:
 
 
 def remove(p: Principal, tid: str) -> None:
+    with db.get_engine().connect() as conn:
+        _stop_run(p, _row(conn, p.organization_id, tid))
     with transaction() as conn:
         r = _row(conn, p.organization_id, tid)
         conn.execute(delete(db.my_tasks).where(db.my_tasks.c.id == tid))
@@ -276,8 +308,11 @@ def do_it(p: Principal, tid: str, redo_note: str | None = None) -> dict:
     """Hand the task to the agents as `p`. Claimed first (a conditional update on the run count), so two presses can't
     both start one; a press while a run is still going gets 409."""
     from fastapi import HTTPException
+    from sqlalchemy import or_
     T = db.my_tasks
     note = " ".join((redo_note or "").split())[:1000] or None
+    now = _now()
+    stale = (now - STARTING_TIMEOUT).isoformat()  # a claim left by a crash mid-start lapses after this
     with transaction() as conn:
         r = _row(conn, p.organization_id, tid)
         if r.status != "OPEN":
@@ -286,19 +321,21 @@ def do_it(p: Principal, tid: str, redo_note: str | None = None) -> dict:
             st = conn.execute(select(db.missions.c.status).where(db.missions.c.id == r.mission_id)).scalar()
             if st and st not in TERMINAL:
                 raise TaskError("the agents are already working on it", 409)
-        claimed = conn.execute(update(T).where(T.c.id == tid, T.c.runs == r.runs).values(runs=r.runs + 1, updated_at=_now().isoformat())).rowcount
+        claimed = conn.execute(update(T).where(T.c.id == tid, T.c.status == "OPEN", T.c.runs == r.runs,
+                                               or_(T.c.starting_at.is_(None), T.c.starting_at < stale))
+                               .values(runs=r.runs + 1, starting_at=now.isoformat(), updated_at=now.isoformat())).rowcount
         if not claimed:
             raise TaskError("it's starting right now", 409)
     try:
         mid = _start(p, r, note)
     except BaseException as exc:
         with transaction() as conn:  # give the claim back, so it can be tried again straight away
-            conn.execute(update(T).where(T.c.id == tid).values(runs=r.runs))
+            conn.execute(update(T).where(T.c.id == tid).values(runs=r.runs, starting_at=None))
         if isinstance(exc, (HTTPException, TaskError, KeyboardInterrupt, SystemExit)):
             raise
         raise TaskError(f"couldn't start it: {exc}"[:300]) from exc
     with transaction() as conn:
-        conn.execute(update(T).where(T.c.id == tid).values(mission_id=mid, updated_at=_now().isoformat()))
+        conn.execute(update(T).where(T.c.id == tid).values(mission_id=mid, starting_at=None, updated_at=_now().isoformat()))
         emit(conn, "my_task.started", mission_id=mid, org_id=p.organization_id,
              payload={"task_id": tid, "title": r.title, "mission_id": mid, "redo": bool(note)})
     with db.get_engine().connect() as conn:
@@ -319,20 +356,26 @@ def _start(p: Principal, r, note: str | None) -> str:
         spec = {"kind": "fix_failing_test", "prompt": prompt[:4000], "title": r.title[:120], "repository_id": r.repository_id,
                 "budget_usd": float(r.budget_usd) if r.budget_usd else None}
         return links.start(spec, p, priority=r.priority, key=f"task:{r.id}:{r.runs + 1}")
+    from services.core.config import get_settings
     task_kind = r.kind if r.kind in ("research", "write") else "personal"
     with transaction() as conn:
         if conn.execute(select(db.organizations.c.emergency_stopped).where(db.organizations.c.id == p.organization_id)).scalar():
             raise HTTPException(409, "emergency stop is engaged")
+        budget = float(r.budget_usd) if r.budget_usd is not None else get_settings().default_mission_budget_usd
         if r.budget_usd is not None:
             try:
-                charter.check_mission_budget(conn, p.organization_id, float(r.budget_usd))
+                charter.check_mission_budget(conn, p.organization_id, budget)
             except charter.CharterError as exc:
                 raise TaskError(str(exc)) from exc
+        else:  # the default budget is held to the charter's cap, as for any mission
+            cap = charter.rules(conn, p.organization_id).get("mission_budget_cap_usd")
+            if cap is not None and budget > cap:
+                budget = float(cap)
         mid = create_mission(conn, org_id=p.organization_id, kind="personal_task", title=r.title,
                              prompt=f"Do the owner's task and write up the result for review: {r.title}",
                              params={"task_id": r.id, "task_kind": task_kind, "title": r.title, "notes": r.notes or "",
                                      "redo_note": note or ""},
-                             opportunity_id=None, created_by=p.user_id, budget_usd=float(r.budget_usd) if r.budget_usd else None)
+                             opportunity_id=None, created_by=p.user_id, budget_usd=budget)
         if r.priority != "normal":
             conn.execute(insert(db.mission_priorities).values(mission_id=mid, organization_id=p.organization_id, priority=r.priority,
                                                               set_by=p.user_id))

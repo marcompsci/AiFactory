@@ -39,7 +39,7 @@ export function MyTasksPanel() {
   const [open, setOpen] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
   const list = useQuery({ queryKey: ["my-tasks"], queryFn: myTasks.list, enabled: status === "live", refetchInterval: 5_000 });
-  const refresh = () => qc.invalidateQueries({ queryKey: ["my-tasks"] });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); qc.invalidateQueries({ queryKey: ["my-task"] }); };
   const add = useMutation({ mutationFn: () => myTasks.add(text), onSuccess: () => { setText(""); setPreview(null); refresh(); } });
   const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: refresh });
 
@@ -78,7 +78,7 @@ export function MyTasksPanel() {
             placeholder="Add a task: draft the Echo blurb by Friday $1"
             className="min-w-0 flex-1 rounded-lg border border-line bg-ground/60 px-3 py-2 text-sm text-ink placeholder:text-ink-3"
           />
-          <Button variant="primary" disabled={add.isPending || text.trim().length < 2}>{add.isPending ? "Adding" : "Add"}</Button>
+          <Button type="submit" variant="primary" disabled={add.isPending || text.trim().length < 2}>{add.isPending ? "Adding" : "Add"}</Button>
         </div>
         {preview && text ? (
           <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-2" aria-live="polite">

@@ -268,5 +268,6 @@ def test_an_interrupted_follow_on_start_goes_back_in_line(client):
         conn.execute(update(db.mission_links).where(db.mission_links.c.id == link["id"])
                      .values(status="STARTING", updated_at="2020-01-01T00:00:00+00:00"))
     _finished(client, first)
-    links.tick()
+    links.tick()  # (the background follow-on job may be mid-start of the same link: wait for whichever finishes it)
+    wait_for(lambda: links.get(link["organization_id"], link["id"])["status"] == "STARTED" or links.tick() and False)
     assert links.get(link["organization_id"], link["id"])["status"] == "STARTED"
