@@ -42,6 +42,9 @@ HANDLERS.update(LAB_HANDLERS)
 from services.factories.handlers import FACTORY_HANDLERS  # noqa: E402
 
 HANDLERS.update(FACTORY_HANDLERS)
+from .task_handlers import TASK_HANDLERS  # noqa: E402
+
+HANDLERS.update(TASK_HANDLERS)
 from .plan import PlanError, plan_for, validate_prompt
 
 log = logging.getLogger("aiciv.runner")

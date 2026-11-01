@@ -1169,7 +1169,7 @@ play_proposals = Table(            # an actionable request turned into a structu
     Column("organization_id", String(36), nullable=False),
     Column("user_id", String(36), nullable=False),
     Column("agent_id", String(36), nullable=False),
-    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission | create_schedule | rerun_mission | start_saved
+    Column("kind", String, nullable=False),                 # create_mission | start_research | cancel_mission | create_schedule | rerun_mission | start_saved | add_task | do_task
     Column("params", JSON, nullable=False, default=dict),
     Column("summary", Text, nullable=False),
     Column("status", String, nullable=False, default="PENDING"),  # PENDING | CONFIRMED | DECLINED | EXPIRED | FAILED
@@ -1308,6 +1308,28 @@ saved_requests = Table(
     Column("last_mission_id", String(36)),
     Column("created_at", String, nullable=False, default=utcnow),
     UniqueConstraint("organization_id", "name_key"),
+)
+
+# ---------------------------------------------------------------- V6.43 the owner's own task list
+my_tasks = Table(
+    "my_tasks", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("title", String, nullable=False),
+    Column("notes", String, nullable=False, default=""),
+    Column("kind", String, nullable=False, default="personal"),   # code | research | write | personal
+    Column("priority", String, nullable=False, default="normal"), # urgent | normal | low
+    Column("status", String, nullable=False, default="OPEN"),     # OPEN | DONE | DROPPED (the run's state is read from its mission)
+    Column("due_at", String),                                     # ISO time, UTC
+    Column("repeat", String, nullable=False, default="none"),     # none | daily | weekdays | weekly
+    Column("budget_usd", Float),
+    Column("repository_id", String(36)),
+    Column("mission_id", String(36)),                             # the latest run working on it
+    Column("runs", Integer, nullable=False, default=0),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("updated_at", String, nullable=False, default=utcnow),
+    Column("done_at", String),
 )
 
 schedule_runs = Table(             # which mission each schedule run started (for its cost and for comparing runs)

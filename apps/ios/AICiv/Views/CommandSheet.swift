@@ -136,7 +136,7 @@ struct TasksTab: View {
                 .pixelPanel(Theme.warn.opacity(0.5))
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    PixelHeader(text: "New mission")
+                    PixelHeader(text: "New mission (code)")
                     TextField("Tell the city what to do", text: $prompt, axis: .vertical)
                         .lineLimit(3...6).font(.subheadline).focused($editing)
                         .padding(8).background(Color.black.opacity(0.25), in: RoundedRectangle(cornerRadius: 6))

@@ -6,6 +6,7 @@ import { api, type Json } from "@/lib/api";
 import { ago, human, STATUS_COLOR, usd } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { ArtifactViewer } from "./Artifacts";
+import { MyTasksPanel } from "./MyTasks";
 import { Button, Empty, ErrorNote, Pill, Section, Skeleton } from "./ui";
 
 const EXAMPLE = "Inspect the sample project, find a failing test, implement a fix, rerun the tests, and prepare a reviewable code change.";
@@ -32,6 +33,7 @@ export function MissionConsole() {
   const missions: Json[] = snap.data?.missions ?? [];
   return (
     <div className="space-y-5">
+      <MyTasksPanel />
       <form
         className="space-y-2"
         onSubmit={(e) => {

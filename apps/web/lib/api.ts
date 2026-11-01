@@ -249,3 +249,20 @@ export const play = {
   confirm: (id: string) => call<Json>(`/api/play/proposals/${id}/confirm`, post()),
   decline: (id: string) => call<Json>(`/api/play/proposals/${id}/decline`, post()),
 };
+
+/** V6.43–V6.49 your task list: quick capture, "do it for me", review, today. */
+const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+export const myTasks = {
+  list: () => call<{ tasks: Json[] }>("/api/my-tasks"),
+  get: (id: string) => call<Json>(`/api/my-tasks/${id}`),
+  today: () => call<Json>(`/api/my-tasks/today?tz=${encodeURIComponent(tz())}`),
+  preview: (text: string) => call<Json>(`/api/my-tasks/parse?${new URLSearchParams({ text, tz: tz() })}`),
+  add: (text: string) => call<Json>("/api/my-tasks", post({ text, tz: tz() })),
+  edit: (id: string, fields: Json) => call<Json>(`/api/my-tasks/${id}`, { method: "PATCH", body: JSON.stringify(fields) }),
+  doIt: (id: string) => call<Json>(`/api/my-tasks/${id}/do`, post()),
+  redo: (id: string, note: string) => call<Json>(`/api/my-tasks/${id}/redo`, post({ note })),
+  done: (id: string) => call<Json>(`/api/my-tasks/${id}/done`, post({ tz: tz() })),
+  reopen: (id: string) => call<Json>(`/api/my-tasks/${id}/reopen`, post()),
+  drop: (id: string) => call<Json>(`/api/my-tasks/${id}/drop`, post()),
+  remove: (id: string) => call<Json>(`/api/my-tasks/${id}`, { method: "DELETE" }),
+};

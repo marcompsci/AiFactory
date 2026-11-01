@@ -190,13 +190,29 @@ FACTORY_SYNC_GRAPH = [
              ["read_plan_usage"], expected_outputs={"count": "int"}),
 ]
 
+# V6.45 "do it for me": the General Manager plans the steps, then the right agent does the work and writes it up for review.
+TASK_PLAN = TaskSpec("task_plan", "general_manager", "Plan the steps for the owner's task", "nexus-spire", "nexus-command",
+                     ["search_knowledge_base", "create_artifact"], expected_outputs={"steps": "list[str]"})
+TASK_DOERS = {  # kind of task → (agent, district, desk, tools)
+    "research": ("researcher", "data-observatory", "observatory-lens", ["search_knowledge_base", "create_artifact"]),
+    "write": ("designer", "vision-quarter", "vision-studio", ["search_knowledge_base", "read_knowledge_document", "create_artifact"]),
+    "personal": ("general_manager", "nexus-spire", "nexus-command", ["search_knowledge_base", "read_knowledge_document", "create_artifact"]),
+}
+
+
+def personal_task_graph(task_kind: str) -> list[TaskSpec]:
+    agent, district, desk, tools = TASK_DOERS.get(task_kind, TASK_DOERS["personal"])
+    return [TASK_PLAN, TaskSpec("task_do", agent, "Do the task and write up the result for review", district, desk, tools,
+                                depends_on=["task_plan"], expected_outputs={"artifact_id": "str"}, timeout_seconds=600)]
+
+
 RUN_TESTS_GRAPH: list[TaskSpec] = [  # V6.15: Sentry runs the suite and reports; nothing is changed
     TaskSpec("reproduce", "qa", "Run the test suite", "sentinel-citadel", "citadel-testbay", ["run_tests"],
              expected_outputs={"failing_tests": "list[str]", "output": "str"}, validation={"tests_executed": True}),
 ]
 
 KINDS = ("fix_failing_test", "run_tests", "market_research", "build_prototype", "qa_prototype", "release",
-         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS, *LAB_KINDS, "factory_sync")
+         "request_tool", "cost_research", "cost_analysis", "finance_execute", *INVESTIGATION_KINDS, *LAB_KINDS, "factory_sync", "personal_task")
 
 
 def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list[TaskSpec]:
@@ -233,6 +249,8 @@ def plan_for(kind: str = "fix_failing_test", params: dict | None = None) -> list
         graph = LAB_ANALYZE_GRAPH
     elif kind == "lab_publish":
         graph = LAB_PUBLISH_GRAPH
+    elif kind == "personal_task":
+        graph = personal_task_graph(params.get("task_kind", "personal"))
     elif kind == "factory_sync":
         graph = [t for t in FACTORY_SYNC_GRAPH if t.key in (params.get("tasks") or ["claude_sync", "github_sync"])]
     else:

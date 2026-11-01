@@ -539,3 +539,33 @@ tests check the numbers against the website's output).
   confirmed on its own), the Owner's Tower beacon, "Play the town" and "Failure clinic" pills, and the district card.
 - **V6.42 Command sheet.** A bottom sheet over the city (peek / half / full) with Overview, Tasks (start a mission, see
   recent ones), Agents (follow one), Activity and Owner tabs.
+
+## V6.43–V6.52: Your task list, done by the factory
+
+The factory now holds your to-do list and does the work on it when you ask.
+
+- **V6.43 My tasks.** `my_tasks` (migration 0018): title, notes, kind (code / research / write / personal), priority, due
+  time, repeat, budget, repository, and the latest run. `/api/my-tasks` lists, adds, edits, finishes, reopens, drops and
+  deletes; reading needs sign-in, changing needs the operator role and the mutation rate limit.
+- **V6.44 Quick capture.** `services/management/capture.py` reads "draft the Echo blurb by Friday $1 urgent" into a
+  title, due time (in your time zone; a date alone means 5pm), budget (up to $50), priority, repeat and kind of work.
+  Rules, not a model: `/api/my-tasks/parse` previews exactly what adding would save.
+- **V6.45 Do it for me.** `POST /api/my-tasks/{id}/do` hands the task to the agents. A code task with a repository runs
+  the regular fix mission; everything else runs a new `personal_task` mission: the General Manager plans the steps, then
+  the researcher, the designer (writing) or the manager does the work and writes it up as an artifact. Without a model it
+  writes a clearly labelled template. Claimed first, so two presses can't start two runs; held by the emergency stop
+  and the charter's budget cap.
+- **V6.46 Live status.** Each task's stage follows its run: to do, working, needs you (an approval), ready to review,
+  run stopped, done, dropped.
+- **V6.47 Review.** The task shows the plan and the result; Accept marks it done, Redo with a note starts a fresh run
+  carrying the note. Only you mark a task done.
+- **V6.48 Today.** `/api/my-tasks/today`: needs you, to review, overdue, due today, working, what's next, and a spoken
+  summary.
+- **V6.49 Repeating tasks.** Daily, weekdays or weekly; finishing one queues the next at the same time of day.
+- **V6.50 The City chat.** "Add a task: …", "remind me to …", "what's on my list?" and "do the … task" work with any
+  agent, each through a proposal you confirm.
+- **V6.51 iPhone.** The Tasks tab is your list: quick add with a live preview, sections (needs you, review, overdue,
+  today, coming up, anytime, done), Do it, a detail screen to edit, review, redo, drop or delete, local reminders at
+  each due time, and Siri / Shortcuts: "Add a task in AI Civ" and "What's on my list in AI Civ".
+- **V6.52 Website.** The same list, quick add and review in the command sheet's Tasks tab; the weekly report counts the
+  tasks you finished.

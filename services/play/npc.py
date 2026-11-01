@@ -400,6 +400,55 @@ def _schedule(conn: Connection, org: str, user: str, agent, t: str, tz: str) -> 
                  "under Owner → Schedules. Confirm to set it up.", proposal=prop)
 
 
+# V6.50 the owner's task list from the City chat
+_TASK_ADD = [
+    re.compile(_LEAD + r"(?:add|put|create|make)\s+(?:a\s+|an\s+)?(?:new\s+)?(?:task|to-?do)(?:\s+to\s+my\s+(?:list|tasks))?\s*[:,-]?\s+(?P<x>.{2,200})$"),
+    re.compile(_LEAD + r"add\s+(?P<x>.{2,200}?)\s+to\s+my\s+(?:list|tasks|to-?do\s+list|todo\s+list)[.!]?$"),
+    re.compile(_LEAD + r"remind\s+me\s+to\s+(?P<x>.{2,200})$"),
+]
+_TASK_DO = re.compile(_LEAD + r"(?:do|work\s+on|handle|take\s+care\s+of|tackle)\s+(?:the\s+|my\s+)?(?P<x>.{2,120}?)\s+task[.!]?$")
+
+
+def _task_add(conn: Connection, org: str, user: str, agent, t: str, raw: str, tz: str) -> Reply | None:
+    m = next((rx.match(t) for rx in _TASK_ADD if rx.match(t)), None)
+    if not m:
+        return None
+    from services.management import capture
+    r = raw.strip()  # the same text as `t`, with the owner's capitals kept for the title
+    text = r[m.start("x"):m.end("x")] if len(r) == len(t) else m.group("x")
+    parsed = capture.parse(text, tz)
+    if len(parsed["title"]) < 2 or not _content_words(parsed["title"].lower()):
+        return Reply("What's the task? For example: \"add a task: draft the Echo blurb by Friday\".")
+    when = f", due {parsed['due_label']}" if parsed["due_label"] else ""
+    rep = {"daily": ", every day", "weekdays": ", every weekday", "weekly": ", every week"}.get(parsed["repeat"], "")
+    prop = _propose(conn, org=org, user=user, agent=agent, kind="add_task", params={"text": text, "tz": tz},
+                    summary=f"Add to your list: {parsed['title']}{when}{rep}.")
+    return Reply(f"I'll add \"{parsed['title']}\"{when}{rep} to your list ({parsed['kind']} task"
+                 + (f", {parsed['priority']}" if parsed["priority"] != "normal" else "") + "). Confirm to add it.", proposal=prop)
+
+
+def _task_list(conn: Connection, org: str, tz: str) -> Reply:
+    from services.management import mytasks
+    return Reply(mytasks.today(conn, org, tz)["spoken"], suggestions=["Add a task: ", "What needs my approval?"])
+
+
+def _task_do(conn: Connection, org: str, user: str, agent, t: str) -> Reply | None:
+    m = _TASK_DO.match(t)
+    if not m:
+        return None
+    from services.management import mytasks
+    hit = mytasks.find(conn, org, m.group("x"))
+    if hit is None:
+        return Reply("I couldn't find an open task like that on your list. Say \"what's on my list?\" to hear it.")
+    if hit["stage"] == "working":
+        return Reply(f"The agents are already working on \"{hit['title']}\".")
+    prop = _propose(conn, org=org, user=user, agent=agent, kind="do_task", params={"task_id": hit["id"]},
+                    summary=f"Hand \"{hit['title']}\" to the agents.")
+    budget = f" with its ${hit['budget_usd']:.2f} budget" if hit.get("budget_usd") else " with the default mission budget"
+    return Reply(f"I can hand \"{hit['title']}\" to the agents{budget}. They plan it, do it and bring you the result to review; "
+                 "nothing is sent or bought. Confirm to start.", proposal=prop)
+
+
 def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str = "UTC") -> Reply:
     raw = (text or "").strip()
     t = raw.lower()
@@ -411,6 +460,14 @@ def respond(conn: Connection, *, org: str, user: str, agent, text: str, tz: str 
         if _has(t, "everything", "all", "missions", "team"):
             return _missions(conn, org)
         return _status(conn, agent)
+    added = _task_add(conn, org, user, agent, t, raw, tz)
+    if added:
+        return added
+    if _has(t, "my list", "my tasks", "my to-do", "my todo", "on my plate", "what do i have to do", "what should i do next"):
+        return _task_list(conn, org, tz)
+    doing = _task_do(conn, org, user, agent, t)
+    if doing:
+        return doing
     scheduled = _schedule(conn, org, user, agent, t, tz)
     if scheduled:
         return scheduled

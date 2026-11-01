@@ -246,7 +246,11 @@ struct HomeView: View {
     @ViewBuilder private func sheetContent(_ t: CommandTab) -> some View {
         switch t {
         case .overview: HomeOverviewTab(overview: overview, error: error)
-        case .tasks: TasksTab { detail = .mission($0) }
+        case .tasks:
+            VStack(alignment: .leading, spacing: 18) {
+                MyTasksTab()
+                TasksTab { detail = .mission($0) }
+            }
         case .agents: AgentsTab(selected: selectedAgent) { id in
                 selectedAgent = id
                 focused = nil

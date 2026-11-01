@@ -192,6 +192,20 @@ def _run(pr, p: Principal) -> dict:
         with db.get_engine().connect() as conn:
             m = conn.execute(select(db.missions.c.title, db.missions.c.execution_mode).where(db.missions.c.id == r["mission_id"])).first()
         return {"mission_id": r["mission_id"], "title": m.title, "execution_mode": m.execution_mode}
+    if pr.kind == "add_task":
+        from services.management import mytasks
+        try:
+            t = mytasks.create_from_text(p, pr.params["text"], pr.params.get("tz") or "UTC")
+        except mytasks.TaskError as exc:
+            raise HTTPException(exc.status, str(exc)) from exc
+        return {"task_id": t["id"], "title": t["title"]}
+    if pr.kind == "do_task":
+        from services.management import mytasks
+        try:
+            t = mytasks.do_it(p, pr.params["task_id"])
+        except mytasks.TaskError as exc:
+            raise HTTPException(exc.status, str(exc)) from exc
+        return {"task_id": t["id"], "title": t["title"], "mission_id": t["mission_id"]}
     if pr.kind == "cancel_mission":
         main.cancel(pr.params["mission_id"], p)
         return {"mission_id": pr.params["mission_id"], "cancelled": True}
@@ -227,6 +241,10 @@ def confirm(pid: str, p: Principal = Depends(operator)):
 def _done_text(kind: str, r: dict) -> str:
     if kind == "create_schedule":
         return f"Scheduled: {r.get('when', '')}. Nothing runs until then; pause or delete it under Owner → Schedules."
+    if kind == "add_task":
+        return f"Added \"{r.get('title', 'it')}\" to your list. Say \"do the … task\" when you want the team on it."
+    if kind == "do_task":
+        return f"The team is on \"{r.get('title', 'your task')}\". The result comes back to your list for review."
     if kind == "cancel_mission":
         return "Done: the mission is cancelled. Anything already running stops at its next step."
     sim = " It's running in simulation because no AI model is connected, so treat its output as a rehearsal." if r.get("execution_mode") == "simulation" else ""

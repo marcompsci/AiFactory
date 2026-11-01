@@ -108,6 +108,10 @@ def report(conn: Connection, org_id: str, now: datetime | None = None, tz: str |
         parts.append(f"schedules ran {_plural(sched_ok, 'time')}" + (f", {sched_err} couldn't start" if sched_err else ""))
     if ev["schedule.auto_paused"]:
         parts.append(f"{_plural(ev['schedule.auto_paused'], 'schedule')} paused itself")
+    from .mytasks import week_done
+    tasks_done = week_done(conn, org_id, start.isoformat())
+    if tasks_done:
+        parts.append(f"you finished {_plural(tasks_done, 'task')} from your list")
     if top:
         parts.append(f"busiest: {top[0]['agent']} ({_plural(top[0]['tasks_completed'], 'task')})")
     headline = "This week: " + "; ".join(parts) + "."
@@ -115,7 +119,7 @@ def report(conn: Connection, org_id: str, now: datetime | None = None, tz: str |
     return {"generated_at": now.isoformat(), "from": start.isoformat(), "to": now.isoformat(), "days": list(per_day.values()),
             "week": week, "previous_week": before, "headline": headline,
             "schedules": {"started": sched_ok, "could_not_start": sched_err, "auto_paused": ev["schedule.auto_paused"]},
-            "reruns": ev["mission.rerun"], "followups_started": ev["mission.followup_started"],
+            "tasks_done": tasks_done, "reruns": ev["mission.rerun"], "followups_started": ev["mission.followup_started"],
             "approvals_decided": {k.lower(): int(v) for k, v in decided.items()}, "top_agents": top,
             "busiest_day": busiest_day["date"] if busiest_day["completed"] + busiest_day["failed"] else None,
             "is_estimate": True, "tz": getattr(z, "key", "UTC"),

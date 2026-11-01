@@ -40,7 +40,7 @@ final class APIClient {
         return r
     }
 
-    private func send<T: Decodable>(_ req: URLRequest, as: T.Type) async throws -> T {
+    func send<T: Decodable>(_ req: URLRequest, as: T.Type) async throws -> T {
         let (data, resp) = try await session.data(for: req)
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
