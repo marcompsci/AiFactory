@@ -98,4 +98,6 @@ def test_unchained_events_are_reported(client):
                                                schema_version=1, correlation_id=db.new_id(), execution_mode="live", payload={},
                                                occurred_at=db.utcnow()))
     v = _verify(client)
-    assert v["ok"] is False and v["problem"]["sequence"] == seq and "never chained" in v["problem"]["reason"]
+    # reported either way: as never chained, or (when the running mission chained a later event meanwhile) as a gap
+    assert v["ok"] is False and v["problem"]["sequence"] == seq
+    assert "never chained" in v["problem"]["reason"] or f"links {seq}–{seq} are missing" in v["problem"]["reason"]
