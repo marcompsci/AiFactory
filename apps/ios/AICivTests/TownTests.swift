@@ -117,14 +117,19 @@ final class TownTests: XCTestCase {
         XCTAssertTrue(Roster.bundled.contains { $0.name == "Lumen" && $0.avatar.look != nil })
     }
 
+    @MainActor
     func testBundledDistrictsBuildTheHomeCity() {
         XCTAssertEqual(Roster.districts.count, 11)
         XCTAssertTrue(Roster.districts.contains { $0.id == "nexus-spire" && $0.architecture == "spire" })
         let city = CityScene()
-        city.sync(districts: Roster.districts, agents: Roster.bundled, live: false, packages: [], serverOffset: 0)
-        for d in Roster.districts { XCTAssertNotNil(city.scene.rootNode.childNode(withName: "district:\(d.id)", recursively: false), d.id) }
-        XCTAssertEqual(city.scene.rootNode.childNodes.filter { $0.name?.hasPrefix("agent:") == true }.count, Roster.bundled.count)
-        XCTAssertEqual(city.scene.rootNode.childNodes.filter { $0.name == "belt" }.count, 10)
+        city.sync(districts: Roster.districts)
+        for d in Roster.districts {
+            XCTAssertNotNil(city.scene.rootNode.childNode(withName: "district:\(d.id)", recursively: true), d.id)
+            XCTAssertNotNil(city.anchors["sign:\(d.id)"], d.id)
+        }
+        XCTAssertNotNil(city.anchors["kb"])
+        XCTAssertNotNil(city.anchors["hub"])
+        XCTAssertEqual(city.anchors.keys.filter { $0.hasPrefix("board:") }.count, 3)  // the three factories
     }
 
     func testShadeMatchesTheWebFormula() {

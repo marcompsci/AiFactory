@@ -95,7 +95,9 @@ enum Roster {
             let role: String
             let homeDistrict: String
             let avatar: Agent.Avatar
+            struct Model: Decodable { let model: String? }
             let modelName: String?
+            var model: Model? = nil
             let tier: String?
         }
         let agents: [A]
@@ -107,7 +109,7 @@ enum Roster {
               let seed = try? APIClient.decoder.decode(Seed.self, from: data) else { return [] }
         return seed.agents.map {
             Agent(id: $0.id, key: $0.key, name: $0.name, role: $0.role, homeDistrict: $0.homeDistrict, avatar: $0.avatar,
-                  modelName: $0.modelName ?? "", executionState: "IDLE", tier: $0.tier, district: $0.homeDistrict, supervisorAgentId: nil)
+                  modelName: $0.modelName ?? $0.model?.model ?? "", executionState: "IDLE", tier: $0.tier, district: $0.homeDistrict, supervisorAgentId: nil)
         }
     }()
 }

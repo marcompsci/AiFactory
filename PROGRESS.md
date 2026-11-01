@@ -508,3 +508,34 @@ stuck in action loops). See services/management/reliability.py.
 - The roster knows a role only as of each person's latest sign-in; a demoted owner's schedules run for up to 30 days
   after their last sign-in unless you pause them.
 - Schedule cost is an average of recent runs; a schedule that hasn't run shows no estimate.
+
+## V6.33–V6.42: The iPhone city matches the website
+
+The iPhone's Home is now the website's 3D city, full screen, built from the same districts.json with the same layout
+code (WorldMap.swift ports District.tsx `rng`/`towersFor`, the navigation routes and the fallback belt graph; unit
+tests check the numbers against the website's output).
+
+- **V6.33 Full-screen city and HUD.** The dashboard is gone; the city fills the screen behind the website's compact
+  bar (AI Civ, connection status, Cash / Agents / Tasks). The view is offset by the sheet peek like the website's ViewFit.
+- **V6.34 Camera and look.** Perspective camera at the website's overview (fov 45, portrait zoom-out), rendered at half
+  resolution without smoothing, with bloom, the dusk sky dome and 600 stars, the window-lit skyline ring with spires,
+  and the website's five lights.
+- **V6.35 Neon signs.** Pixelify Sans (bundled, OFL) signs with icon tile, name and sub-line ("AI Manager (OPUS 5.5)"),
+  at the website's heights, constant screen size, tappable.
+- **V6.36 Buildings.** Jagged rock islands, tiled decks with rims, screen walls, desks and trees, towers of the
+  website's shapes with neon edges, workstation desks with beams, bank floors, walkways, plaza ring, Logistics hub,
+  waterfalls, islets and flying cars.
+- **V6.37 Camera modes.** City / Orbit / Follow / Fly chips; one finger orbits (Fly: moves), two fingers pan, pinch zooms;
+  tapping a district flies to it as on the website.
+- **V6.38 Agents and the demo.** Agents walk the website's routes at its speed, with status rings, carried cubes, name
+  tags and the website's bubbles (Assigned / Using / Done / Needs approval / Problem / Says). With no server, the
+  website's scripted demo mission plays on the bundled cast, labelled as a demo.
+- **V6.39 Belts and packages.** Belts from the snapshot's logistics graph (fallback: the same graph the server builds),
+  coloured by load and status, moving slats, terminal gantries; packages ride their routes in the website's colours and
+  a tap says what each one is.
+- **V6.40 Knowledge Base and factory boards.** The floating library island with wings, crystal and one tile per skill or
+  doc (counts from /api/knowledge); factory CRT boards from /api/factories (owners and admins only).
+- **V6.41 Owner calls.** The amber approval call (demo: approve/reject; real approvals open the Owner tab, where each is
+  confirmed on its own), the Owner's Tower beacon, "Play the town" and "Failure clinic" pills, and the district card.
+- **V6.42 Command sheet.** A bottom sheet over the city (peek / half / full) with Overview, Tasks (start a mission, see
+  recent ones), Agents (follow one), Activity and Owner tabs.

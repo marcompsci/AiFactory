@@ -11,6 +11,13 @@ enum Pixel {
     static func title(_ size: CGFloat = 13) -> Font { scaled(size, .heavy) }
     static func mono(_ size: CGFloat = 12) -> Font { scaled(size, .regular) }
 
+    /// The website's sign face (Pixelify Sans, bundled under the SIL Open Font License); falls back to the monospaced
+    /// title face if the font didn't load.
+    static func sign(_ size: CGFloat = 12, bold: Bool = true) -> Font {
+        guard let f = UIFont(name: bold ? "PixelifySans-Bold" : "PixelifySans-Medium", size: size) else { return title(size) }
+        return Font(UIFontMetrics(forTextStyle: .body).scaledFont(for: f, maximumPointSize: size * 1.4))
+    }
+
     private static func scaled(_ size: CGFloat, _ weight: UIFont.Weight) -> Font {
         let base = UIFont.monospacedSystemFont(ofSize: size, weight: weight)
         return Font(UIFontMetrics(forTextStyle: .body).scaledFont(for: base, maximumPointSize: size * 1.6))
@@ -61,18 +68,23 @@ struct NeonSign: View {
     let text: String
     let color: Color
     var sub: String? = nil
+    /// The website's `.neon-sign`: Pixelify Sans caps on a dark gradient plate with a 2 px neon border and glow, a
+    /// 22 px icon tile, and an optional sub-line in the sign's colour.
     var body: some View {
-        HStack(spacing: 6) {
-            Text(icon).font(Pixel.title(11)).foregroundStyle(Color.black).frame(minWidth: 22, minHeight: 22).background(color, in: RoundedRectangle(cornerRadius: 3))
-            VStack(alignment: .leading, spacing: 0) {
-                Text(text.uppercased()).font(Pixel.title(12)).foregroundStyle(.white).shadow(color: color, radius: 4)
-                if let sub { Text(sub.uppercased()).font(Pixel.mono(8)).foregroundStyle(color) }
+        HStack(spacing: 7) {
+            Text(icon).font(Pixel.sign(12)).foregroundStyle(Color(hex: 0x080C1C))
+                .frame(width: 22, height: 22).background(color, in: RoundedRectangle(cornerRadius: 3))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(text.uppercased()).font(Pixel.sign(12)).foregroundStyle(.white).shadow(color: color, radius: 3)
+                if let sub { Text(sub).font(Pixel.sign(10, bold: false)).foregroundStyle(color) }
             }
+            .lineLimit(1).fixedSize()
         }
         .padding(.vertical, 4).padding(.leading, 4).padding(.trailing, 10)
-        .background(Pixel.panel, in: RoundedRectangle(cornerRadius: 4))
+        .background(LinearGradient(colors: [Color(hex: 0x0E142C), Color(hex: 0x080C1C)], startPoint: .top, endPoint: .bottom),
+                    in: RoundedRectangle(cornerRadius: 4))
         .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(color, lineWidth: 2))
-        .shadow(color: color.opacity(0.6), radius: 6)
+        .shadow(color: color.opacity(0.55), radius: 8)
     }
 }
 

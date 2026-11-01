@@ -31,6 +31,8 @@ struct TownPackage: Identifiable, Equatable {
     let destination: String
     var routeStartedAt: Date?
     var eta: Date?
+    /// Belt segment ids from origin to destination (logistics_packages.route), for the 3D city.
+    var route: [String] = []
 }
 
 enum TownRules {

@@ -54,6 +54,8 @@ struct Agent: Codable, Identifiable, Hashable {
     let supervisorAgentId: String?
     /// STATIONARY | MOVING (from agent_positions); visual only, never a sign of work.
     var movementState: String? = nil
+    /// The desk the agent is at, if any (agent_positions.waypoint).
+    var waypoint: String? = nil
 }
 
 struct MissionRow: Codable, Identifiable, Hashable {
@@ -80,12 +82,22 @@ struct OpportunitySummary: Codable, Identifiable, Hashable {
 }
 
 struct District: Codable, Identifiable, Hashable {
+    struct Workstation: Codable, Hashable {
+        let id: String
+        let label: String
+        let offset: [Double]
+        var floor: Int? = nil
+    }
     let id: String
     let name: String
     let purpose: String?
     let position: [Double]
     let color: String
     let architecture: String?
+    /// Building height, tower count and desks (districts.json): the website builds from these, and so does the iPhone.
+    var towers: Int? = nil
+    var height: Double? = nil
+    var workstations: [Workstation]? = nil
     var x: Double { position.first ?? 0 }
     var z: Double { position.count > 2 ? position[2] : 0 }
 }
@@ -121,9 +133,16 @@ struct SnapshotLogistics: Codable {
         let destinationDistrict: String
         let routeStartedAt: String?
         let eta: String?
+        var route: [String]? = nil
+        var title: String? = nil
     }
+    struct Node: Codable, Hashable { let id: String; let kind: String; let district: String?; let position: [Double] }
+    struct Route: Codable, Hashable { let id: String; let fromNode: String; let toNode: String; let status: String; var load: Int? = nil }
     let packages: [Package]?
     let serverTime: String?
+    var nodes: [Node]? = nil
+    var routes: [Route]? = nil
+    var beltSpeed: Double? = nil
 }
 
 enum ISODate {

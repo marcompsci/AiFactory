@@ -26,6 +26,10 @@ final class AppState {
     var openTab: String?
     var health: Health?
     var ledger = EventLedger()
+    /// The city's live picture from events (bubbles, busy desks, the offline demo), shared by the home city and its overlays.
+    let world = CityWorld()
+    /// The conveyor graph (nodes, belt segments with load and status, belt speed) from the snapshot.
+    var logistics: SnapshotLogistics?
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"
     var webURL: String = UserDefaults.standard.string(forKey: "webURL") ?? "http://localhost:3000"
     var tokenSet: Bool = Keychain.load() != nil
@@ -40,6 +44,23 @@ final class AppState {
 
     private var streamTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
+
+    init() {
+        world.waypointOf = { [weak self] id in self?.agents[id]?.waypoint }
+        world.districtOf = { [weak self] id in self?.agents[id].flatMap { $0.district ?? $0.homeDistrict } }
+    }
+
+    /// With no server reachable, play the website's scripted demo mission on the bundled cast (labelled as a demo).
+    func startDemoIfOffline() {
+        guard connection != .live, agents.isEmpty else { return }
+        let ids = Dictionary(Roster.bundled.map { ($0.key, $0.id) }, uniquingKeysWith: { a, _ in a })
+        world.startDemo(ids: ids) { [weak self] e in _ = self?.ledger.ingest([e]) }
+    }
+
+    func decideDemo(granted: Bool) {
+        let ids = Dictionary(Roster.bundled.map { ($0.key, $0.id) }, uniquingKeysWith: { a, _ in a })
+        world.decideDemo(granted: granted, ids: ids) { [weak self] e in _ = self?.ledger.ingest([e]) }
+    }
 
     var api: APIClient? {
         guard let url = URL(string: serverURL) else { return nil }
@@ -190,6 +211,8 @@ final class AppState {
     }
 
     private func apply(snapshot snap: Snapshot) {
+        world.stopDemo()
+        world.clearOverrides()
         agents = Dictionary(uniqueKeysWithValues: snap.agents.map { ($0.id, $0) })
         applyWorld(snap)
         if let d = snap.districts { districts = d }
@@ -207,10 +230,11 @@ final class AppState {
         executionMode = snap.executionMode
         approvals = (snap.approvals ?? []).filter { $0.status == "PENDING" }
         if let lg = snap.logistics {
+            logistics = lg
             if let t = ISODate.parse(lg.serverTime) { serverOffset = t.timeIntervalSinceNow }
             packages = (lg.packages ?? []).map {
                 TownPackage(id: $0.id, type: $0.packageType, status: $0.status, origin: $0.originDistrict, destination: $0.destinationDistrict,
-                            routeStartedAt: ISODate.parse($0.routeStartedAt), eta: ISODate.parse($0.eta))
+                            routeStartedAt: ISODate.parse($0.routeStartedAt), eta: ISODate.parse($0.eta), route: $0.route ?? [])
             }
         }
     }
@@ -226,6 +250,7 @@ final class AppState {
                 agents = Dictionary(uniqueKeysWithValues: snap.agents.map { ($0.id, $0) })
                 missions = snap.missions
                 applyWorld(snap)
+                world.clearOverrides()
             }
             worldRefresh = nil
         }
@@ -295,6 +320,7 @@ final class AppState {
         if result.needsReplay, let missing = try? await api.events(after: ledger.lastSequence) {
             result = ledger.ingest(missing)
         }
+        for e in result.applied { world.apply(e) }
         let types = Set(result.applied.map(\.eventType))
         let decisionTypes: Set<String> = ["approval.requested", "approval.granted", "approval.rejected", "recovery.proposed", "recovery.decided",
                                           "finance.approval_requested", "finance.approval_decided", "finance.approval_expired",

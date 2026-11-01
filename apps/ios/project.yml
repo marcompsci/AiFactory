@@ -35,6 +35,8 @@ targets:
       path: AICiv/Info.plist
       properties:
         CFBundleDisplayName: AI Civ
+        # the website's pixel font for signs and the HUD (SIL Open Font License, AICiv/Fonts/PixelifySans-OFL.txt)
+        UIAppFonts: [PixelifySans-Medium.ttf, PixelifySans-Bold.ttf]
         UILaunchScreen:
           UIColorName: AccentColor
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
