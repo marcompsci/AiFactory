@@ -32,9 +32,14 @@ struct HomeView: View {
             let peek = SheetDetent.peekHeight
             let fullHeight = geo.size.height + geo.safeAreaInsets.top
             ZStack(alignment: .top) {
-                cityLayer(width: geo.size.width, height: fullHeight + peek)
-                    .offset(y: -peek)  // the website's ViewFit: centre the city in the part the sheet doesn't cover
-                    .ignoresSafeArea(edges: .top)
+                // The city is taller than the screen and shifted up by the sheet's peek (the website's ViewFit), so it
+                // centres in the part the sheet doesn't cover. It hangs in an overlay so it never sizes the layout.
+                Color.clear
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .overlay(alignment: .top) {
+                        cityLayer(width: geo.size.width, height: fullHeight + peek)
+                            .offset(y: -peek - geo.safeAreaInsets.top)
+                    }
                 VStack(alignment: .leading, spacing: 8) {
                     HUDBar(overview: overview)
                     HStack(alignment: .top) {
@@ -351,6 +356,7 @@ struct HUDBar: View {
     }
 
     private var status: (text: String, color: Color) {
+        if app.connection != .live && app.world.demo { return ("Demo, no server", Color(hex: 0xFFBD69)) }
         switch app.connection {
         case .live: return ("Live", Color(hex: 0x5BF2A5))
         case .connecting, .idle: return ("Connecting", Color(hex: 0x8FA8FF))
