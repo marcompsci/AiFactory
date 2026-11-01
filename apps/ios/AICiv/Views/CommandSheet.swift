@@ -26,6 +26,8 @@ struct CommandSheet<Content: View>: View {
     @Binding var detent: SheetDetent
     @Binding var tab: CommandTab
     let maxHeight: CGFloat
+    /// Rides on top of the sheet and moves with it (the "Play the town" and "Failure clinic" pills).
+    var accessory = AnyView(EmptyView())
     @ViewBuilder let content: (CommandTab) -> Content
     @GestureState private var drag: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -94,6 +96,7 @@ struct CommandSheet<Content: View>: View {
         .frame(height: maxHeight, alignment: .top)
         .background(Color(hex: 0x0A1022).opacity(0.96), in: UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14))
         .overlay(UnevenRoundedRectangle(topLeadingRadius: 14, topTrailingRadius: 14).stroke(Pixel.rim, lineWidth: 1))
+        .overlay(alignment: .top) { accessory.alignmentGuide(.top) { $0[.bottom] + 8 } }
         .offset(y: max(0, min(maxHeight - SheetDetent.peekHeight, hidden + drag)))
         .animation(reduceMotion ? .easeOut(duration: 0.18) : .spring(duration: 0.35, bounce: 0), value: detent)
     }

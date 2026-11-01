@@ -41,7 +41,7 @@ final class CityWorld {
 
     /// Apply one event (in sequence order). `waypoints` is where each agent stands now, for tool events.
     func apply(_ e: EventEnvelope, now: Date = Date()) {
-        func s(_ k: String) -> String { e.payload[k]?.string ?? "" }
+        func s(_ k: String) -> String { e.payload.get(k)?.string ?? "" }
         let who = e.agentId
         func indicate(_ kind: String, _ text: String) { if let who { indicators[who] = Indicator(kind: kind, text: text, at: now) } }
         func bump(_ district: String, _ by: Double) { if !district.isEmpty { activity[district] = min(1, (activity[district] ?? 0) + by) } }
@@ -51,9 +51,9 @@ final class CityWorld {
         case "task.started":
             bump(s("district"), 0.35)
         case "agent.movement_requested":
-            if let who { places[who] = Place(district: s("to_district"), waypoint: e.payload["waypoint"]?.string) }
+            if let who { places[who] = Place(district: s("to_district"), waypoint: e.payload.get("waypoint")?.string) }
         case "agent.arrived":
-            if let who { places[who] = Place(district: s("district"), waypoint: e.payload["waypoint"]?.string) }
+            if let who { places[who] = Place(district: s("district"), waypoint: e.payload.get("waypoint")?.string) }
         case "agent.status_changed":
             if let who { states[who] = s("to") }
         case "agent.message":

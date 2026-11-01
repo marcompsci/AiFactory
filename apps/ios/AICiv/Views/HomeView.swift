@@ -8,7 +8,7 @@ struct HomeView: View {
     @Environment(AppState.self) private var app
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
-    @State private var city = CityScene()
+    private var city: CityScene { app.city }
     @State private var pins = CityPins()
     @State private var overview: JSONValue?
     @State private var error: String?
@@ -48,8 +48,8 @@ struct HomeView: View {
                 .padding(.top, 4)
                 VStack(spacing: 0) {
                     Spacer()
-                    pills.padding(.horizontal, 10).padding(.bottom, 8)
-                    CommandSheet(detent: $sheet, tab: $tab, maxHeight: geo.size.height - 64) { t in sheetContent(t) }
+                    CommandSheet(detent: $sheet, tab: $tab, maxHeight: geo.size.height - 64,
+                                 accessory: AnyView(pills.padding(.horizontal, 10))) { t in sheetContent(t) }
                 }
             }
         }

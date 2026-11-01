@@ -28,6 +28,8 @@ final class AppState {
     var ledger = EventLedger()
     /// The city's live picture from events (bubbles, busy desks, the offline demo), shared by the home city and its overlays.
     let world = CityWorld()
+    /// The home 3D city, built once for the life of the app (it renders its sky and skyline when created).
+    @ObservationIgnored lazy var city = CityScene()
     /// The conveyor graph (nodes, belt segments with load and status, belt speed) from the snapshot.
     var logistics: SnapshotLogistics?
     var serverURL: String = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"

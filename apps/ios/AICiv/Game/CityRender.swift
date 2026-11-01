@@ -77,7 +77,7 @@ final class CityScene {
     private(set) var anchors: [String: SCNNode] = [:]
 
     init() {
-        scene.background.contents = Self.skyImage()
+        scene.background.contents = Self.sky
         let cam = SCNCamera()
         cam.fieldOfView = 45
         cam.projectionDirection = .vertical
@@ -212,13 +212,15 @@ final class CityScene {
         let ids = list.map(\.id).sorted()
         guard ids != builtFor else { return }
         builtFor = ids
+        scene.rootNode.childNode(withName: "city", recursively: false)?.removeFromParentNode()
+        beacon = nil
         districtRoots.values.forEach { $0.removeFromParentNode() }
         districtRoots = [:]
         pads = [:]
         deskTops = [:]
         bankFloors = []
         anchors = anchors.filter { !$0.key.hasPrefix("sign:") && !$0.key.hasPrefix("bubble:") && !$0.key.hasPrefix("board:") }
-        districts = Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0) })
+        districts = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         districtList = list
         let root = SCNNode()
         root.name = "city"
@@ -244,6 +246,7 @@ final class CityScene {
         buildKnowledgeBase(root)
         scene.rootNode.addChildNode(root)
         beltGraphKey = ""
+        setKnowledge(skills: knowledgeCounts.skills, docs: knowledgeCounts.docs)
     }
 
     private func anchor(_ id: String, in parent: SCNNode, at p: SCNVector3) {
@@ -419,14 +422,14 @@ final class CityScene {
             ring.position.y = 0.01
             wn.addChildNode(ring)
             dn.addChildNode(wn)
-            deskTops[w.id] = (top, beam, c)
+            deskTops[w.id] = (top, beam, UIColor(hex: c))
             if let f = w.floor, d.architecture == "bank" {
                 let band = SCNNode(geometry: SCNBox(width: 8.6, height: 0.35, length: 8.6, chamferRadius: 0))
                 band.geometry?.firstMaterial = Self.glow(0x7A6A3A, alpha: 1)
                 band.opacity = 0.18
                 band.position = SCNVector3(2, Float(f) * 4.6 + 2.2, 0)
                 dn.addChildNode(band)
-                bankFloors.append((w.id, band, c))
+                bankFloors.append((w.id, band, UIColor(hex: c)))
             }
         }
         if d.id == "owners-tower" {
@@ -522,7 +525,10 @@ final class CityScene {
     }
 
     /// One orbiting tile per doc or skill (gold for skills), as on the website.
+    private var knowledgeCounts = (skills: 0, docs: 0)
+
     func setKnowledge(skills: Int, docs: Int) {
+        knowledgeCounts = (skills, docs)
         let n = min(28, skills + docs)
         guard n != kbTiles else { return }
         kbTiles = n
@@ -794,6 +800,7 @@ final class CityScene {
             n.removeFromParentNode()
             agentNodes[id] = nil
             walks[id] = nil
+            lastStyle[id] = nil
             anchors["agent:\(id)"] = nil
         }
     }
@@ -1057,6 +1064,8 @@ final class CityScene {
 
     /// The website's dusk sky dome as a latitude/longitude image: navy overhead, violet, a warm band at the horizon,
     /// dark below, and a scatter of stars.
+    static let sky: UIImage = skyImage()
+
     static func skyImage() -> UIImage {
         let w = 1024, h = 512
         return UIGraphicsImageRenderer(size: CGSize(width: w, height: h), format: .pixel).image { ctx in
