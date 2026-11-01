@@ -171,13 +171,13 @@ struct HomeView: View {
         if let id = focused, let d = districts.first(where: { $0.id == id }) {
             DistrictCard(district: d, onClose: { focused = nil; city.showOverview() }, onDetails: { detail = .district(d) },
                          onAgent: { a in selectedAgent = a; focused = nil })
-                .transition(Motion.fromEdge(.leading, reduce: reduceMotion))
+                .transition(.fromEdge(.leading, reduce: reduceMotion))
         } else if let id = selectedAgent, let a = app.agents[id] ?? Roster.bundled.first(where: { $0.id == id }) {
             AgentCard(agent: a, following: camera == .follow,
                       onFollow: { camera = camera == .follow ? .orbit : .follow },
                       onDetails: { detail = .agent(id) },
                       onClose: { selectedAgent = nil; if camera == .follow { camera = .orbit } })
-                .transition(Motion.fromEdge(.leading, reduce: reduceMotion))
+                .transition(.fromEdge(.leading, reduce: reduceMotion))
         }
     }
 
@@ -199,7 +199,7 @@ struct HomeView: View {
             .frame(maxWidth: 340, alignment: .leading)
             .background(Color(hex: 0xFFBD69), in: RoundedRectangle(cornerRadius: 12))
             .shadow(color: Color(hex: 0xFFBD69).opacity(0.5), radius: 10)
-            .transition(Motion.fromEdge(.top, reduce: reduceMotion))
+            .transition(.fromEdge(.top, reduce: reduceMotion))
         } else if app.connection == .live, app.approvals.count + app.ownerWaiting > 0 {
             let n = app.approvals.count + app.ownerWaiting
             Button {
