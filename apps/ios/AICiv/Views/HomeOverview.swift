@@ -122,7 +122,6 @@ struct HomeOverviewTab: View {
         return d.formatted(date: .omitted, time: .shortened)
     }
 }
-}
 
 struct DistrictSheet: View {
     @Environment(AppState.self) private var app
