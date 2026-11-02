@@ -482,11 +482,12 @@ final class CityScene {
 
     private func buildDistrict(_ dn: SCNNode, _ d: District) {
         let c = Self.color(d)
-        let pad = SCNCylinder(radius: 11, height: 0.02)
-        pad.radialSegmentCount = 48
-        pad.firstMaterial = Self.glow(c, alpha: 0.99)
+        let pad = SCNPlane(width: 24, height: 24)  // a soft pool of the district's light, brighter while it's busy
+        pad.firstMaterial = CityArt.light(c, image: CityArt.dot, alpha: 1)
         let pn = SCNNode(geometry: pad)
-        pn.position.y = 0.06
+        pn.eulerAngles.x = -.pi / 2
+        pn.castsShadow = false
+        pn.position.y = 0.08
         dn.addChildNode(pn)
         pads[d.id] = pn
         let warm = d.color.uppercased() == "#F4D58D"
@@ -1048,7 +1049,7 @@ final class CityScene {
             if v != seenActivity[id] { seenActivity[id] = v; padLevel[id] = max(padLevel[id] ?? 0, v) }
             padLevel[id] = max(0, (padLevel[id] ?? 0) - Double(dt) * 0.08)
             let focused = goal == nil && mode != .overview && districts[id].map { simd_distance(target, SIMD3<Float>(Float($0.x), 4, Float($0.z))) < 6 } == true
-            pad.opacity = CGFloat(min(0.75, 0.18 + (padLevel[id] ?? 0) * 0.5 + (focused ? 0.15 : 0)))
+            pad.opacity = CGFloat(min(0.5, 0.12 + (padLevel[id] ?? 0) * 0.3 + (focused ? 0.08 : 0)))
         }
         // desks light up while a tool runs there, with a pulsing beam
         for (id, desk) in deskTops {

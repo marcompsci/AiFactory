@@ -704,7 +704,9 @@ enum CityArt {
     static func tube(length: Float) -> SCNNode {
         let cy = SCNCylinder(radius: 0.62, height: CGFloat(length))
         cy.radialSegmentCount = 16
-        cy.firstMaterial = glass(0x9FD8FF, alpha: 0.16, glow: 0.05)
+        let m = glass(0x9FD8FF, alpha: 0.1, glow: 0.03)
+        m.metalness.contents = NSNumber(value: 0.15)  // a faint pipe, not a mirror
+        cy.firstMaterial = m
         let n = SCNNode(geometry: cy)
         n.eulerAngles.x = .pi / 2
         n.position.y = 0.35
