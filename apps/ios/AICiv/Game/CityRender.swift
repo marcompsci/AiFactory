@@ -158,8 +158,8 @@ final class CityScene {
         var out = SIMD3<Float>(c.x, 0, c.z)
         if simd_length(out) < 0.001 { out = SIMD3<Float>(0, 0, 1) }
         out = simd_normalize(out)
-        var e = c + out * 30
-        e.y = 24
+        var e = c + out * 40  // a little further out than the website: the whole district fits a phone screen
+        e.y = 30
         goal = (e, SIMD3<Float>(c.x, 4, c.z))
         if mode == .overview { mode = .orbit }
     }
@@ -1168,8 +1168,8 @@ final class CityScene {
         m.diffuse.wrapT = .repeat
         m.diffuse.contentsTransform = SCNMatrix4MakeScale(6, 6, 1)
         m.lightingModel = .physicallyBased
-        m.roughness.contents = NSNumber(value: 0.35)
-        m.metalness.contents = NSNumber(value: 0.2)
+        m.roughness.contents = NSNumber(value: 0.85)  // matte stone: no sun glare on the floor
+        m.metalness.contents = NSNumber(value: 0)
         return m
     }
 

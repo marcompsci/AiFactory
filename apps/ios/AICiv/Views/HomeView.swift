@@ -43,10 +43,10 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HUDBar(overview: overview)
                     HStack(alignment: .top) {
-                        cards
-                        Spacer(minLength: 8)
+                        Spacer(minLength: 0)
                         cameraChips
                     }
+                    cards  // under the camera chips, so neither squeezes the other on a narrow phone
                     approvalCall
                 }
                 .padding(.horizontal, 10)
@@ -163,6 +163,7 @@ struct HomeView: View {
                 }
             }
             .padding(3)
+            .fixedSize()
             .background(Color(hex: 0x0A1022).opacity(0.82), in: RoundedRectangle(cornerRadius: 13))
             .opacity(voiceOver || listMode ? 0 : 1)
             Button {
