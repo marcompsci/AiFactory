@@ -64,6 +64,10 @@ struct HomeView: View {
             city.reduceMotion = reduceMotion
             city.onMode = { m in if camera != m { camera = m } }
             city.sync(districts: districts)
+            if let id = UserDefaults.standard.string(forKey: "homeFocus") {  // -homeFocus code-forge (CI screenshots)
+                focused = id
+                city.focus(id)
+            }
         }
         .onChange(of: app.districts) { city.sync(districts: districts) }
         .onChange(of: reduceMotion) { city.reduceMotion = reduceMotion }

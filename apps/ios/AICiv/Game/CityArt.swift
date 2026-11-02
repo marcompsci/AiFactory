@@ -712,6 +712,39 @@ enum CityArt {
         return n
     }
 
+    /// One layer of the cloud sea: soft, overlapping puffs, warm toward one side, fading out at the edges.
+    static func cloudLayer(_ layer: Int) -> SCNMaterial {
+        let size = 1024
+        var r = WorldMap.Rng("cloudsea\(layer)")
+        let img = UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { ctx in
+            let cg = ctx.cgContext
+            let cs = CGColorSpaceCreateDeviceRGB()
+            for _ in 0..<(layer == 0 ? 420 : 260) {
+                let x = CGFloat(r.next()) * CGFloat(size), y = CGFloat(r.next()) * CGFloat(size)
+                let dx = x / CGFloat(size) - 0.5, dy = y / CGFloat(size) - 0.5
+                let edge = max(0, 1 - sqrt(dx * dx + dy * dy) * 2.1)   // thin out toward the rim
+                if edge <= 0 { continue }
+                let rad = CGFloat(18 + r.next() * 70)
+                let warm = CGFloat(r.next()) * 0.5 + (1 - y / CGFloat(size)) * 0.5
+                let col = UIColor(red: 0.62 + 0.33 * warm, green: 0.48 + 0.2 * warm, blue: 0.72 - 0.12 * warm, alpha: 0.32 * edge)
+                guard let g = CGGradient(colorsSpace: cs, colors: [col.cgColor, col.withAlphaComponent(0).cgColor] as CFArray,
+                                         locations: [0, 1]) else { continue }
+                let c = CGPoint(x: x, y: y)
+                cg.drawRadialGradient(g, startCenter: c, startRadius: 0, endCenter: c, endRadius: rad, options: [])
+            }
+        }
+        let m = SCNMaterial()
+        m.lightingModel = .constant
+        m.diffuse.contents = img
+        m.emission.contents = img
+        m.emission.intensity = layer == 0 ? 0.55 : 0.75
+        m.blendMode = .alpha
+        m.transparencyMode = .aOne
+        m.writesToDepthBuffer = false
+        m.isDoubleSided = true
+        return m
+    }
+
     // MARK: V6.55 sky
 
     /// The dusk sky as a latitude/longitude image: deep navy overhead, violet, rose and gold at the horizon, a

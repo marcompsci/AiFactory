@@ -72,6 +72,7 @@ final class CityScene {
     private var groundCars: [(node: SCNNode, r: Float, speed: Float, phase: Float)] = []
     private var drones: [(node: SCNNode, center: SIMD3<Float>, r: Float, speed: Float, phase: Float)] = []
     private var blinks: [SCNNode] = []
+    private var clouds: [SCNNode] = []
     private var globe: SCNNode?
     private var sun = SCNNode()
     /// High: full resolution, soft shadows, ambient occlusion and particles. Low (set when the phone runs hot, or
@@ -114,6 +115,7 @@ final class CityScene {
         buildIslets()
         buildCars()
         buildDrones()
+        buildCloudSea()
         scene.rootNode.addChildNode(beltRoot)
         let motes = SCNNode()
         motes.name = "motes"
@@ -698,6 +700,21 @@ final class CityScene {
         }
     }
 
+    /// A sea of soft clouds far below the islands, lit pink and gold by the low sun, drifting slowly.
+    private func buildCloudSea() {
+        for (i, y) in [Float(-52), -38].enumerated() {
+            let plane = SCNPlane(width: 1500, height: 1500)
+            plane.firstMaterial = CityArt.cloudLayer(i)
+            let n = SCNNode(geometry: plane)
+            n.name = "clouds\(i)"
+            n.eulerAngles.x = -.pi / 2
+            n.position.y = y
+            n.castsShadow = false
+            scene.rootNode.addChildNode(n)
+            clouds.append(n)
+        }
+    }
+
     /// Delivery drones circling between the towers.
     private func buildDrones() {
         let spots: [SIMD3<Float>] = [SIMD3(-40, 22, -20), SIMD3(40, 26, -24), SIMD3(0, 30, -50), SIMD3(-56, 20, 20), SIMD3(52, 24, 18), SIMD3(0, 18, 40)]
@@ -1091,7 +1108,10 @@ final class CityScene {
         let on = reduceMotion || Int(phase * 1.2) % 2 == 0  // aircraft lights blink about once a second
         for b in blinks { b.isHidden = !on }
         for d in drones { d.node.childNode(withName: "blink", recursively: false)?.isHidden = !on }
-        if !reduceMotion { globe?.eulerAngles.y = Float(phase * 0.25) }
+        if !reduceMotion {
+            globe?.eulerAngles.y = Float(phase * 0.25)
+            for (i, c) in clouds.enumerated() { c.eulerAngles.y = Float(phase) * (i == 0 ? 0.004 : -0.006) }
+        }
     }
 
     // MARK: materials and geometry
@@ -1127,7 +1147,7 @@ final class CityScene {
     /// The deck's checkered floor (PixelWorld.tsx useTileTexture), sampled without smoothing.
     static func tiles(_ c: UInt32) -> SCNMaterial {
         let img = tileCache[c] ?? {
-            let base = mix(c, 0x2A2140, 0.62), alt = mix(c, 0x3A2F58, 0.5)
+            let base = mix(c, 0x2B2D3E, 0.78), alt = mix(c, 0x30324A, 0.72)  // quiet stone tiles, a hint of the district
             let i = UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16), format: .pixel).image { ctx in
                 for y in 0..<2 { for x in 0..<2 {
                     UIColor(hex: (x + y) % 2 == 1 ? alt : base).setFill()
