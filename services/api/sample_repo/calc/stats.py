@@ -16,7 +16,7 @@ def median(values: Sequence[float]) -> float:
     mid = len(ordered) // 2
     if len(ordered) % 2 == 1:
         return ordered[mid]
-    return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2
 
 
 def clamp(value: float, low: float, high: float) -> float:
