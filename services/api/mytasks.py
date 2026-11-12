@@ -34,6 +34,7 @@ class TaskIn(BaseModel):
     list_name: str | None = Field(default=None, max_length=41)
     estimate_minutes: int | None = Field(default=None, ge=5, le=600)
     items: list[str] | None = Field(default=None, max_length=50)
+    client_ref: str | None = Field(default=None, pattern="^[A-Za-z0-9-]{8,64}$")  # sending the same add twice makes one task
     tz: str | None = Field(default="UTC", max_length=64)
 
 

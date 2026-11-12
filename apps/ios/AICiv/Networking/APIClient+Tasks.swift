@@ -106,8 +106,9 @@ extension APIClient {
         return try await send(request("/api/my-tasks/parse?\(q)"), as: TaskPreview.self)
     }
 
-    func addTask(text: String, tz: String) async throws -> MyTask {
-        try await send(request("/api/my-tasks", method: "POST", body: body(["text": text, "tz": tz])), as: MyTask.self)
+    /// `clientRef` makes a repeat of the same add (a timed-out reply, then the outbox) return the task already made.
+    func addTask(text: String, tz: String, clientRef: String? = nil) async throws -> MyTask {
+        try await send(request("/api/my-tasks", method: "POST", body: body(["text": text, "tz": tz, "client_ref": clientRef])), as: MyTask.self)
     }
 
     func editTask(_ id: String, _ fields: [String: Any?]) async throws -> MyTask {

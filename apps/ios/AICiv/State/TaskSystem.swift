@@ -52,46 +52,58 @@ enum TaskActions {
             guard let api = client() else { throw APIError(status: 0, detail: "no server") }
             if action == "done" { try await api.finishTask(id, tz: tz) }
             else { _ = try await api.snoozeTask(id, preset: nil, until: Date().addingTimeInterval(3600), tz: tz) }
-        } catch let e as APIError where e.status >= 400 && e.status < 500 {
+        } catch let e as APIError where TaskOutbox.isFinal(e) {
             return  // the task changed or went away on your Mac: nothing to retry
         } catch {
-            TaskOutbox.queue(.init(kind: action, taskId: id, text: nil))
+            await TaskOutbox.queue(.init(kind: action, taskId: id, text: nil))
         }
     }
 }
 
 /// V6.82: what you do while your Mac is out of reach waits here (on this phone only) and goes through when you
-/// reconnect, oldest first.
+/// reconnect, oldest first. One send at a time; each entry leaves the queue only once the Mac has it (or refused it for
+/// good), and an add carries its own id so the Mac makes one task even if it arrives twice.
+@MainActor
 enum TaskOutbox {
     struct Entry: Codable, Hashable {
         let kind: String      // add, done, snooze1h
         let taskId: String?
         let text: String?
         var at = Date()
+        var ref = UUID().uuidString
     }
     private static let key = "taskOutbox"
+    private static var flushing = false
 
-    static var entries: [Entry] {
+    nonisolated static var count: Int { read().count }
+
+    nonisolated private static func read() -> [Entry] {
         guard let d = UserDefaults.standard.data(forKey: key) else { return [] }
         return (try? JSONDecoder().decode([Entry].self, from: d)) ?? []
     }
 
     private static func save(_ e: [Entry]) {
-        UserDefaults.standard.set(try? JSONEncoder().encode(Array(e.suffix(50))), forKey: key)
+        UserDefaults.standard.set(try? JSONEncoder().encode(Array(e.suffix(100))), forKey: key)
     }
 
-    static func queue(_ e: Entry) { save(entries + [e]) }
+    static func queue(_ e: Entry) { save(read() + [e]) }
 
-    /// Sends what's waiting; keeps only what still can't reach the Mac. Returns how many went through.
+    /// Refused for good (the task is gone, changed, or the request can never succeed): don't retry. Sign-in problems,
+    /// rate limits and server errors are not final; those wait for the next try.
+    nonisolated static func isFinal(_ e: APIError) -> Bool { [400, 404, 409, 422].contains(e.status) }
+
+    /// Sends what's waiting, oldest first, stopping at the first thing the Mac can't take yet. Returns how many went through.
     @discardableResult
     static func flush(_ api: APIClient) async -> Int {
+        guard !flushing else { return 0 }
+        flushing = true
+        defer { flushing = false }
         let tz = TimeZone.current.identifier
-        var left: [Entry] = []
         var sent = 0
-        for e in entries {
+        for e in read() {
             do {
                 switch e.kind {
-                case "add": if let t = e.text { _ = try await api.addTask(text: t, tz: tz) }
+                case "add": if let t = e.text { _ = try await api.addTask(text: t, tz: tz, clientRef: e.ref) }
                 case "done": if let id = e.taskId { try await api.finishTask(id, tz: tz) }
                 default:  // snooze1h: an hour from when you pressed it, or a few minutes from now if that's passed
                     if let id = e.taskId {
@@ -100,13 +112,13 @@ enum TaskOutbox {
                     }
                 }
                 sent += 1
-            } catch let x as APIError where x.status >= 400 && x.status < 500 {
-                continue  // refused (it changed on the Mac): drop it rather than retry forever
+            } catch let x as APIError where isFinal(x) {
+                // refused for good: let it go rather than retry forever
             } catch {
-                left.append(e)
+                break  // the Mac can't take it yet (offline, signed out, busy): keep this and the rest for next time
             }
+            save(read().filter { $0.ref != e.ref })
         }
-        save(left)
         return sent
     }
 }
@@ -150,7 +162,8 @@ enum DayPlanCalendar {
         let stamp = f.string(from: Date())
         func esc(_ s: String) -> String {
             s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: ";", with: "\\;")
-                .replacingOccurrences(of: ",", with: "\\,").replacingOccurrences(of: "\n", with: "\\n")
+                .replacingOccurrences(of: ",", with: "\\,").replacingOccurrences(of: "\r\n", with: "\\n")
+                .replacingOccurrences(of: "\r", with: "\\n").replacingOccurrences(of: "\n", with: "\\n")
         }
         var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AI Civilization//Plan my day//EN", "CALSCALE:GREGORIAN"]
         for b in plan.blocks {
@@ -162,7 +175,26 @@ enum DayPlanCalendar {
                       "END:VEVENT"]
         }
         lines.append("END:VCALENDAR")
-        return lines.joined(separator: "\r\n") + "\r\n"
+        return lines.map(fold).joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// RFC 5545: lines longer than 75 bytes continue on the next line after a space, never splitting a character.
+    static func fold(_ line: String) -> String {
+        var out: [String] = []
+        var cur = ""
+        var bytes = 0
+        for ch in line {
+            let n = String(ch).utf8.count
+            if bytes + n > (out.isEmpty ? 75 : 74) {
+                out.append(cur)
+                cur = ""
+                bytes = 0
+            }
+            cur.append(ch)
+            bytes += n
+        }
+        out.append(cur)
+        return out.joined(separator: "\r\n ")
     }
 
     static func file(_ plan: DayPlan) -> URL? {

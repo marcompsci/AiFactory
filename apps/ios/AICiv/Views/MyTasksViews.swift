@@ -16,7 +16,7 @@ struct MyTasksTab: View {
     @State private var showDone = false
     @State private var listFilter: String?
     @State private var tool: TaskTool?
-    @State private var queued = TaskOutbox.entries.count
+    @State private var queued = TaskOutbox.count
     @FocusState private var typing: Bool
 
     private var tz: String { TimeZone.current.identifier }
@@ -55,7 +55,7 @@ struct MyTasksTab: View {
         .sheet(item: $tool) { k in
             TaskToolSheet(tool: k) { await load() }.presentationDetents([.large])
         }
-        .task(id: app.openTaskId) { await openRequested() }
+        .task(id: "\(app.openTaskId ?? "")|\(app.connection == .live)") { await openRequested() }
     }
 
     // MARK: quick capture
@@ -103,8 +103,9 @@ struct MyTasksTab: View {
         guard t.count >= 2, let api = app.api else { return }
         adding = true
         defer { adding = false }
+        let ref = UUID().uuidString  // if the reply is lost and the outbox sends it again, the Mac still makes one task
         do {
-            let task = try await api.addTask(text: t, tz: tz)
+            let task = try await api.addTask(text: t, tz: tz, clientRef: ref)
             text = ""
             preview = nil
             error = nil
@@ -114,8 +115,8 @@ struct MyTasksTab: View {
         } catch let e as APIError {
             self.error = e.detail
         } catch {
-            TaskOutbox.queue(.init(kind: "add", taskId: nil, text: t))  // the Mac didn't answer: keep it for later
-            queued = TaskOutbox.entries.count
+            TaskOutbox.queue(.init(kind: "add", taskId: nil, text: t, ref: ref))  // the Mac didn't answer: keep it for later
+            queued = TaskOutbox.count
             text = ""
             preview = nil
             self.error = "Your Mac didn't answer, so the task is waiting on this phone. It's added when you reconnect."
@@ -126,7 +127,7 @@ struct MyTasksTab: View {
         let t = text.trimmingCharacters(in: .whitespaces)
         guard t.count >= 2 else { return }
         TaskOutbox.queue(.init(kind: "add", taskId: nil, text: t))
-        queued = TaskOutbox.entries.count
+        queued = TaskOutbox.count
         text = ""
         Haptics.light()
     }
@@ -259,8 +260,8 @@ struct MyTasksTab: View {
 
     private func load() async {
         guard app.connection == .live, let api = app.api else { return }
-        if !TaskOutbox.entries.isEmpty, await TaskOutbox.flush(api) > 0 { Haptics.light() }
-        queued = TaskOutbox.entries.count
+        if TaskOutbox.count > 0, await TaskOutbox.flush(api) > 0 { Haptics.light() }
+        queued = TaskOutbox.count
         if let list = try? await api.myTasks() {
             withAnimation(Motion.ui) { tasks = list }
             loaded = true
@@ -272,9 +273,14 @@ struct MyTasksTab: View {
     /// Spotlight or a reminder asked for one task: show it (fetched if it isn't in the list yet).
     private func openRequested() async {
         guard let id = app.openTaskId else { return }
-        app.openTaskId = nil
-        if let t = tasks.first(where: { $0.id == id }) { open = t; return }
-        if let api = app.api, let t = try? await api.myTask(id) { open = t }
+        if let t = tasks.first(where: { $0.id == id }) {
+            open = t
+        } else if let api = app.api, let t = try? await api.myTask(id) {
+            open = t
+        } else if app.connection != .live {
+            return  // not connected yet: try again when the connection (and this task) changes
+        }
+        if app.openTaskId == id { app.openTaskId = nil }  // cleared only after it's shown, so the fetch isn't cancelled
     }
 
     private func snooze(_ t: MyTask, _ preset: String) async {

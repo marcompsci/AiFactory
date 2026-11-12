@@ -229,12 +229,21 @@ def create(p: Principal, fields: dict) -> dict:
     extra = {"list_name": taskplus.clean_list(fields.pop("list_name", None)),
              "estimate_minutes": taskplus.clean_estimate(fields.pop("estimate_minutes", None))}
     steps = [s for s in (fields.pop("items", None) or []) if str(s).strip()][:taskplus.MAX_ITEMS]
+    ref = fields.pop("client_ref", None)
     clean = _clean({"kind": None, "priority": "normal", "repeat": "none", **fields})
     if "title" not in clean:
         raise TaskError("give the task a title of 2 to 160 characters")
     clean.setdefault("kind", capture.kind_of(clean["title"]))
     tid = db.new_id()
     T = db.my_tasks
+    seen = None
+    with transaction() as conn:
+        if ref:  # the phone sent this add before (a timed-out reply, then the outbox): hand back the task it made
+            seen = conn.execute(select(db.task_meta.c.task_id).where(db.task_meta.c.organization_id == p.organization_id,
+                                                                     db.task_meta.c.client_ref == ref)).scalar()
+    if seen:
+        with db.get_engine().connect() as conn:
+            return get(conn, p.organization_id, seen)
     with transaction() as conn:
         _check_repo(conn, p.organization_id, clean.get("repository_id"))
         n = len(conn.execute(select(T.c.id).where(T.c.organization_id == p.organization_id, T.c.status == "OPEN")).fetchall())
@@ -243,7 +252,9 @@ def create(p: Principal, fields: dict) -> dict:
         now = _now().isoformat()
         conn.execute(insert(T).values(id=tid, organization_id=p.organization_id, status="OPEN", runs=0, created_by=p.user_id,
                                       created_at=now, updated_at=now, notes=clean.pop("notes", ""), **clean))
-        if extra["list_name"] or extra["estimate_minutes"]:
+        if ref:
+            extra["client_ref"] = ref
+        if any(extra.values()):
             taskplus.set_meta(conn, p.organization_id, tid, **extra)
         if steps:
             taskplus._insert_items(conn, p.organization_id, tid, steps)

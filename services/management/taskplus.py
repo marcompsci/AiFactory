@@ -12,7 +12,7 @@ import statistics
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, insert, select, update
+from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.engine import Connection
 
 from services.core import db
@@ -428,7 +428,8 @@ def estimate(conn: Connection, org: str, tid: str) -> dict:
     if not rows:
         return {"label": "estimate", "runs": 0, "about": what, "cost_usd": None, "minutes": None, "budget_usd": budget,
                 "note": "No finished runs like this yet, so there's nothing to estimate from. The budget cap still applies."}
-    costs = [float(x.spent_usd_estimated or 0) for x in rows]
+    # simulations cost nothing, so they say nothing about what a real run costs
+    costs = [float(x.spent_usd_estimated or 0) for x in rows if x.execution_mode != "simulation"]
     mins = []
     for x in rows:
         try:
@@ -437,10 +438,11 @@ def estimate(conn: Connection, org: str, tid: str) -> dict:
             continue
     sim = sum(1 for x in rows if x.execution_mode == "simulation")
     return {"label": "estimate", "runs": len(rows), "about": what, "budget_usd": budget,
-            "cost_usd": {"typical": round(statistics.median(costs), 2), "high": round(max(costs), 2)},
+            "cost_usd": {"typical": round(statistics.median(costs), 2), "high": round(max(costs), 2)} if costs else None,
             "minutes": {"typical": round(statistics.median(mins), 1), "high": round(max(mins), 1)} if mins else None,
             "simulated_runs": sim,
             "note": (f"From your last {len(rows)} finished {what}" + (f", {sim} of them simulations" if sim else "")
+                     + (". They were all simulations, so there's no real cost to go by yet" if not costs else "")
                      + ". An estimate, not a quote; the run stops at its budget cap.")}
 
 
@@ -457,7 +459,7 @@ def _doer(conn: Connection, mission_id: str) -> str | None:
 def give_feedback(p: Principal, tid: str, rating: int, reason: str | None) -> dict:
     if rating not in (1, -1):
         raise PlusError("rate a result up (1) or down (-1)")
-    reason = " ".join((reason or "").split())[:300]
+    reason = " ".join((reason or "").split())[:300] or None
     with transaction() as conn:
         r = _task(conn, p.organization_id, tid)
         if not r.mission_id:
@@ -468,10 +470,10 @@ def give_feedback(p: Principal, tid: str, rating: int, reason: str | None) -> di
         F = db.task_feedback
         agent = _doer(conn, r.mission_id)
         if conn.execute(select(F.c.id).where(F.c.mission_id == r.mission_id)).first():
-            conn.execute(update(F).where(F.c.mission_id == r.mission_id).values(rating=rating, reason=reason, created_at=_now().isoformat()))
+            conn.execute(update(F).where(F.c.mission_id == r.mission_id).values(rating=rating, reason=reason or "", created_at=_now().isoformat()))
         else:
             conn.execute(insert(F).values(id=db.new_id(), organization_id=p.organization_id, task_id=tid, mission_id=r.mission_id,
-                                          rating=rating, reason=reason, agent_key=agent, created_by=p.user_id, created_at=_now().isoformat()))
+                                          rating=rating, reason=reason or "", agent_key=agent, created_by=p.user_id, created_at=_now().isoformat()))
         emit(conn, "my_task.rated", org_id=p.organization_id, mission_id=r.mission_id,
              payload={"task_id": tid, "rating": rating, "agent": agent})
     return {"rating": rating, "reason": reason, "agent": agent}
@@ -481,7 +483,7 @@ def feedback_for(conn: Connection, mission_id: str | None) -> dict | None:
     if not mission_id:
         return None
     r = conn.execute(select(db.task_feedback).where(db.task_feedback.c.mission_id == mission_id)).first()
-    return {"rating": r.rating, "reason": r.reason, "agent": r.agent_key} if r else None
+    return {"rating": r.rating, "reason": r.reason or None, "agent": r.agent_key} if r else None
 
 
 def agent_quality(conn: Connection, org: str) -> list[dict]:
@@ -507,12 +509,13 @@ def agent_quality(conn: Connection, org: str) -> list[dict]:
 def results(conn: Connection, org: str, q: str | None = None, kind: str | None = None, limit: int = 50) -> list[dict]:
     """Every result the agents wrote for your tasks, newest first; searchable by words in the title or text."""
     M, A, T = db.missions, db.artifacts, db.my_tasks
-    rows = conn.execute(
-        select(A.c.id, A.c.title, A.c.content, A.c.created_at, M.c.id.label("mission_id"), M.c.execution_mode, M.c.params)
-        .join(M, M.c.id == A.c.mission_id)
-        .where(M.c.organization_id == org, M.c.kind == "personal_task", A.c.kind == "note")
-        .order_by(A.c.created_at.desc()).limit(500)).fetchall()
-    words = [w for w in re.findall(r"[a-z0-9]{2,}", (q or "").lower())]
+    words = [w for w in re.findall(r"[a-z0-9]{2,}", (q or "").lower())][:8]
+    query = (select(A.c.id, A.c.title, A.c.content, A.c.created_at, M.c.id.label("mission_id"), M.c.execution_mode, M.c.params)
+             .join(M, M.c.id == A.c.mission_id)
+             .where(M.c.organization_id == org, M.c.kind == "personal_task", A.c.kind == "note"))
+    for w in words:  # searched in the database, so older results are found too (words are letters and digits only)
+        query = query.where(or_(A.c.title.ilike(f"%{w}%"), A.c.content.ilike(f"%{w}%")))
+    rows = conn.execute(query.order_by(A.c.created_at.desc()).limit(500)).fetchall()
     titles = {r.id: r.title for r in conn.execute(select(T.c.id, T.c.title).where(T.c.organization_id == org))}
     fb = {r.mission_id: r.rating for r in conn.execute(select(db.task_feedback.c.mission_id, db.task_feedback.c.rating)
                                                        .where(db.task_feedback.c.organization_id == org))}
@@ -602,15 +605,16 @@ def review(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     from .mytasks import listing
     zone = _zone(tz)
     now = _now()
-    week_ago = (now - timedelta(days=7)).isoformat()
+    local = now.astimezone(zone)
+    monday = datetime.combine(local.date() - timedelta(days=local.weekday()), time(0, 0), tzinfo=zone)
+    week_start = monday.astimezone(timezone.utc).isoformat()
     stale_cut = (now - timedelta(days=14)).isoformat()
     tasks = listing(conn, org, include_done=True)
-    done = [t for t in tasks if t["stage"] == "done" and (t.get("done_at") or "") >= week_ago]
+    done = [t for t in tasks if t["stage"] == "done" and (t.get("done_at") or "") >= week_start]
     slipped = [t for t in tasks if t["overdue"] and t["status"] == "OPEN"]
     stale = [t for t in tasks if t["status"] == "OPEN" and not t["due_at"] and t["created_at"] < stale_cut and t["stage"] == "open"]
     upcoming_end = (now + timedelta(days=7)).isoformat()
     upcoming = [t for t in tasks if t["status"] == "OPEN" and t["due_at"] and now.isoformat() <= t["due_at"] <= upcoming_end]
-    local = now.astimezone(zone)
     return {"week_of": (local.date() - timedelta(days=local.weekday())).isoformat(), "done": done, "slipped": slipped,
             "stale": stale, "upcoming": upcoming,
             "summary": f"{len(done)} done this week, {len(slipped)} slipped, {len(stale)} sitting for two weeks or more, "

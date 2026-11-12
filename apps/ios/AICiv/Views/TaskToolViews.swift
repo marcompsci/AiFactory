@@ -60,6 +60,7 @@ struct PlanDayView: View {
     @State private var end = Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: Date()) ?? Date()
     @State private var error: String?
     @State private var focusOn: MyTask?
+    @State private var icsURL: URL?
 
     var body: some View {
         List {
@@ -106,7 +107,7 @@ struct PlanDayView: View {
                         ForEach(p.later) { l in LabeledContent(l.title, value: TaskTime.minutes(l.minutes)) }
                     }
                 }
-                if !p.blocks.isEmpty, let url = DayPlanCalendar.file(p) {
+                if !p.blocks.isEmpty, let url = icsURL {
                     Section {
                         ShareLink(item: url) { Label("Add to Calendar (.ics)", systemImage: "calendar.badge.plus") }
                     } footer: { Text("Makes a calendar file on this phone. Nothing is added until you open it in Calendar and confirm.") }
@@ -126,7 +127,12 @@ struct PlanDayView: View {
 
     private func load() async {
         guard let api = app.api else { error = "Connect to your Mac to plan the day."; return }
-        do { plan = try await api.planDay(tz: phoneTZ, start: hhmm(start), end: hhmm(end)); error = nil }
+        do {
+            let p = try await api.planDay(tz: phoneTZ, start: hhmm(start), end: hhmm(end))
+            plan = p
+            icsURL = p.blocks.isEmpty ? nil : DayPlanCalendar.file(p)  // written once per plan, not on every redraw
+            error = nil
+        }
         catch { self.error = failure(error) }
     }
 }

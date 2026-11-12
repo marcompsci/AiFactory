@@ -1343,7 +1343,9 @@ task_meta = Table(  # one row per task that has any of these set (new data in a 
     Column("estimate_minutes", Integer),  # V6.73 "45m"
     Column("snoozed_until", String),      # V6.70 ISO time, UTC
     Column("blocked_by", String(36)),     # V6.71 waits on this task
+    Column("client_ref", String(64)),     # V6.82 the phone's id for an add it may send twice (offline outbox)
     Column("updated_at", String, nullable=False, default=utcnow),
+    UniqueConstraint("organization_id", "client_ref", name="task_meta_client_ref"),
 )
 
 task_items = Table(  # V6.68 a task's checklist

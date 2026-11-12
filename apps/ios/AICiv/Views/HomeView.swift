@@ -70,10 +70,8 @@ struct HomeView: View {
             }
         }
         .onChange(of: app.districts) { city.sync(districts: districts) }
-        .onChange(of: app.openTaskId) { _, id in
-            guard id != nil else { return }
-            withAnimation(Motion.ui) { tab = .tasks; if sheet == .peek { sheet = .half } }
-        }
+        .onChange(of: app.openTaskId) { _, id in if id != nil { showTasks() } }
+        .onAppear { if app.openTaskId != nil { showTasks() } }  // asked for before Home was on screen (cold launch)
         .onChange(of: reduceMotion) { city.reduceMotion = reduceMotion }
         .onChange(of: camera) { _, m in
             if m == .follow, let id = selectedAgent { city.follow(id) } else if city.mode != m { city.mode = m }
@@ -120,6 +118,10 @@ struct HomeView: View {
             }
         }
         .frame(width: width, height: height)
+    }
+
+    private func showTasks() {
+        withAnimation(Motion.ui) { tab = .tasks; if sheet == .peek { sheet = .half } }
     }
 
     private func handle(_ t: CityTap) {

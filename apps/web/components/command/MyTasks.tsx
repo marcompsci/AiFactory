@@ -302,13 +302,30 @@ function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
   return <Templates refresh={refresh} />;
 }
 
+/** RFC 5545: lines over 75 bytes continue on the next line after a space, never splitting a character. */
+function fold(line: string): string {
+  const enc = new TextEncoder();
+  const out: string[] = [];
+  let cur = "";
+  let bytes = 0;
+  for (const ch of line) {
+    const n = enc.encode(ch).length;
+    if (bytes + n > (out.length ? 74 : 75)) { out.push(cur); cur = ""; bytes = 0; }
+    cur += ch; bytes += n;
+  }
+  out.push(cur);
+  return out.join("\r\n ");
+}
+
 function icsFor(plan: Json): string {
   const f = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/[;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/[;,]/g, (c) => `\\${c}`).replace(/\r\n|\r|\n/g, "\\n");
   const now = f(new Date().toISOString());
-  const ev = (plan.blocks as Json[]).map((b) => ["BEGIN:VEVENT", `UID:${b.task_id}-${f(b.start)}@aiciv`, `DTSTAMP:${now}`, `DTSTART:${f(b.start)}`,
-    `DTEND:${f(b.end)}`, `SUMMARY:${esc(`${b.verb}: ${b.title}`)}`, "END:VEVENT"].join("\r\n"));
-  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AI Civilization//Plan my day//EN", ...ev, "END:VCALENDAR", ""].join("\r\n");
+  const ev = (plan.blocks as Json[]).flatMap((b) => ["BEGIN:VEVENT", `UID:${b.task_id}-${f(b.start)}@aiciv`, `DTSTAMP:${now}`, `DTSTART:${f(b.start)}`,
+    `DTEND:${f(b.end)}`, `SUMMARY:${esc(`${b.verb}: ${b.title}`)}`,
+    `DESCRIPTION:${esc(b.estimated ? `${b.minutes} minutes (a default length, not your estimate)` : `${b.minutes} minutes`)}`, "END:VEVENT"]);
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AI Civilization//Plan my day//EN", "CALSCALE:GREGORIAN", ...ev, "END:VCALENDAR"]
+    .map(fold).join("\r\n") + "\r\n";
 }
 
 function PlanDay() {

@@ -49,8 +49,9 @@ def task_plan(env: TaskEnv) -> dict:
     if not env.live:
         body = f"{SIM_NOTE}\n\n{body}"
     env.tool("create_artifact", kind="plan", title=f"Plan: {title}"[:120], content=body)
-    from services.management import taskplus  # the plan's steps become the task's checklist (V6.68)
-    taskplus.seed_from_plan(env.mission.organization_id, (env.mission.params or {}).get("task_id"), steps)
+    if env.live:  # a real plan's steps become the task's checklist (V6.68); a simulation's template steps don't
+        from services.management import taskplus
+        taskplus.seed_from_plan(env.mission.organization_id, (env.mission.params or {}).get("task_id"), steps)
     env.say(f"Here's the plan for \"{title}\": {len(steps)} steps. Over to you.", to_key=None, kind="handoff")
     return {"steps": steps}
 

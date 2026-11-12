@@ -25,6 +25,12 @@ def test_capture_reads_lists_and_estimates():
     assert parse("gym 1.5h #health", LA)["estimate_minutes"] == 90
     assert parse("write 3 posts", LA)["estimate_minutes"] is None
     assert parse("nap 2m", LA)["estimate_minutes"] is None  # under 5 minutes isn't an estimate
+    # lengths that aren't estimates stay in the title
+    assert parse("Buy 2 m of rope", LA)["title"] == "Buy 2 m of rope"
+    assert parse("Return book within 24h", LA)["title"] == "Return book within 24h"
+    r = parse("Run 100m sprint drills", LA)
+    assert r["title"] == "Run 100m sprint drills" and r["estimate_minutes"] is None
+    assert parse("walk for 20 m", LA)["estimate_minutes"] == 20
 
 
 def test_checklists_lists_and_estimates(client):
@@ -123,7 +129,8 @@ def test_estimate_feedback_library_and_quality(client):
     run = client.post(f"/api/my-tasks/{t['id']}/do").json()["mission_id"]
     _finished(client, run)
     d = client.get(f"/api/my-tasks/{t['id']}").json()
-    assert d["items_total"] == 4 and all(i["from_agents"] for i in d["items"])  # the plan became the checklist
+    assert d["items_total"] == 0  # a simulation's template steps don't become your checklist
+    assert client.post(f"/api/my-tasks/{t['id']}/feedback", json={"rating": 1, "reason": "  "}).json()["reason"] is None
     f = client.post(f"/api/my-tasks/{t['id']}/feedback", json={"rating": -1, "reason": "Too long"}).json()
     assert f["agent"] == "designer"
     assert client.get(f"/api/my-tasks/{t['id']}").json()["feedback"]["reason"] == "Too long"
@@ -134,7 +141,7 @@ def test_estimate_feedback_library_and_quality(client):
     assert client.get("/api/my-tasks/results", params={"q": "zebra"}).json()["results"] == []
     t2 = _add(client, "draft the welcome email")
     e2 = client.get(f"/api/my-tasks/{t2['id']}/estimate").json()
-    assert e2["runs"] == 1 and e2["cost_usd"]["typical"] >= 0 and "estimate" in e2["note"]
+    assert e2["runs"] == 1 and e2["cost_usd"] is None and "simulations" in e2["note"] and "estimate" in e2["note"]
 
 
 def test_weekly_review_and_bulk(client):
@@ -151,3 +158,20 @@ def test_weekly_review_and_bulk(client):
     assert out["changed"] == [a["id"]] and out["errors"][0]["task_id"] == "not-a-task"
     with db.get_engine().connect() as conn:
         assert conn.execute(select(db.my_tasks.c.status).where(db.my_tasks.c.id == a["id"])).scalar() == "DROPPED"
+
+
+def test_seed_from_plan_makes_the_checklist(client):
+    t = _add(client, "pack for the trip")
+    with db.get_engine().connect() as conn:
+        org = conn.execute(select(db.my_tasks.c.organization_id)).scalar()
+    taskplus.seed_from_plan(org, t["id"], ["Clothes", "Charger"])
+    d = client.get(f"/api/my-tasks/{t['id']}").json()
+    assert [i["text"] for i in d["items"]] == ["Clothes", "Charger"] and all(i["from_agents"] for i in d["items"])
+
+
+def test_the_same_add_twice_makes_one_task(client):
+    a = _add(client, "call the bank", client_ref="phone-0001-abcd")
+    b = _add(client, "call the bank", client_ref="phone-0001-abcd")
+    assert a["id"] == b["id"]
+    assert len(client.get("/api/my-tasks").json()["tasks"]) == 1
+    assert client.post("/api/my-tasks", json={"text": "x y", "client_ref": "bad ref!"}).status_code == 422

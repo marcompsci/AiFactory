@@ -6,9 +6,11 @@ create table task_meta (
   estimate_minutes integer check (estimate_minutes is null or estimate_minutes between 5 and 600),
   snoozed_until timestamptz,
   blocked_by uuid references my_tasks(id) on delete set null,
+  client_ref text check (client_ref is null or client_ref ~ '^[A-Za-z0-9-]{8,64}$'),
   updated_at timestamptz not null default now()
 );
 create index task_meta_org on task_meta (organization_id);
+create unique index task_meta_client_ref on task_meta (organization_id, client_ref) where client_ref is not null;
 
 create table task_items (
   id uuid primary key,

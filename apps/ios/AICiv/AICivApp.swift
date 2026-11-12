@@ -33,7 +33,7 @@ struct AICivApp: App {
                 }
         }
         .onChange(of: phase) { _, newPhase in
-            if newPhase == .active, app.connection == .live, let api = app.api, !TaskOutbox.entries.isEmpty {
+            if newPhase == .active, app.connection == .live, let api = app.api, TaskOutbox.count > 0 {
                 Task { await TaskOutbox.flush(api) }
             }
             if newPhase == .background { BackgroundRefresh.schedule() }

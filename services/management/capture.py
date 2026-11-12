@@ -97,11 +97,6 @@ def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dic
     m = cut(r"\s#([a-z0-9][a-z0-9_-]{0,39})(?=\s)")
     if m:
         out["list_name"] = m.group(1)
-    out["estimate_minutes"] = None
-    m = cut(r"\s(?:for |~)?(\d{1,3}(?:\.\d)?)\s?(m|min|mins|minutes|h|hr|hrs|hour|hours)(?=\s)")
-    if m:
-        v = float(m.group(1)) * (60 if m.group(2).startswith("h") else 1)
-        out["estimate_minutes"] = int(v) if 5 <= v <= 600 else None
     m = cut(r"\s\$\s?(\d{1,2}(?:\.\d{1,2})?)\b")
     if m:
         v = float(m.group(1))
@@ -110,6 +105,19 @@ def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dic
         out["priority"] = "urgent"
     elif cut(r"\s(low priority|someday|whenever|no rush)(?=\s)"):
         out["priority"] = "low"
+    out["estimate_minutes"] = None
+    # Only a plausible length is read (and taken out of the title): "2h", "45 min", "for 2 m". A bare "m" counts only when
+    # written on the number at the very end ("... 45m") or after "for"/"~", so "100m sprint" and "2 m of rope" stay words.
+    for m in re.finditer(r"\s(for |~)?(\d{1,3}(?:\.\d)?)(\s?)(min|mins|minutes|m|h|hr|hrs|hour|hours)(?=\s)", low):
+        unit = m.group(4)
+        if unit == "m" and not m.group(1) and (m.group(3) or low[m.end():].strip()):
+            continue
+        v = float(m.group(2)) * (60 if unit.startswith("h") else 1)
+        if 5 <= v <= 600:
+            out["estimate_minutes"] = int(v)
+            t = t[:m.start()] + " " + t[m.end():]
+            low = t.lower()
+            break
 
     weekly_day = None
     if cut(r"\s(every ?day|daily|each day)(?=\s)"):
