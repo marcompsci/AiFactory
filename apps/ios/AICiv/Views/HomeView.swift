@@ -70,6 +70,10 @@ struct HomeView: View {
             }
         }
         .onChange(of: app.districts) { city.sync(districts: districts) }
+        .onChange(of: app.openTaskId) { _, id in
+            guard id != nil else { return }
+            withAnimation(Motion.ui) { tab = .tasks; if sheet == .peek { sheet = .half } }
+        }
         .onChange(of: reduceMotion) { city.reduceMotion = reduceMotion }
         .onChange(of: camera) { _, m in
             if m == .follow, let id = selectedAgent { city.follow(id) } else if city.mode != m { city.mode = m }

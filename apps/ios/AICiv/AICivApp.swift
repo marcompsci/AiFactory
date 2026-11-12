@@ -1,8 +1,10 @@
 import BackgroundTasks
+import CoreSpotlight
 import SwiftUI
 
 @main
 struct AICivApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @State private var app = AppState()
     @Environment(\.scenePhase) private var phase
 
@@ -22,12 +24,26 @@ struct AICivApp: App {
                     if !shots { Notifier.requestPermission() }
                     app.connect()
                     if !shots { app.startFinding() }
+                    if let id = TaskActions.pendingOpen { TaskActions.pendingOpen = nil; open(id) }
+                }
+                // a task found in Spotlight, or a reminder's Open button
+                .onContinueUserActivity(CSSearchableItemActionType) { a in if let id = TaskSpotlight.taskId(from: a) { open(id) } }
+                .onReceive(NotificationCenter.default.publisher(for: TaskActions.openNote)) { n in
+                    if let id = n.object as? String { TaskActions.pendingOpen = nil; open(id) }
                 }
         }
         .onChange(of: phase) { _, newPhase in
+            if newPhase == .active, app.connection == .live, let api = app.api, !TaskOutbox.entries.isEmpty {
+                Task { await TaskOutbox.flush(api) }
+            }
             if newPhase == .background { BackgroundRefresh.schedule() }
             if newPhase == .active, app.connection != .live { app.connect(); app.startFinding() }
         }
+    }
+
+    private func open(_ id: String) {
+        app.openTab = "home"
+        app.openTaskId = id
     }
 }
 

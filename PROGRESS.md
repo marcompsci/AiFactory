@@ -598,3 +598,37 @@ The Home city keeps its layout, signs, bubbles and camera modes, with a new look
 - **V6.66 Life.** Drifting light motes, delivery drones between the towers, a glass-and-crystal Knowledge Base.
 - **V6.67 Comfort.** A light mode (no shadows, occlusion or particles, half the plants) switches on when the phone runs
   hot, or with `-cityQuality low`; Reduce Motion stills limbs, cars, drones, the globe and blinking.
+
+## V6.68–V6.87: Getting through the list (iPhone, web, server)
+
+Everything still waits for you: nothing starts, spends, sends or is marked done without you, budgets and approvals are
+unchanged, and every estimate is labelled as one.
+
+- **V6.68 Checklists.** Steps on a task (`task_items`), ticked only by you. When the agents plan a task, the plan's steps
+  become its checklist, marked ✦. A repeating task's next occurrence keeps the checklist, unticked.
+- **V6.69 Lists.** `#home` in quick capture files a task on a list; filter chips on the phone and the web.
+- **V6.70 Snooze.** Later (3 hours), tonight, tomorrow morning, next week, or wake it now. Snoozed tasks drop to their own group.
+- **V6.71 Waiting on.** A task can wait on another (no loops, no self); it opens up when the other is done or deleted.
+- **V6.72 Templates.** Save a task's title, list, estimate, budget and checklist; start a copy any time.
+- **V6.73 Time estimates.** `30m`, `1.5h`, `2 hours` in quick capture (5 minutes to 10 hours).
+- **V6.74 Plan my day.** A timeline: decisions first (5 minutes), results to review (10), then overdue, due today and the
+  rest by priority for their estimates or a default by kind (marked "default length"). What doesn't fit is listed.
+- **V6.75 Calendar export.** The plan as an `.ics` file made on the phone or in the browser; nothing is added until you open it.
+- **V6.76 Focus timer.** A timer on the phone; when you stop, the minutes are logged on the task (`focus_sessions`).
+- **V6.77 Weekly review.** What's done this week, what slipped, what's been sitting two weeks, what's coming up.
+- **V6.78 Estimate before Do it.** Typical and high cost and time from your finished runs of the same kind, labelled as an
+  estimate, with the budget cap; "nothing to estimate from" when there's no history.
+- **V6.79 Ratings.** Thumbs up or down (with an optional reason) on a finished result; each agent's record in Insights.
+- **V6.80 Results library.** Every result the agents wrote for your tasks, searchable, with simulations marked.
+- **V6.81 Actionable reminders.** Done (iOS asks you to unlock first), Snooze 1 hour, Open.
+- **V6.82 Offline outbox.** Tasks you add while your Mac is out of reach (and reminder actions) wait on the phone and go
+  through when you reconnect.
+- **V6.83 Bulk actions.** Pick tasks in the weekly review and mark them done, drop them or push them to next week.
+- **V6.84 Insights.** Done and added per day, focus minutes, on-time rate and runs (Swift Charts on the phone).
+- **V6.85 Spotlight.** Open tasks show up in the phone's search; tapping one opens it.
+- **V6.86 Web parity.** Checklists, lists, snooze, estimates, ratings, plan with `.ics`, review, results, insights, templates.
+- **V6.87 Polish and review.** Accessibility labels, an independent review, then the phone install.
+
+Server: migration `0019_task_details.sql` (task_meta, task_items, task_templates, task_feedback, focus_sessions), new
+event `my_task.rated`, `services/management/taskplus.py`, tests in `tests/integration/test_v668_v687.py`.
+Left out on purpose: the Home Screen widget and Live Activities (they need an app group and extra signing).

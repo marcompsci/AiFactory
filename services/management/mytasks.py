@@ -150,36 +150,68 @@ def stage(task, mission: dict | None) -> str:
     return "problem"
 
 
-def _view(task, mission: dict | None, now: datetime) -> dict:
+def _view(task, mission: dict | None, now: datetime, meta: dict | None = None, items: list | None = None,
+          open_ids: set | None = None) -> dict:
     d = dict(task._mapping)
     d["stage"] = stage(task, mission)
     d["mission"] = mission
     d["overdue"] = bool(task.due_at and task.status == "OPEN" and datetime.fromisoformat(task.due_at) < now)
+    meta = meta or {}
+    d["list_name"] = meta.get("list_name")
+    d["estimate_minutes"] = meta.get("estimate_minutes")
+    snoozed = meta.get("snoozed_until")
+    d["snoozed_until"] = snoozed if snoozed and snoozed > now.isoformat() else None
+    blocker = meta.get("blocked_by")
+    d["blocked_by"] = blocker if blocker and (open_ids is None or blocker in open_ids) else None
+    if d["stage"] == "open":  # V6.70/V6.71: set aside until later, or waiting on another task
+        if d["blocked_by"]:
+            d["stage"] = "blocked"
+        elif d["snoozed_until"]:
+            d["stage"] = "snoozed"
+    items = items or []
+    d["items_total"] = len(items)
+    d["items_done"] = sum(1 for i in items if i["done"])
     return d
 
 
+def _open_ids(conn: Connection, org: str) -> set:
+    T = db.my_tasks
+    return {r.id for r in conn.execute(select(T.c.id).where(T.c.organization_id == org, T.c.status == "OPEN"))}
+
+
 def listing(conn: Connection, org: str, include_done: bool = True) -> list[dict]:
+    from . import taskplus
     T = db.my_tasks
     q = select(T).where(T.c.organization_id == org)
     if not include_done:
         q = q.where(T.c.status == "OPEN")
     rows = conn.execute(q.order_by(T.c.created_at.desc()).limit(1000)).fetchall()
     ms = _missions(conn, [r.mission_id for r in rows if r.mission_id])
+    ids = [r.id for r in rows]
+    metas, items, open_ids = taskplus.meta_for(conn, org, ids), taskplus.items_for(conn, org, ids), _open_ids(conn, org)
     now = _now()
-    out = [_view(r, ms.get(r.mission_id) if r.mission_id else None, now) for r in rows]
+    out = [_view(r, ms.get(r.mission_id) if r.mission_id else None, now, metas.get(r.id), items.get(r.id), open_ids) for r in rows]
     out.sort(key=sort_key)
     return out
 
 
 def sort_key(t: dict):
-    order = {"needs_you": 0, "review": 1, "problem": 2, "working": 3, "open": 4, "done": 5, "dropped": 6}
+    order = {"needs_you": 0, "review": 1, "problem": 2, "working": 3, "open": 4, "blocked": 5, "snoozed": 6, "done": 7, "dropped": 8}
     return (order.get(t["stage"], 9), t["due_at"] is None, t["due_at"] or "", PRIORITY_RANK.get(t["priority"], 1), t["created_at"])
 
 
 def get(conn: Connection, org: str, tid: str) -> dict:
+    from . import taskplus
     r = _row(conn, org, tid)
     ms = _missions(conn, [r.mission_id] if r.mission_id else [])
-    d = _view(r, ms.get(r.mission_id) if r.mission_id else None, _now())
+    items = taskplus.items_for(conn, org, [tid]).get(tid, [])
+    d = _view(r, ms.get(r.mission_id) if r.mission_id else None, _now(), taskplus.meta_for(conn, org, [tid]).get(tid), items,
+              _open_ids(conn, org))
+    d["items"] = items
+    d["feedback"] = taskplus.feedback_for(conn, r.mission_id)
+    d["focus_minutes"] = taskplus.focus_total(conn, tid)
+    if d["blocked_by"]:
+        d["blocked_by_title"] = conn.execute(select(db.my_tasks.c.title).where(db.my_tasks.c.id == d["blocked_by"])).scalar()
     m = d["mission"] or {}
     A = db.artifacts
     for key in ("plan_artifact_id", "result_artifact_id"):
@@ -192,6 +224,11 @@ def get(conn: Connection, org: str, tid: str) -> dict:
 # ---------------------------------------------------------------- writing
 
 def create(p: Principal, fields: dict) -> dict:
+    from . import taskplus
+    fields = dict(fields)
+    extra = {"list_name": taskplus.clean_list(fields.pop("list_name", None)),
+             "estimate_minutes": taskplus.clean_estimate(fields.pop("estimate_minutes", None))}
+    steps = [s for s in (fields.pop("items", None) or []) if str(s).strip()][:taskplus.MAX_ITEMS]
     clean = _clean({"kind": None, "priority": "normal", "repeat": "none", **fields})
     if "title" not in clean:
         raise TaskError("give the task a title of 2 to 160 characters")
@@ -206,6 +243,10 @@ def create(p: Principal, fields: dict) -> dict:
         now = _now().isoformat()
         conn.execute(insert(T).values(id=tid, organization_id=p.organization_id, status="OPEN", runs=0, created_by=p.user_id,
                                       created_at=now, updated_at=now, notes=clean.pop("notes", ""), **clean))
+        if extra["list_name"] or extra["estimate_minutes"]:
+            taskplus.set_meta(conn, p.organization_id, tid, **extra)
+        if steps:
+            taskplus._insert_items(conn, p.organization_id, tid, steps)
         emit(conn, "my_task.created", org_id=p.organization_id,
              payload={"task_id": tid, "title": clean["title"], "kind": clean["kind"], "due_at": clean.get("due_at")})
     with db.get_engine().connect() as conn:
@@ -216,21 +257,40 @@ def create_from_text(p: Principal, text: str, tz: str | None = "UTC", extra: dic
     parsed = capture.parse(text, tz)
     if len(parsed["title"]) < 2:
         raise TaskError("say what the task is")
-    fields = {k: parsed[k] for k in ("title", "kind", "priority", "due_at", "repeat", "budget_usd")}
+    fields = {k: parsed[k] for k in ("title", "kind", "priority", "due_at", "repeat", "budget_usd", "list_name", "estimate_minutes")}
     fields.update({k: v for k, v in (extra or {}).items() if v is not None})
     return create(p, fields)
 
 
 def edit(p: Principal, tid: str, fields: dict) -> dict:
+    from . import taskplus
+    fields = dict(fields)
+    meta: dict = {}
+    try:
+        if "list_name" in fields:
+            meta["list_name"] = taskplus.clean_list(fields.pop("list_name"))
+        if "estimate_minutes" in fields:
+            meta["estimate_minutes"] = taskplus.clean_estimate(fields.pop("estimate_minutes"))
+    except taskplus.PlusError as exc:
+        raise TaskError(str(exc), exc.status) from exc
+    blocked = fields.pop("blocked_by", ...) if "blocked_by" in fields else ...
     clean = _clean(fields)
-    if not clean:
+    if not clean and not meta and blocked is ...:
         raise TaskError("nothing to change")
     with transaction() as conn:
         _row(conn, p.organization_id, tid)
         if "repository_id" in clean:
             _check_repo(conn, p.organization_id, clean["repository_id"])
-        conn.execute(update(db.my_tasks).where(db.my_tasks.c.id == tid).values(updated_at=_now().isoformat(), **clean))
-        emit(conn, "my_task.updated", org_id=p.organization_id, payload={"task_id": tid, "fields": sorted(clean)})
+        if blocked is not ...:
+            try:
+                meta["blocked_by"] = taskplus.check_blocker(conn, p.organization_id, tid, blocked or None)
+            except taskplus.PlusError as exc:
+                raise TaskError(str(exc), exc.status) from exc
+        if clean:
+            conn.execute(update(db.my_tasks).where(db.my_tasks.c.id == tid).values(updated_at=_now().isoformat(), **clean))
+        if meta:
+            taskplus.set_meta(conn, p.organization_id, tid, **meta)
+        emit(conn, "my_task.updated", org_id=p.organization_id, payload={"task_id": tid, "fields": sorted([*clean, *meta])})
     with db.get_engine().connect() as conn:
         return get(conn, p.organization_id, tid)
 
@@ -254,6 +314,8 @@ def complete(p: Principal, tid: str, tz: str | None = "UTC") -> dict:
                                           priority=r.priority, status="OPEN", due_at=capture.next_due(r.due_at, r.repeat, tz),
                                           repeat=r.repeat, budget_usd=r.budget_usd, repository_id=r.repository_id, runs=0,
                                           repeat_of=tid, created_by=p.user_id, created_at=now, updated_at=now))
+            from . import taskplus
+            taskplus.copy_details(conn, r.organization_id, tid, nxt_id)
         emit(conn, "my_task.completed", org_id=p.organization_id,
              payload={"task_id": tid, "title": r.title, "next_task_id": nxt_id, "had_run": bool(r.mission_id)})
     with db.get_engine().connect() as conn:
@@ -294,10 +356,12 @@ def set_status(p: Principal, tid: str, status: str) -> dict:
 
 
 def remove(p: Principal, tid: str) -> None:
+    from . import taskplus
     with db.get_engine().connect() as conn:
         _stop_run(p, _row(conn, p.organization_id, tid))
     with transaction() as conn:
         r = _row(conn, p.organization_id, tid)
+        taskplus.forget(conn, tid)
         conn.execute(delete(db.my_tasks).where(db.my_tasks.c.id == tid))
         emit(conn, "my_task.deleted", org_id=p.organization_id, payload={"task_id": tid, "title": r.title})
 

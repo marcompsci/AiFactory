@@ -14,7 +14,11 @@ const STAGE: Record<string, { text: string; color: string }> = {
   problem: { text: "Run stopped", color: "#FF6178" },
   done: { text: "Done", color: "#8a93b8" },
   dropped: { text: "Dropped", color: "#8a93b8" },
+  blocked: { text: "Waiting", color: "#A66BFF" },
+  snoozed: { text: "Snoozed", color: "#8a93b8" },
 };
+const SNOOZE: [string, string][] = [["later", "Later today"], ["tonight", "Tonight"], ["tomorrow", "Tomorrow"], ["next_week", "Next week"]];
+const mins = (m: number) => (m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`);
 const KIND_COLOR: Record<string, string> = { code: "#FF9A3D", research: "#5B8CFF", write: "#FF4FB0", personal: "#A66BFF" };
 
 /** "today 5:00 PM", "tomorrow 9:00 AM", "Fri 5:00 PM", "Nov 14", in this browser's time zone. */
@@ -38,6 +42,8 @@ export function MyTasksPanel() {
   const [preview, setPreview] = useState<Json | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [listFilter, setListFilter] = useState<string | null>(null);
+  const [tool, setTool] = useState<string | null>(null);
   const list = useQuery({ queryKey: ["my-tasks"], queryFn: myTasks.list, enabled: status === "live", refetchInterval: 5_000 });
   const refresh = () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); qc.invalidateQueries({ queryKey: ["my-task"] }); };
   const add = useMutation({ mutationFn: () => myTasks.add(text), onSuccess: () => { setText(""); setPreview(null); refresh(); } });
@@ -53,7 +59,9 @@ export function MyTasksPanel() {
   if (status !== "live") {
     return <Empty>Your task list lives on your server. Connect to it to add tasks and hand them to the agents.</Empty>;
   }
-  const tasks: Json[] = list.data?.tasks ?? [];
+  const all: Json[] = list.data?.tasks ?? [];
+  const lists = [...new Set(all.filter((t) => t.status === "OPEN" && t.list_name).map((t) => t.list_name as string))].sort();
+  const tasks = listFilter ? all.filter((t) => t.list_name === listFilter) : all;
   const live = tasks.filter((t) => t.stage !== "done" && t.stage !== "dropped");
   const pending = live.filter((t) => t.stage === "open" || t.stage === "working");
   const endOfDay = new Date(); endOfDay.setHours(23, 59, 59, 999);
@@ -64,6 +72,8 @@ export function MyTasksPanel() {
     ["Today", pending.filter((t) => !t.overdue && t.due_at && new Date(t.due_at) <= endOfDay)],
     ["Coming up", pending.filter((t) => t.due_at && new Date(t.due_at) > endOfDay)],
     ["Anytime", pending.filter((t) => !t.due_at)],
+    ["Waiting on something", live.filter((t) => t.stage === "blocked")],
+    ["Snoozed", live.filter((t) => t.stage === "snoozed")],
   ];
   const done = tasks.filter((t) => t.stage === "done");
 
@@ -88,10 +98,27 @@ export function MyTasksPanel() {
             {preview.priority !== "normal" ? <Pill color={preview.priority === "urgent" ? "#FF6178" : "#8a93b8"}>{preview.priority}</Pill> : null}
             {preview.budget_usd ? <Pill color="#5BF2A5">${Number(preview.budget_usd).toFixed(2)}</Pill> : null}
             {preview.repeat !== "none" ? <Pill color="#A66BFF">{preview.repeat}</Pill> : null}
+            {preview.list_name ? <Pill color="#FFBD69">#{preview.list_name}</Pill> : null}
+            {preview.estimate_minutes ? <Pill color="#8a93b8">{mins(preview.estimate_minutes)}</Pill> : null}
           </p>
         ) : null}
         <ErrorNote error={add.error ?? act.error} />
       </form>
+      <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Task tools">
+        {[["plan", "Plan my day"], ["review", "Weekly review"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"]].map(([k, label]) => (
+          <Button key={k} aria-pressed={tool === k} variant={tool === k ? "primary" : "quiet"} onClick={() => setTool(tool === k ? null : k)}>{label}</Button>
+        ))}
+      </div>
+      {tool ? <TaskTools tool={tool} refresh={refresh} /> : null}
+      {lists.length ? (
+        <div className="flex flex-wrap gap-1.5 text-xs" aria-label="Lists">
+          <button type="button" aria-pressed={!listFilter} onClick={() => setListFilter(null)} className={`rounded-full px-2 py-0.5 ${!listFilter ? "bg-white/15 text-ink" : "text-ink-3"}`}>All</button>
+          {lists.map((n) => (
+            <button key={n} type="button" aria-pressed={listFilter === n} onClick={() => setListFilter(listFilter === n ? null : n)}
+              className={`rounded-full px-2 py-0.5 ${listFilter === n ? "bg-[#FFBD69]/25 text-ink" : "text-[#FFBD69]"}`}>#{n}</button>
+          ))}
+        </div>
+      ) : null}
       {list.isLoading ? <Skeleton /> : null}
       {!list.isLoading && live.length === 0 ? <Empty>Nothing on your list. Add something above, or tell any agent in the town "add a task: …".</Empty> : null}
       {groups.filter(([, g]) => g.length).map(([name, g]) => (
@@ -133,6 +160,10 @@ function TaskRow({ t, open, onOpen, act, busy }: { t: Json; open: boolean; onOpe
             {t.due_at ? <span className={t.overdue ? "text-bad" : ""}>{dueLabel(t.due_at)}</span> : null}
             {t.repeat !== "none" ? <span>↻ {t.repeat}</span> : null}
             {t.priority === "urgent" ? <span className="text-bad">urgent</span> : null}
+            {t.list_name ? <span className="text-[#FFBD69]">#{t.list_name}</span> : null}
+            {t.estimate_minutes ? <span>{mins(t.estimate_minutes)}</span> : null}
+            {t.items_total ? <span aria-label={`${t.items_done} of ${t.items_total} steps done`}>☑ {t.items_done}/{t.items_total}</span> : null}
+            {t.stage === "snoozed" && t.snoozed_until ? <span>until {dueLabel(t.snoozed_until)}</span> : null}
           </span>
         </button>
         {t.status === "OPEN" && (t.stage === "open" || t.stage === "problem") ? (
@@ -149,7 +180,11 @@ function TaskRow({ t, open, onOpen, act, busy }: { t: Json; open: boolean; onOpe
 function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json>) => void; busy: boolean }) {
   const q = useQuery({ queryKey: ["my-task", id], queryFn: () => myTasks.get(id), refetchInterval: 4_000 });
   const [note, setNote] = useState("");
+  const [step, setStep] = useState("");
+  const [why, setWhy] = useState("");
   const t = q.data;
+  const runnable = t?.status === "OPEN" && (t?.stage === "open" || t?.stage === "problem");
+  const est = useQuery({ queryKey: ["my-task-estimate", id], queryFn: () => myTasks.estimate(id), enabled: !!runnable });
   if (!t) return <div className="mt-2"><Skeleton lines={2} /></div>;
   const sim = t.mission?.execution_mode === "simulation";
   return (
@@ -161,6 +196,62 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
           {Number(t.mission.budget_usd ?? 0).toFixed(2)} · {t.runs} run{t.runs === 1 ? "" : "s"}
         </p>
       ) : null}
+      {t.items?.length || t.status === "OPEN" ? (
+        <div>
+          <p className="text-xs font-semibold text-ink-2">Checklist{t.items?.length ? ` ${t.items_done}/${t.items_total}` : ""}</p>
+          <ul className="mt-1 space-y-0.5">
+            {(t.items ?? []).map((i: Json) => (
+              <li key={i.id} className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={i.done} disabled={busy} aria-label={i.done ? `Untick ${i.text}` : `Tick ${i.text}`}
+                  onChange={() => act(() => myTasks.setItem(id, i.id, { done: !i.done }))} className="size-3.5 accent-[#5BF2A5]" />
+                <span className={i.done ? "text-ink-3 line-through" : ""}>{i.text}</span>
+                {i.from_agents ? <span className="text-ink-3" title="From the agents' plan">✦</span> : null}
+                <button type="button" className="ml-auto text-ink-3 hover:text-bad" aria-label={`Remove ${i.text}`} onClick={() => act(() => myTasks.removeItem(id, i.id))}>×</button>
+              </li>
+            ))}
+          </ul>
+          {t.status === "OPEN" ? (
+            <form className="mt-1 flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (step.trim()) { act(() => myTasks.addItems(id, [step.trim()])); setStep(""); } }}>
+              <input aria-label="Add a step" value={step} onChange={(e) => setStep(e.target.value)} placeholder="Add a step"
+                className="min-w-0 flex-1 rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+              <Button type="submit" disabled={!step.trim() || busy}>Add</Button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+      {t.status === "OPEN" ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-2">
+          <label className="flex items-center gap-1">List
+            <input defaultValue={t.list_name ? `#${t.list_name}` : ""} placeholder="#home" aria-label="List"
+              onBlur={(e) => { const v = e.target.value.trim(); if (v.replace(/^#/, "") !== (t.list_name ?? "")) act(() => myTasks.edit(id, { list_name: v || null })); }}
+              className="w-24 rounded-md border border-line bg-ground/60 px-1.5 py-0.5 text-ink" />
+          </label>
+          <label className="flex items-center gap-1">Time
+            <select value={t.estimate_minutes ?? ""} aria-label="Time it takes" onChange={(e) => act(() => myTasks.edit(id, { estimate_minutes: e.target.value ? Number(e.target.value) : null }))}
+              className="rounded-md border border-line bg-ground/60 px-1 py-0.5 text-ink">
+              <option value="">not set</option>
+              {[...new Set([15, 30, 45, 60, 90, 120, 180, 240, ...(t.estimate_minutes ? [t.estimate_minutes] : [])])].sort((a, b) => a - b).map((m) => <option key={m} value={m}>{mins(m)}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-1">Snooze
+            <select value="" aria-label="Snooze" onChange={(e) => { if (e.target.value) act(() => myTasks.snooze(id, e.target.value)); }}
+              className="rounded-md border border-line bg-ground/60 px-1 py-0.5 text-ink">
+              <option value="">{t.snoozed_until ? `until ${dueLabel(t.snoozed_until)}` : "choose"}</option>
+              {SNOOZE.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              {t.snoozed_until ? <option value="wake">Wake it now</option> : null}
+            </select>
+          </label>
+          {t.blocked_by ? <span>Waiting on “{t.blocked_by_title}” <button type="button" className="underline" onClick={() => act(() => myTasks.edit(id, { blocked_by: null }))}>clear</button></span> : null}
+          {t.focus_minutes ? <span>{mins(t.focus_minutes)} focused</span> : null}
+          <Button onClick={() => { const n = window.prompt("Template name", t.title); if (n) act(() => myTasks.saveTemplate(id, n)); }}>Save as template</Button>
+        </div>
+      ) : null}
+      {runnable && est.data ? (
+        <p className="text-xs text-ink-3">
+          {est.data.cost_usd ? <b className="text-ink-2">Estimate: about ${Number(est.data.cost_usd.typical).toFixed(2)} (up to ${Number(est.data.cost_usd.high).toFixed(2)}). </b> : null}
+          {est.data.note}
+        </p>
+      ) : null}
       {t.result ? (
         <div>
           <p className="text-xs font-semibold text-ink-2">Result</p>
@@ -168,6 +259,15 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
           <p className="mt-1 text-[11px] text-ink-3">
             {sim ? "Simulation: no AI model is connected, so this is a template, not finished work." : "Written by the agents. Check facts before you use it; nothing has been sent or published."}
           </p>
+        </div>
+      ) : null}
+      {t.result && t.mission?.status === "COMPLETED" ? (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-ink-2">{t.feedback ? (t.feedback.rating > 0 ? "You rated this useful." : `You rated this not useful${t.feedback.reason ? `: ${t.feedback.reason}` : ""}.`) : "Was it useful?"}</span>
+          <input aria-label="Why? (optional)" value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? (optional)"
+            className="min-w-0 flex-1 rounded-md border border-line bg-ground/60 px-2 py-1 text-ink" />
+          <Button aria-label="Useful" disabled={busy} onClick={() => { act(() => myTasks.feedback(id, 1, why)); setWhy(""); }}>👍</Button>
+          <Button aria-label="Not useful" disabled={busy} onClick={() => { act(() => myTasks.feedback(id, -1, why)); setWhy(""); }}>👎</Button>
         </div>
       ) : null}
       {t.plan ? (
@@ -189,6 +289,176 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
         <Button disabled={busy} onClick={() => { if (window.confirm("Delete this task from your list?")) act(() => myTasks.remove(id)); }}>Delete</Button>
       </div>
       <ErrorNote error={q.error} />
+    </div>
+  );
+}
+
+/** Plan my day, the weekly review, results, insights and templates (V6.74–V6.84). */
+function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
+  if (tool === "plan") return <PlanDay />;
+  if (tool === "review") return <Review refresh={refresh} />;
+  if (tool === "results") return <Results />;
+  if (tool === "insights") return <Insights />;
+  return <Templates refresh={refresh} />;
+}
+
+function icsFor(plan: Json): string {
+  const f = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/[;,]/g, (c) => `\\${c}`).replace(/\n/g, "\\n");
+  const now = f(new Date().toISOString());
+  const ev = (plan.blocks as Json[]).map((b) => ["BEGIN:VEVENT", `UID:${b.task_id}-${f(b.start)}@aiciv`, `DTSTAMP:${now}`, `DTSTART:${f(b.start)}`,
+    `DTEND:${f(b.end)}`, `SUMMARY:${esc(`${b.verb}: ${b.title}`)}`, "END:VEVENT"].join("\r\n"));
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AI Civilization//Plan my day//EN", ...ev, "END:VCALENDAR", ""].join("\r\n");
+}
+
+function PlanDay() {
+  const [start, setStart] = useState("09:00");
+  const [end, setEnd] = useState("18:00");
+  const q = useQuery({ queryKey: ["plan", start, end], queryFn: () => myTasks.plan(start, end) });
+  const p = q.data;
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([icsFor(p!)], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "plan-my-day.ics"; a.click();
+    URL.revokeObjectURL(url);
+  };
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <div className="flex items-center gap-2 text-xs text-ink-2">
+        <label>From <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="rounded border border-line bg-ground/60 px-1 text-ink" /></label>
+        <label>to <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="rounded border border-line bg-ground/60 px-1 text-ink" /></label>
+        {p ? <span>{mins(p.planned_minutes)} planned · {mins(p.free_minutes)} free</span> : null}
+        {p?.blocks?.length ? <Button className="ml-auto" onClick={download}>Download .ics</Button> : null}
+      </div>
+      {q.isLoading ? <Skeleton lines={3} /> : null}
+      <ErrorNote error={q.error} />
+      {p && !p.blocks.length ? <Empty>Nothing to plan for the rest of the day.</Empty> : null}
+      <ol className="space-y-1">
+        {(p?.blocks ?? []).map((b: Json) => (
+          <li key={b.task_id + b.start} className="flex items-baseline gap-2">
+            <span className="w-16 shrink-0 text-right font-mono text-xs text-ink-2">{new Date(b.start).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span>
+            <span className="h-3 w-1 shrink-0 rounded" style={{ background: KIND_COLOR[b.kind] ?? "#A66BFF" }} />
+            <span className="min-w-0 flex-1 truncate">{b.title}</span>
+            <Pill color={b.verb === "Decide" ? "#FFBD69" : b.verb === "Review" ? "#5BF2A5" : "#32D8FF"}>{b.verb}</Pill>
+            <span className="text-xs text-ink-3">{mins(b.minutes)}{b.estimated ? " (default)" : ""}</span>
+          </li>
+        ))}
+      </ol>
+      {p?.later?.length ? <p className="text-xs text-ink-3">Doesn't fit today: {p.later.map((l: Json) => l.title).join(", ")}</p> : null}
+    </div>
+  );
+}
+
+function Review({ refresh }: { refresh: () => void }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["review"], queryFn: myTasks.review });
+  const [picked, setPicked] = useState<string[]>([]);
+  const bulk = useMutation({ mutationFn: (action: string) => myTasks.bulk(picked, action), onSuccess: () => { setPicked([]); refresh(); qc.invalidateQueries({ queryKey: ["review"] }); } });
+  const r = q.data;
+  const group = (name: string, list: Json[]) => (list?.length ? (
+    <div key={name}>
+      <h5 className="text-xs font-semibold text-ink-2">{name} ({list.length})</h5>
+      <ul>{list.map((t) => (
+        <li key={t.id} className="flex items-center gap-2 text-xs">
+          <input type="checkbox" checked={picked.includes(t.id)} aria-label={`Pick ${t.title}`}
+            onChange={() => setPicked(picked.includes(t.id) ? picked.filter((x) => x !== t.id) : [...picked, t.id])} />
+          <span className="truncate">{t.title}</span>
+          {t.due_at ? <span className={t.overdue ? "text-bad" : "text-ink-3"}>{dueLabel(t.due_at)}</span> : null}
+        </li>
+      ))}</ul>
+    </div>
+  ) : null);
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      {q.isLoading ? <Skeleton lines={3} /> : null}
+      <ErrorNote error={q.error ?? bulk.error} />
+      {r ? <p className="text-xs text-ink-2">{r.summary}</p> : null}
+      {r ? [group("Slipped", r.slipped), group("Sitting for two weeks or more", r.stale), group("Due in the next seven days", r.upcoming)] : null}
+      {picked.length ? (
+        <div className="flex gap-1.5">
+          <Button disabled={bulk.isPending} onClick={() => bulk.mutate("done")}>Mark {picked.length} done</Button>
+          <Button disabled={bulk.isPending} onClick={() => bulk.mutate("next_week")}>Next week</Button>
+          <Button disabled={bulk.isPending} onClick={() => bulk.mutate("drop")}>Drop</Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Results() {
+  const [text, setText] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => { const t = window.setTimeout(() => setQ(text), 250); return () => clearTimeout(t); }, [text]);
+  const r = useQuery({ queryKey: ["task-results", q], queryFn: () => myTasks.results(q) });
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <input aria-label="Search results" value={text} onChange={(e) => setText(e.target.value)} placeholder="Search what the agents wrote"
+        className="w-full rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+      <ErrorNote error={r.error} />
+      {r.data && !r.data.results.length ? <Empty>{q ? `Nothing matches "${q}".` : "No results yet."}</Empty> : null}
+      {(r.data?.results ?? []).map((x) => (
+        <details key={x.artifact_id} className="rounded-md bg-ground/40 p-1.5">
+          <summary className="cursor-pointer text-xs">
+            <b>{x.task_title ?? x.title}</b> {x.simulated ? <Pill color="#FFBD69">simulation</Pill> : null} {x.rating ? (x.rating > 0 ? "👍" : "👎") : null}
+            <span className="block truncate text-ink-3">{x.excerpt}</span>
+          </summary>
+          <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap font-sans text-xs">{x.content}</pre>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function Insights() {
+  const [days, setDays] = useState(14);
+  const q = useQuery({ queryKey: ["insights", days], queryFn: () => myTasks.insights(days) });
+  const a = useQuery({ queryKey: ["agent-quality"], queryFn: myTasks.agentQuality });
+  const i = q.data;
+  const top = Math.max(1, ...((i?.series ?? []) as Json[]).map((d) => Math.max(d.done, d.added)));
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <div className="flex gap-1.5">{[14, 30, 60].map((d) => <Button key={d} aria-pressed={days === d} variant={days === d ? "primary" : "quiet"} onClick={() => setDays(d)}>{d} days</Button>)}</div>
+      {q.isLoading ? <Skeleton lines={3} /> : null}
+      <ErrorNote error={q.error} />
+      {i ? (
+        <>
+          <p className="font-semibold">{i.headline}</p>
+          <div className="flex h-24 items-end gap-0.5" role="img" aria-label={`${i.done} done and ${i.added} added over ${i.days} days`}>
+            {(i.series as Json[]).map((d) => (
+              <div key={d.day} className="flex flex-1 items-end gap-px" title={`${d.day}: ${d.done} done, ${d.added} added, ${d.focus_minutes}m focused`}>
+                <div className="flex-1 rounded-t bg-[#5BF2A5]" style={{ height: `${(d.done / top) * 100}%` }} />
+                <div className="flex-1 rounded-t bg-[#32D8FF]/60" style={{ height: `${(d.added / top) * 100}%` }} />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-ink-3"><span className="text-[#5BF2A5]">■</span> done <span className="text-[#32D8FF]">■</span> added · {i.open} open · on time {i.on_time_rate == null ? "n/a" : `${Math.round(i.on_time_rate * 100)}%`} · {mins(i.focus_minutes)} focused · runs {i.runs.completed} finished, {i.runs.failed} failed{i.runs.simulated ? ` (${i.runs.simulated} simulated)` : ""}</p>
+        </>
+      ) : null}
+      {a.data?.agents?.length ? (
+        <div>
+          <h5 className="text-xs font-semibold text-ink-2">Your ratings by agent</h5>
+          <ul className="text-xs">{a.data.agents.map((x) => <li key={x.agent}>{x.name}: 👍 {x.up} · 👎 {x.down}{x.recent_reasons.length ? ` — ${x.recent_reasons.join("; ")}` : ""}</li>)}</ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Templates({ refresh }: { refresh: () => void }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["templates"], queryFn: myTasks.templates });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: ["templates"] }); } });
+  return (
+    <div className="space-y-1 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={q.error ?? act.error} />
+      {q.data && !q.data.templates.length ? <Empty>No templates yet. Open a task and choose Save as template.</Empty> : null}
+      {(q.data?.templates ?? []).map((t) => (
+        <div key={t.id} className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate"><b>{t.name}</b> <span className="text-xs text-ink-3">{t.title}{t.items.length ? ` · ${t.items.length} steps` : ""}</span></span>
+          <Button disabled={act.isPending} onClick={() => act.mutate(() => myTasks.useTemplate(t.id))}>Start a copy</Button>
+          <Button disabled={act.isPending} onClick={() => { if (window.confirm(`Delete the template "${t.name}"?`)) act.mutate(() => myTasks.deleteTemplate(t.id)); }}>Delete</Button>
+        </div>
+      ))}
     </div>
   );
 }

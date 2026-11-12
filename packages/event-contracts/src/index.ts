@@ -55,6 +55,7 @@ export const EVENT_TYPES = [
   "my_task.started",
   "my_task.completed",
   "my_task.deleted",
+  "my_task.rated",
   "mission.priority_changed",
   "permission.revoked",
   "permission.restored",

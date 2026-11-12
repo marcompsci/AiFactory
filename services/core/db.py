@@ -1334,6 +1334,72 @@ my_tasks = Table(
     Column("done_at", String),
 )
 
+# ---------------------------------------------------------------- V6.68–V6.87 more on each task
+task_meta = Table(  # one row per task that has any of these set (new data in a new table: SQLite can't add columns)
+    "task_meta", metadata,
+    Column("task_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("list_name", String),          # V6.69 "#echo"
+    Column("estimate_minutes", Integer),  # V6.73 "45m"
+    Column("snoozed_until", String),      # V6.70 ISO time, UTC
+    Column("blocked_by", String(36)),     # V6.71 waits on this task
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+task_items = Table(  # V6.68 a task's checklist
+    "task_items", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("task_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("text", String, nullable=False),
+    Column("done", Integer, nullable=False, default=0),
+    Column("position", Integer, nullable=False, default=0),
+    Column("from_agents", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False, default=utcnow),
+    Column("done_at", String),
+)
+
+task_templates = Table(  # V6.72
+    "task_templates", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("title", String, nullable=False),
+    Column("notes", String, nullable=False, default=""),
+    Column("kind", String, nullable=False, default="personal"),
+    Column("priority", String, nullable=False, default="normal"),
+    Column("list_name", String),
+    Column("estimate_minutes", Integer),
+    Column("budget_usd", Float),
+    Column("items", JSON, nullable=False, default=list),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+task_feedback = Table(  # V6.79 the owner's verdict on a result
+    "task_feedback", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("task_id", String(36), nullable=False),
+    Column("mission_id", String(36), nullable=False, unique=True),
+    Column("rating", Integer, nullable=False),       # 1 or -1
+    Column("reason", String, nullable=False, default=""),
+    Column("agent_key", String),                     # who wrote the result
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+focus_sessions = Table(  # V6.76
+    "focus_sessions", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("task_id", String(36), nullable=False),
+    Column("minutes", Integer, nullable=False),
+    Column("started_at", String, nullable=False),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
 schedule_runs = Table(             # which mission each schedule run started (for its cost and for comparing runs)
     "schedule_runs", metadata,
     Column("id", String(36), primary_key=True),

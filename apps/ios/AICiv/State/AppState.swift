@@ -24,6 +24,8 @@ final class AppState {
     var executionMode: String = ""
     /// Set to switch tabs from inside a screen (e.g. the home screen's town preview opens the City tab).
     var openTab: String?
+    /// Set to open one of your tasks (from Spotlight or a reminder): Home switches to the Tasks tab and shows it.
+    var openTaskId: String?
     var health: Health?
     var ledger = EventLedger()
     /// The city's live picture from events (bubbles, busy desks, the offline demo), shared by the home city and its overlays.

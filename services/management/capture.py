@@ -76,7 +76,8 @@ def kind_of(text: str) -> str:
 
 
 def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dict:
-    """Read a typed task. Returns {title, due_at (UTC ISO or None), due_label, priority, budget_usd, kind, repeat}."""
+    """Read a typed task. Returns {title, due_at (UTC ISO or None), due_label, priority, budget_usd, kind, repeat,
+    list_name, estimate_minutes}."""
     zone = _zone(tz)
     now = (now or datetime.now(timezone.utc)).astimezone(zone)
     t = " " + re.sub(r"\s+", " ", (text or "").strip()) + " "
@@ -91,6 +92,16 @@ def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dic
             low = t.lower()
         return m
 
+    # V6.69 a list tag ("#echo") and V6.73 an estimate ("30m", "1.5h", "2 hours")
+    out["list_name"] = None
+    m = cut(r"\s#([a-z0-9][a-z0-9_-]{0,39})(?=\s)")
+    if m:
+        out["list_name"] = m.group(1)
+    out["estimate_minutes"] = None
+    m = cut(r"\s(?:for |~)?(\d{1,3}(?:\.\d)?)\s?(m|min|mins|minutes|h|hr|hrs|hour|hours)(?=\s)")
+    if m:
+        v = float(m.group(1)) * (60 if m.group(2).startswith("h") else 1)
+        out["estimate_minutes"] = int(v) if 5 <= v <= 600 else None
     m = cut(r"\s\$\s?(\d{1,2}(?:\.\d{1,2})?)\b")
     if m:
         v = float(m.group(1))

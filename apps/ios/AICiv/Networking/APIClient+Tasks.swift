@@ -35,15 +35,41 @@ struct MyTask: Decodable, Identifiable, Hashable {
     let doneAt: String?
     var plan: Doc? = nil
     var result: Doc? = nil
+    // V6.68+: lists, estimates, snooze, waiting-on, the checklist, ratings and focus time
+    var listName: String? = nil
+    var estimateMinutes: Int? = nil
+    var snoozedUntil: String? = nil
+    var blockedBy: String? = nil
+    var blockedByTitle: String? = nil
+    var itemsTotal: Int? = nil
+    var itemsDone: Int? = nil
+    var items: [TaskItem]? = nil
+    var feedback: TaskFeedback? = nil
+    var focusMinutes: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, title, notes, kind, priority, status, dueAt, repeats = "repeat", budgetUsd, repositoryId, missionId, runs, stage, overdue,
-             mission, createdAt, doneAt, plan, result
+             mission, createdAt, doneAt, plan, result, listName, estimateMinutes, snoozedUntil, blockedBy, blockedByTitle,
+             itemsTotal, itemsDone, items, feedback, focusMinutes
     }
 
     var due: Date? { ISODate.parse(dueAt) }
     var isOpen: Bool { status == "OPEN" }
     var simulated: Bool { mission?.executionMode == "simulation" }
+    var snoozed: Date? { ISODate.parse(snoozedUntil) }
+}
+
+struct TaskItem: Decodable, Identifiable, Hashable {
+    let id: String
+    let text: String
+    let done: Bool
+    var fromAgents: Bool = false
+}
+
+struct TaskFeedback: Decodable, Hashable {
+    let rating: Int
+    let reason: String?
+    let agent: String?
 }
 
 /// What quick capture reads from a line of text (exactly what adding it would save).
@@ -55,8 +81,10 @@ struct TaskPreview: Decodable, Hashable {
     let budgetUsd: Double?
     let kind: String
     let repeats: String
+    var listName: String? = nil
+    var estimateMinutes: Int? = nil
 
-    enum CodingKeys: String, CodingKey { case title, dueAt, dueLabel, priority, budgetUsd, kind, repeats = "repeat" }
+    enum CodingKeys: String, CodingKey { case title, dueAt, dueLabel, priority, budgetUsd, kind, repeats = "repeat", listName, estimateMinutes }
 }
 
 private struct TaskList: Decodable { let tasks: [MyTask] }
