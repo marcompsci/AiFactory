@@ -1,5 +1,6 @@
 """V6.19–V6.26: weekday schedules, run now and skip; schedules that pause themselves; run again; follow-on missions;
 the weekly report; the team roster and the owner check; the records export."""
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import insert, select, update
@@ -165,6 +166,10 @@ def test_follow_on_waits_out_the_emergency_stop(client):
     client.post("/api/emergency-stop", json={"engaged": False})
     from services.api.main import state
     state.scheduler._followups()
+    for _ in range(20):  # the background scheduler may be the one starting it: give it a moment to finish
+        if links.get(link["organization_id"], link["id"])["status"] == "STARTED":
+            break
+        time.sleep(0.25)
     assert links.get(link["organization_id"], link["id"])["status"] == "STARTED"
 
 

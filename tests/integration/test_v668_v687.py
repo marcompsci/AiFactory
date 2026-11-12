@@ -104,7 +104,7 @@ def test_plan_my_day_orders_and_sizes_the_day(client):
 def test_plan_lists_what_does_not_fit(client):
     now = datetime(2026, 11, 12, 16, 0, tzinfo=timezone.utc)
     with db.get_engine().connect() as conn:
-        p = taskplus.plan_day(conn, "no-org", "UTC", "16:00", "16:10", now=now)
+        p = taskplus.plan_day(conn, "00000000-0000-4000-8000-0000000000ff", "UTC", "16:00", "16:10", now=now)
     assert p["blocks"] == [] and p["free_minutes"] == 10
 
 

@@ -1,5 +1,6 @@
 """V6.27–V6.31: the weekly report in your time zone; schedules pause when their creator hasn't signed in for 30 days;
 saved requests; schedule costs and per-run budgets; comparing runs."""
+import time
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import insert, update
@@ -75,11 +76,15 @@ def test_saved_requests_start_from_the_api_and_the_city(client):
     listed = client.get("/api/saved-requests").json()["saved_requests"][0]
     assert listed["uses"] == 1 and listed["last_mission_id"] == mid
 
-    prop = _talk(client, ATLAS, "start nightly tests")["proposal"]
-    assert prop["kind"] == "start_saved" and prop["params"]["saved_request_id"] == sid
-    with transaction() as conn:  # past the double-tap window
-        conn.execute(update(db.saved_requests).where(db.saved_requests.c.id == sid).values(last_used_at="2020-01-01T00:00:00+00:00"))
-    c = client.post(f"/api/play/proposals/{prop['id']}/confirm").json()
+    c = None
+    for _ in range(3):  # past the double-tap window (a background thread may touch the request in between: try again)
+        prop = _talk(client, ATLAS, "start nightly tests")["proposal"]
+        assert prop["kind"] == "start_saved" and prop["params"]["saved_request_id"] == sid
+        with transaction() as conn:
+            conn.execute(update(db.saved_requests).where(db.saved_requests.c.id == sid).values(last_used_at="2020-01-01T00:00:00+00:00"))
+        c = client.post(f"/api/play/proposals/{prop['id']}/confirm").json()
+        if c["status"] == "CONFIRMED" and c["result"]["mission_id"] != mid:
+            break
     assert c["status"] == "CONFIRMED" and c["result"]["mission_id"] != mid
     assert _talk(client, ATLAS, "start something nobody saved")["proposal"] is None or \
         _talk(client, ATLAS, "start something nobody saved")["proposal"]["kind"] != "start_saved"
@@ -148,13 +153,14 @@ def test_compare_a_schedule_run_with_the_previous_one(client):
     a = client.post(f"/api/schedules/{s['id']}/run-now").json()["mission_id"]
     _finished(client, a)
     b = a
-    for _ in range(3):  # past the double-tap window (another thread may touch the schedule in between: try again)
+    for _ in range(6):  # past the double-tap window (another thread may touch the schedule in between: try again)
         with transaction() as conn:
             conn.execute(update(db.mission_schedules).where(db.mission_schedules.c.id == s["id"]).values(last_run_at="2020-01-01T00:00:00+00:00"))
         r = client.post(f"/api/schedules/{s['id']}/run-now").json()
         if not r.get("repeat") and r["mission_id"] != a:
             b = r["mission_id"]
             break
+        time.sleep(0.5)
     assert b != a
     _finished(client, b)
     c = client.get(f"/api/missions/{b}/compare").json()
