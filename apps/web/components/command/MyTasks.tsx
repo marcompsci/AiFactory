@@ -53,7 +53,9 @@ export function MyTasksPanel() {
   const found = useQuery({ queryKey: ["my-tasks", "search", q], queryFn: () => myTasks.search(q), enabled: status === "live" && q.length > 0 });
   const list = useQuery({ queryKey: ["my-tasks"], queryFn: myTasks.list, enabled: status === "live", refetchInterval: 5_000 });
   useListStyles();
-  const refresh = () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); qc.invalidateQueries({ queryKey: ["my-task"] }); };
+  const refresh = () => {
+    for (const k of ["my-tasks", "my-task", "goals", "shutdown", "month", "fit"]) qc.invalidateQueries({ queryKey: [k] });
+  };
   const add = useMutation({ mutationFn: () => myTasks.add(text), onSuccess: () => { setText(""); setPreview(null); refresh(); } });
   const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: refresh });
   const finish = (t: Json) => {
@@ -710,7 +712,7 @@ function Bills() {
           <span>{money(b.amount)}</span>
           <span className={`text-xs ${b.overdue ? "text-bad" : "text-ink-3"}`}>{b.overdue ? `was due ${b.next_due}` : `due ${b.next_due}`}</span>
           {b.link_url ? <a href={b.link_url} target="_blank" rel="noopener noreferrer nofollow" className="text-xs text-[#32D8FF] underline">pay page</a> : null}
-          {b.paid_this_period && !b.overdue ? <span className="text-xs text-[#5BF2A5]">paid ✓ <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.billUnpaid(b.id, b.payments[0].period))}>undo</button></span>
+          {b.paid_this_period && !b.overdue ? <span className="text-xs text-[#5BF2A5]">paid ✓ <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.billUnpaid(b.id, b.this_period))}>undo</button></span>
             : <Button disabled={act.isPending} onClick={() => act.mutate(() => myTasks.billPaid(b.id))}>Mark paid</Button>}
           <button type="button" className="text-ink-3 hover:text-bad" aria-label={`Delete ${b.name}`} onClick={() => { if (window.confirm(`Delete the bill "${b.name}"?`)) act.mutate(() => myTasks.removeBill(b.id)); }}>×</button>
         </li>
@@ -818,7 +820,7 @@ function Archive({ refresh }: { refresh: () => void }) {
       const url = URL.createObjectURL(await myTasks.exportFile(format));
       const el = document.createElement("a");
       el.href = url; el.download = `my-tasks.${format}`; el.click();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);  // let the download start first
     } catch (e) { setErr(e); }
   };
   return (

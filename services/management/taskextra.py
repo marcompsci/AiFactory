@@ -47,15 +47,27 @@ def _lines(text: str) -> list[str]:
 
 def _csv_rows(text: str) -> list[dict]:
     """A CSV with a header: title (required), and optionally due, list, notes, priority, estimate."""
-    reader = csv.DictReader(io.StringIO(text or ""))
-    if not reader.fieldnames or "title" not in [f.strip().lower() for f in reader.fieldnames]:
-        raise PlusError("a CSV needs a header row with a title column")
-    rows = []
-    for r in reader:
-        r = {(k or "").strip().lower(): (v or "").strip() for k, v in r.items()}
-        if len(r.get("title", "")) >= 2:
-            rows.append(r)
-    return rows
+    reader = csv.DictReader(io.StringIO((text or "").lstrip("\ufeff")))  # a byte-order mark from Excel is ignored
+    try:
+        if not reader.fieldnames or "title" not in [(f or "").strip().lower() for f in reader.fieldnames]:
+            raise PlusError("a CSV needs a header row with a title column")
+        rows = []
+        for r in reader:
+            extra = r.pop(None, None)  # more fields than the header (an unquoted comma): they belong to the last column
+            r = {(k or "").strip().lower(): (v if isinstance(v, str) else "").strip() for k, v in r.items()}
+            if extra and reader.fieldnames:
+                last = (reader.fieldnames[-1] or "").strip().lower()
+                r[last] = ", ".join([r.get(last, "")] + [str(x).strip() for x in extra if str(x).strip()]).strip(", ")
+            for k, v in r.items():  # undo the export's guard against spreadsheet formulas
+                if v[:2] in ("'=", "'+", "'-", "'@"):
+                    r[k] = v[1:]
+            if len(r.get("title", "")) >= 2:
+                rows.append(r)
+            if len(rows) >= MAX_DUMP:
+                break
+        return rows
+    except csv.Error as exc:
+        raise PlusError(f"that CSV couldn't be read ({exc})") from exc
 
 
 def dump_preview(text: str, tz: str | None = "UTC", fmt: str = "lines") -> list[dict]:
@@ -64,13 +76,38 @@ def dump_preview(text: str, tz: str | None = "UTC", fmt: str = "lines") -> list[
     from .taskmore import take_urls
     out = []
     if fmt == "csv":
+        from .capture import valid_repeat
+        from .taskplus import clean_list
         for r in _csv_rows(text)[:MAX_DUMP]:
-            line = " ".join(x for x in (r["title"], f"#{r['list']}" if r.get("list") else "", r.get("due", ""),
-                                        r.get("priority", ""), f"{r['estimate']}m" if r.get("estimate", "").isdigit() else "") if x)
+            # columns are read as what they are (a date, a priority, minutes); only a due date in words is parsed
+            due_iso = None
+            due = r.get("due", "")
+            if due:
+                try:
+                    d = datetime.fromisoformat(due.replace("Z", "+00:00"))
+                    due_iso = (d if d.tzinfo else d.replace(tzinfo=_zone(tz))).astimezone(timezone.utc).isoformat()
+                except ValueError:
+                    due_iso = None
+            line = r["title"] if due_iso or not due else f"{r['title']} {due}"
             rest, urls = take_urls(line)
             p = parse(rest, tz)
+            if due_iso:
+                p["due_at"], p["due_label"] = due_iso, None
+            if r.get("priority", "").lower() in ("urgent", "normal", "low"):
+                p["priority"] = r["priority"].lower()
+            est = r.get("estimate", "")
+            if est.isdigit() and 5 <= int(est) <= 600:
+                p["estimate_minutes"] = int(est)
+            try:
+                if r.get("list"):
+                    p["list_name"] = clean_list(r["list"])
+            except PlusError:
+                pass
+            if valid_repeat(r.get("repeat", "")):
+                p["repeat"] = r["repeat"]
             p["notes"] = r.get("notes", "")[:4000]
-            p["links"], p["repeat_label"], p["source"] = urls, repeat_label(p["repeat"]), r["title"]
+            urls += [u for u in r.get("links", "").split() if u.startswith(("http://", "https://"))]
+            p["links"], p["repeat_label"], p["source"] = urls[:20], repeat_label(p["repeat"]), r["title"]
             out.append(p)
         return out
     for line in _lines(text)[:MAX_DUMP]:
@@ -208,18 +245,23 @@ def next_due(bill, today: date, paid: set[str]) -> date:
     return sorted(c for c in cands if c >= today)[0]
 
 
-def _bill_view(r, payments: list, today: date) -> dict:
+def _bill_view(r, payments: list, today: date, zone=timezone.utc) -> dict:
     d = dict(r._mapping)
     d["autopay"], d["active"] = bool(d["autopay"]), bool(d["active"])
-    d["created_day"] = datetime.fromisoformat(str(d["created_at"]).replace("Z", "+00:00")).date() if d.get("created_at") else None
+    d["created_day"] = datetime.fromisoformat(str(d["created_at"]).replace("Z", "+00:00")).astimezone(zone).date() \
+        if d.get("created_at") else None
     paid = {p.period for p in payments}
     nd = next_due(d, today, paid)
     d["next_due"] = nd.isoformat()
     d["days_until"] = (nd - today).days
     d["overdue"] = nd < today
     d["period"] = period_of(d, nd)
-    this_period = period_of(d, due_date(d, today.year, today.month) if d["cadence"] == "monthly" else due_date(d, today.year))
+    this_due = due_date(d, today.year, today.month) if d["cadence"] == "monthly" else due_date(d, today.year)
+    this_period = period_of(d, this_due)
     d["paid_this_period"] = this_period in paid
+    d["this_period"] = this_period
+    # owed this month (or year) only if its date there came on or after the day you added it
+    d["owed_this_period"] = not (d["created_day"] and this_due < d["created_day"])
     d["payments"] = [{"period": p.period, "paid_at": p.paid_at, "amount_cents": p.amount_cents} for p in payments][:12]
     d["amount"] = d["amount_cents"] / 100 if d["amount_cents"] is not None else None
     d.pop("created_day", None)
@@ -238,7 +280,7 @@ def bills(conn: Connection, org: str, tz: str | None = "UTC", include_inactive: 
         for pr in conn.execute(select(P).where(P.c.organization_id == org, P.c.bill_id.in_([r.id for r in rows]))
                                .order_by(P.c.period.desc())):
             pays.setdefault(pr.bill_id, []).append(pr)
-    out = [_bill_view(r, pays.get(r.id, []), today) for r in rows]
+    out = [_bill_view(r, pays.get(r.id, []), today, _zone(tz)) for r in rows]
     out.sort(key=lambda b: (not b["active"], b["next_due"], b["name"].lower()))
     return out
 
@@ -248,7 +290,7 @@ def bill_summary(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     Bills with no fixed amount are counted, not added up."""
     today = _now().astimezone(_zone(tz)).date()
     items = bills(conn, org, tz)
-    month = [b for b in items if b["cadence"] == "monthly" or b["due_month"] == today.month]
+    month = [b for b in items if (b["cadence"] == "monthly" or b["due_month"] == today.month) and b["owed_this_period"]]
     known = [b for b in month if b["amount_cents"] is not None]
     paid = [b for b in month if b["paid_this_period"]]
     soon = [b for b in items if not b["overdue"] and 0 <= b["days_until"] <= 30]
@@ -357,7 +399,7 @@ def month(conn: Connection, org: str, year: int, mon: int, tz: str | None = "UTC
     days: dict[str, dict] = {}
     first = date(year, mon, 1)
     last = date(year, mon, _month_len(year, mon))
-    for t in listing(conn, org, include_done=True):
+    for t in listing(conn, org, include_done=True, archived=True):
         if not t["due_at"]:
             continue
         d = datetime.fromisoformat(t["due_at"]).astimezone(zone).date()
@@ -389,7 +431,13 @@ def parse_busy(raw: list[str], limit: int = 60) -> list[tuple[datetime, datetime
         if s.tzinfo is None or e.tzinfo is None or e <= s or (e - s) > timedelta(days=1):
             raise PlusError("busy times need a time zone and an end after the start")
         out.append((s, e))
-    return sorted(out)
+    merged: list[tuple[datetime, datetime]] = []  # overlapping events count once
+    for s, e in sorted(out):
+        if merged and s <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+        else:
+            merged.append((s, e))
+    return merged
 
 
 # ---------------------------------------------------------------- V6.104 "I have N minutes"
@@ -435,6 +483,8 @@ def shutdown(conn: Connection, org: str, tz: str | None = "UTC", now: datetime |
                                                         T.c.done_at >= start, T.c.done_at < end)).fetchall()
     open_ = listing(conn, org, include_done=False)
     left = [t for t in open_ if t["due_at"] and t["due_at"] < end and t["stage"] in ("open", "problem", "blocked", "waiting")]
+    for t in left:
+        t["repeats"] = t.get("repeat", "none") != "none"
     tomorrow_end = (datetime.fromisoformat(end) + timedelta(days=1)).isoformat()
     tomorrow = [t for t in open_ if t["due_at"] and end <= t["due_at"] < tomorrow_end]
     note = conn.execute(select(db.day_notes.c.note).where(db.day_notes.c.organization_id == org,
@@ -442,7 +492,8 @@ def shutdown(conn: Connection, org: str, tz: str | None = "UTC", now: datetime |
     yesterday = conn.execute(select(db.day_notes.c.note).where(db.day_notes.c.organization_id == org,
                                                                db.day_notes.c.day == (today - timedelta(days=1)).isoformat())).scalar()
     return {"day": today.isoformat(), "done": [{"id": r.id, "title": r.title} for r in done],
-            "still_due": [{"id": t["id"], "title": t["title"], "due_at": t["due_at"], "overdue": t["overdue"]} for t in left],
+            "still_due": [{"id": t["id"], "title": t["title"], "due_at": t["due_at"], "overdue": t["overdue"], "repeats": t["repeats"]}
+                          for t in left],
             "tomorrow": [{"id": t["id"], "title": t["title"], "due_at": t["due_at"]} for t in tomorrow],
             "note": note or "", "yesterdays_note": yesterday or ""}
 
@@ -458,8 +509,8 @@ def close_day(p: Principal, tz: str | None = "UTC", move: bool = False, note: st
         T = db.my_tasks
         for t in due:
             r = conn.execute(select(T.c.due_at, T.c.repeat).where(T.c.id == t["id"], T.c.organization_id == p.organization_id)).first()
-            if r is None or not r.due_at:
-                continue
+            if r is None or not r.due_at or r.repeat != "none":
+                continue  # a repeating task keeps its own schedule
             old = datetime.fromisoformat(r.due_at).astimezone(zone)
             new = datetime.combine(today + timedelta(days=1), old.time(), tzinfo=zone)
             conn.execute(update(T).where(T.c.id == t["id"]).values(due_at=new.astimezone(timezone.utc).isoformat(),
@@ -556,13 +607,15 @@ def remove_goal(p: Principal, gid: str, tz: str | None = "UTC") -> dict:
         return goals(conn, p.organization_id, tz, _day(g.week_start))
 
 
-def link_goal(p: Principal, tid: str, gid: str | None) -> None:
+def link_goal(p: Principal, tid: str, gid: str | None, tz: str | None = "UTC") -> None:
     TG = db.task_goals
     with transaction() as conn:
         _task(conn, p.organization_id, tid)
         conn.execute(delete(TG).where(TG.c.task_id == tid))
         if gid:
-            _goal(conn, p.organization_id, gid)
+            g = _goal(conn, p.organization_id, gid)
+            if _day(g.week_start) != week_of(tz).isoformat():
+                raise PlusError("tasks can count toward this week's goals")
             conn.execute(insert(TG).values(task_id=tid, goal_id=gid, organization_id=p.organization_id))
         emit(conn, "my_task.updated", org_id=p.organization_id, payload={"task_id": tid, "fields": ["goal"]})
 

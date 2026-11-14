@@ -14,6 +14,9 @@ struct DumpPreview: Decodable, Hashable, Identifiable {
     var id: String { source + title }
 }
 
+/// A preview entry with its position, so two identical lines are still two rows.
+struct NumberedPreview: Identifiable, Hashable { let n: Int; let p: DumpPreview; var id: Int { n } }
+
 struct DumpResult: Decodable {
     struct Problem: Decodable, Hashable { let line: String; let error: String }
     let added: [MyTask]
@@ -40,6 +43,7 @@ struct Bill: Decodable, Hashable, Identifiable {
     let overdue: Bool
     let period: String
     let paidThisPeriod: Bool
+    var thisPeriod: String? = nil
     let payments: [Payment]
 
     var due: Date? {
@@ -88,7 +92,7 @@ struct FitResult: Decodable, Hashable {
 }
 
 struct DayShutdown: Decodable, Hashable {
-    struct Item: Decodable, Hashable, Identifiable { let id: String; let title: String; let dueAt: String?; let overdue: Bool? }
+    struct Item: Decodable, Hashable, Identifiable { let id: String; let title: String; let dueAt: String?; let overdue: Bool?; var repeats: Bool? = nil }
     let day: String
     let done: [Item]
     let stillDue: [Item]
@@ -113,7 +117,13 @@ struct ListStyle: Decodable, Hashable { let color: String; let icon: String }
 private struct BillsBox: Decodable { let bills: [Bill] }
 private struct PreviewBox: Decodable { let preview: [DumpPreview] }
 private struct ArchiveBox: Decodable { let tasks: [ArchivedTask] }
-private struct StylesBox: Decodable { let styles: [String: ListStyle]; let icons: [String]? }
+/// List styles come as an array: dictionary keys would be renamed by the snake_case decoder ("side_hustle").
+private struct StylesBox: Decodable {
+    struct Item: Decodable { let name: String; let color: String; let icon: String }
+    let items: [Item]
+    let icons: [String]?
+    var styles: [String: ListStyle] { Dictionary(items.map { ($0.name, ListStyle(color: $0.color, icon: $0.icon)) }, uniquingKeysWith: { a, _ in a }) }
+}
 
 extension APIClient {
     private func enc(_ s: String) -> String {
@@ -184,7 +194,8 @@ extension APIClient {
         try await send(request("/api/goals/\(id)?\(tzq)", method: "DELETE"), as: WeekGoals.self)
     }
     func linkGoal(_ task: String, goal: String?) async throws -> MyTask {
-        try await send(request("/api/my-tasks/\(task)/goal", method: "POST", body: data(["goal_id": goal])), as: MyTask.self)
+        try await send(request("/api/my-tasks/\(task)/goal", method: "POST", body: data(["goal_id": goal, "tz": TimeZone.current.identifier])),
+                       as: MyTask.self)
     }
     func setWaiting(_ task: String, person: String?, followUp: Date?) async throws -> MyTask {
         try await send(request("/api/my-tasks/\(task)/waiting", method: "POST",

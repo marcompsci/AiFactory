@@ -314,8 +314,8 @@ def digest(conn: Connection, org: str, tz: str | None = "UTC", day: str = "today
     end = datetime.combine(date + timedelta(days=1), time(0, 0), tzinfo=zone).astimezone(timezone.utc).isoformat()
     tasks = [t for t in mytasks.listing(conn, org, include_done=False)]
     from_ = max(start, now.isoformat())
-    due = [t for t in tasks if t["due_at"] and from_ <= t["due_at"] < end and t["stage"] not in ("snoozed",)]
-    overdue = [t for t in tasks if t["due_at"] and t["due_at"] < now.isoformat() and t["stage"] not in ("snoozed", "blocked")]
+    due = [t for t in tasks if t["due_at"] and from_ <= t["due_at"] < end and t["stage"] not in ("snoozed", "waiting")]
+    overdue = [t for t in tasks if t["due_at"] and t["due_at"] < now.isoformat() and t["stage"] not in ("snoozed", "blocked", "waiting")]
     needs = [t for t in tasks if t["stage"] in ("needs_you", "review")]
     planned = sum(taskplus.minutes_of(t) for t in due)
     bits = []

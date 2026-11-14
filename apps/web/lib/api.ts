@@ -299,7 +299,7 @@ export const myTasks = {
   },
   waiting: (id: string, person: string | null, followUpAt: string | null) =>
     call<Json>(`/api/my-tasks/${id}/waiting`, post({ person, follow_up_at: followUpAt })),
-  linkGoal: (id: string, goalId: string | null) => call<Json>(`/api/my-tasks/${id}/goal`, post({ goal_id: goalId })),
+  linkGoal: (id: string, goalId: string | null) => call<Json>(`/api/my-tasks/${id}/goal`, post({ goal_id: goalId, tz: tz() })),
   goals: () => call<Json>(`/api/goals?tz=${encodeURIComponent(tz())}`),
   addGoal: (text: string) => call<Json>("/api/goals", post({ text, tz: tz() })),
   setGoal: (id: string, done: boolean) => call<Json>(`/api/goals/${id}`, { method: "PATCH", body: JSON.stringify({ done, tz: tz() }) }),

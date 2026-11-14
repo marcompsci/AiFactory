@@ -487,12 +487,13 @@ def promote(tid: str, iid: str, p: Principal = Depends(operator)) -> dict:
 
 class GoalLinkIn(BaseModel):
     goal_id: str | None = Field(default=None, max_length=36)
+    tz: str | None = Field(default="UTC", max_length=64)
 
 
 @router.post("/my-tasks/{tid}/goal")
 def link_goal(tid: str, body: GoalLinkIn, p: Principal = Depends(operator)) -> dict:
     try:
-        taskextra.link_goal(p, tid, body.goal_id)
+        taskextra.link_goal(p, tid, body.goal_id, body.tz)
         with db.get_engine().connect() as conn:
             return mytasks.get(conn, p.organization_id, tid)
     except Errors as exc:
@@ -638,12 +639,14 @@ class StyleIn(BaseModel):
 @router.get("/lists/styles")
 def styles(p: Principal = Depends(member)) -> dict:
     with db.get_engine().connect() as conn:
-        return {"styles": taskextra.list_styles(conn, p.organization_id), "icons": list(taskextra.ICONS)}
+        s = taskextra.list_styles(conn, p.organization_id)
+        return {"styles": s, "items": [{"name": k, **v} for k, v in s.items()], "icons": list(taskextra.ICONS)}
 
 
 @router.put("/lists/{name}/style")
 def set_style(name: str, body: StyleIn, p: Principal = Depends(operator)) -> dict:
     try:
-        return {"styles": taskextra.set_list_style(p, name, body.color, body.icon)}
+        s = taskextra.set_list_style(p, name, body.color, body.icon)
+        return {"styles": s, "items": [{"name": k, **v} for k, v in s.items()]}
     except Errors as exc:
         raise _err(exc) from exc

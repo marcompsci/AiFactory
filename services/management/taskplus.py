@@ -371,8 +371,8 @@ def plan_day(conn: Connection, org: str, tz: str | None = "UTC", start: str = "0
     busy_minutes = 0
     for s, e in busy:
         s2, e2 = max(s, day_start), min(e, day_end)
-        busy_minutes += int((e2 - s2).total_seconds() // 60)
-        if e2 > cursor:
+        if e2 > cursor:  # only what's still ahead of now counts
+            busy_minutes += int((e2 - max(s2, cursor)).total_seconds() // 60)
             blocks.append({"task_id": None, "title": "Busy", "verb": "Busy", "minutes": int((e2 - max(s2, cursor)).total_seconds() // 60),
                            "kind": "busy", "priority": "normal", "overdue": False, "list_name": None, "estimated": False,
                            "start": max(s2, cursor).astimezone(timezone.utc).isoformat(), "end": e2.astimezone(timezone.utc).isoformat()})

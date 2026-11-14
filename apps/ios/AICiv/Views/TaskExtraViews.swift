@@ -38,7 +38,8 @@ struct BrainDumpView: View {
             if let note { Text(note).foregroundStyle(Theme.ok).font(.caption) }
             if !preview.isEmpty {
                 Section("Will add \(preview.count)") {
-                    ForEach(preview) { p in
+                    ForEach(preview.enumerated().map { NumberedPreview(n: $0.offset, p: $0.element) }) { row in
+                        let p = row.p
                         VStack(alignment: .leading, spacing: 2) {
                             Text(p.title).font(.subheadline)
                             HStack(spacing: 6) {
@@ -136,8 +137,8 @@ struct BillsView: View {
                 .onTapGesture { editing = BillDraft(b) }
                 .swipeActions {
                     Button(role: .destructive) { Task { await remove(b) } } label: { Label("Delete", systemImage: "trash") }
-                    if let last = b.payments.first {
-                        Button { Task { await unpaid(b, last.period) } } label: { Label("Undo paid", systemImage: "arrow.uturn.backward") }
+                    if b.paidThisPeriod, let per = b.thisPeriod {
+                        Button { Task { await unpaid(b, per) } } label: { Label("Undo paid", systemImage: "arrow.uturn.backward") }
                     }
                 }
                 .accessibilityElement(children: .contain)
@@ -443,7 +444,10 @@ struct EndOfDayView: View {
                 }
                 if !s.stillDue.isEmpty {
                     Section {
-                        ForEach(s.stillDue) { t in Label(t.title, systemImage: t.overdue == true ? "exclamationmark.circle" : "circle") }
+                        ForEach(s.stillDue) { t in
+                            Label(t.title + (t.repeats == true ? " (repeats, keeps its schedule)" : ""),
+                                  systemImage: t.overdue == true ? "exclamationmark.circle" : "circle")
+                        }
                         Toggle("Move these to tomorrow", isOn: $move)
                     } header: { Text("Still due (\(s.stillDue.count))") } footer: {
                         Text("Same time tomorrow. Nothing is marked done or dropped.")
@@ -663,14 +667,6 @@ struct ListStyleSheet: View {
             saved(s)
             dismiss()
         } catch { self.error = problem(error) }
-    }
-}
-
-extension Color {
-    /// "#RRGGBB" → a color (gray if it isn't one).
-    init(hexString: String) {
-        let v = UInt32(hexString.dropFirst(), radix: 16) ?? 0x9AA5C8
-        self.init(red: Double((v >> 16) & 0xFF) / 255, green: Double((v >> 8) & 0xFF) / 255, blue: Double(v & 0xFF) / 255)
     }
 }
 

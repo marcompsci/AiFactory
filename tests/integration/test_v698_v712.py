@@ -187,3 +187,51 @@ def test_list_styles(client):
     assert client.put("/api/lists/home/style", json={"color": "#33aa77", "icon": "rocket.launch.secret"}).status_code == 422
     assert client.put("/api/lists/home/style", json={}).json()["styles"] == {}
     assert "house" in client.get("/api/lists/styles").json()["icons"]
+
+
+def test_review_fixes_csv(client):
+    exported = ("﻿title,status,due,list,priority,estimate,repeat,notes\n"
+                "Call mom,OPEN,2026-11-20T17:00:00+00:00,family,low,30,none,ask about thanksgiving\n"
+                "'=SUM(A1),OPEN,,,,,,\n"
+                "Call Sam, about the lease,OPEN,,,,,,\n")
+    prev = client.post("/api/my-tasks/dump", json={"text": exported, "format": "csv", "tz": LA}).json()["preview"]
+    assert prev[0]["title"] == "Call mom" and prev[0]["due_at"].startswith("2026-11-20T17:00") and prev[0]["priority"] == "low"
+    assert prev[0]["estimate_minutes"] == 30 and prev[0]["list_name"] == "family"
+    assert prev[1]["title"] == "=SUM(A1)" and prev[2]["title"].startswith("Call Sam")
+    bad = client.post("/api/my-tasks/dump", json={"text": 'title\n"unclosed\n', "format": "csv"})
+    assert bad.status_code in (200, 422)
+
+
+def test_review_fixes_end_of_day_keeps_repeats(client):
+    t = _add(client, "standup every day at 9am")
+    with transaction() as conn:  # due an hour ago, still open
+        conn.execute(update(db.my_tasks).where(db.my_tasks.c.id == t["id"]).values(
+            due_at=(datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()))
+    out = client.post("/api/my-tasks/shutdown", json={"tz": "UTC", "move": True}).json()
+    assert out["moved"] == []
+
+
+def test_review_fixes_bill_added_after_its_day():
+    zone = __import__("zoneinfo").ZoneInfo(LA)
+    bill = {"cadence": "monthly", "due_day": 11, "due_month": None, "created_day": date(2026, 11, 14)}
+    assert taskextra.next_due(bill, date(2026, 11, 14), set()) == date(2026, 12, 11)
+    del zone
+
+
+def test_review_fixes_busy_overlaps_and_old_months(client):
+    org = _org() or "00000000-0000-4000-8000-0000000000ff"
+    now = datetime.now(timezone.utc).replace(hour=8, minute=0, second=0, microsecond=0)
+    busy = taskextra.parse_busy([f"{now.replace(hour=10).isoformat()},{now.replace(hour=11).isoformat()}",
+                                 f"{now.replace(hour=10, minute=30).isoformat()},{now.replace(hour=11, minute=30).isoformat()}"])
+    with db.get_engine().connect() as conn:
+        p = taskplus.plan_day(conn, org, "UTC", "09:00", "18:00", now=now, busy=busy)
+    assert p["busy_minutes"] == 90 and sum(1 for b in p["blocks"] if b["verb"] == "Busy") == 1
+    t = _add(client, "old thing on jan 5")
+    client.post(f"/api/my-tasks/{t['id']}/done")
+    with transaction() as conn:
+        conn.execute(update(db.my_tasks).where(db.my_tasks.c.id == t["id"]).values(
+            due_at="2026-01-05T20:00:00+00:00", done_at="2026-01-05T21:00:00+00:00", updated_at="2026-01-05T21:00:00+00:00"))
+    m = client.get("/api/my-tasks/month", params={"year": 2026, "month": 1, "tz": LA}).json()
+    assert m["days"]["2026-01-05"]["tasks"][0]["title"] == "Old thing"
+    s = client.get("/api/lists/styles").json()
+    assert "items" in s
