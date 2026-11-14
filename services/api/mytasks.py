@@ -2,12 +2,12 @@
 and starting tasks need the operator role (with the mutation rate limit), the same as starting a mission."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from services.core import db
 from services.core.auth import Principal, authenticate
-from services.management import capture, mytasks, taskmore, taskplus
+from services.management import capture, mytasks, taskextra, taskmore, taskplus
 
 router = APIRouter(prefix="/api")
 
@@ -178,10 +178,12 @@ def delete_template(tmpl: str, p: Principal = Depends(operator)) -> dict:
 
 @router.get("/my-tasks/plan")
 def plan(tz: str = Query(default="UTC", max_length=64), start: str = Query(default="09:00", max_length=5),
-         end: str = Query(default="18:00", max_length=5), p: Principal = Depends(member)) -> dict:
+         end: str = Query(default="18:00", max_length=5), busy: list[str] = Query(default=[], max_length=60),
+         p: Principal = Depends(member)) -> dict:
+    """`busy`: "start,end" times from your phone's calendar (V6.103); titles are never sent."""
     with db.get_engine().connect() as conn:
         try:
-            return taskplus.plan_day(conn, p.organization_id, tz, start, end)
+            return taskplus.plan_day(conn, p.organization_id, tz, start, end, busy=taskextra.parse_busy(busy))
         except Errors as exc:
             raise _err(exc) from exc
 
@@ -231,6 +233,68 @@ def day_digest(tz: str = Query(default="UTC", max_length=64), day: str = Query(d
                p: Principal = Depends(member)) -> dict:
     with db.get_engine().connect() as conn:
         return taskmore.digest(conn, p.organization_id, tz, day)
+
+
+@router.get("/my-tasks/month")
+def month_view(year: int = Query(ge=2000, le=2100), month: int = Query(ge=1, le=12), tz: str = Query(default="UTC", max_length=64),
+               p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return taskextra.month(conn, p.organization_id, year, month, tz)
+
+
+@router.get("/my-tasks/fit")
+def fit(minutes: int = Query(ge=5, le=480), tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return taskextra.fit(conn, p.organization_id, minutes, tz)
+
+
+@router.get("/my-tasks/shutdown")
+def shutdown(tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return taskextra.shutdown(conn, p.organization_id, tz)
+
+
+class CloseDayIn(BaseModel):
+    tz: str | None = Field(default="UTC", max_length=64)
+    move: bool = False
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.post("/my-tasks/shutdown")
+def close_day(body: CloseDayIn, p: Principal = Depends(operator)) -> dict:
+    return taskextra.close_day(p, body.tz, body.move, body.note)
+
+
+@router.get("/my-tasks/archive")
+def archive(q: str | None = Query(default=None, max_length=120), limit: int = Query(default=100, ge=1, le=500),
+            p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return {"tasks": taskextra.archive(conn, p.organization_id, q, limit)}
+
+
+@router.get("/my-tasks/export")
+def export(format: str = Query(default="json", pattern="^(json|csv)$"), p: Principal = Depends(member)) -> Response:
+    with db.get_engine().connect() as conn:
+        body, ctype = taskextra.export(conn, p.organization_id, format)
+    return Response(body, media_type=ctype, headers={"Content-Disposition": f'attachment; filename="my-tasks.{format}"'})
+
+
+class DumpIn(BaseModel):
+    text: str = Field(min_length=1, max_length=40_000)
+    format: str = Field(default="lines", pattern="^(lines|csv)$")
+    tz: str | None = Field(default="UTC", max_length=64)
+    dry_run: bool = True
+
+
+@router.post("/my-tasks/dump")
+def dump(body: DumpIn, p: Principal = Depends(operator)) -> dict:
+    """V6.98 brain dump / V6.109 import: with dry_run (the default) only shows what would be added."""
+    try:
+        if body.dry_run:
+            return {"preview": taskextra.dump_preview(body.text, body.tz, body.format)}
+        return taskextra.dump_add(p, body.text, body.tz, body.format)
+    except Errors as exc:
+        raise _err(exc) from exc
 
 
 @router.get("/my-tasks/{tid}")
@@ -407,5 +471,179 @@ def add_link(tid: str, body: LinkIn, p: Principal = Depends(operator)) -> dict:
 def remove_link(tid: str, lid: str, p: Principal = Depends(operator)) -> dict:
     try:
         return {"links": taskmore.remove_link(p, tid, lid)}
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+# ---------------------------------------------------------------- V6.98–V6.112
+
+@router.post("/my-tasks/{tid}/items/{iid}/promote", status_code=201)
+def promote(tid: str, iid: str, p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.promote_item(p, tid, iid)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+class GoalLinkIn(BaseModel):
+    goal_id: str | None = Field(default=None, max_length=36)
+
+
+@router.post("/my-tasks/{tid}/goal")
+def link_goal(tid: str, body: GoalLinkIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        taskextra.link_goal(p, tid, body.goal_id)
+        with db.get_engine().connect() as conn:
+            return mytasks.get(conn, p.organization_id, tid)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+class WaitingIn(BaseModel):
+    person: str | None = Field(default=None, max_length=60)
+    follow_up_at: str | None = Field(default=None, max_length=40)
+
+
+@router.post("/my-tasks/{tid}/waiting")
+def waiting(tid: str, body: WaitingIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        taskextra.set_waiting(p, tid, body.person, body.follow_up_at)
+        with db.get_engine().connect() as conn:
+            return mytasks.get(conn, p.organization_id, tid)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+# bills you track (V6.100–V6.101): nothing here pays anything
+
+class BillIn(BaseModel):
+    name: str | None = Field(default=None, max_length=80)
+    amount: float | None = Field(default=None, ge=0, le=1_000_000)
+    cadence: str | None = Field(default=None, pattern="^(monthly|yearly)$")
+    due_day: int | None = Field(default=None, ge=1, le=31)
+    due_month: int | None = Field(default=None, ge=1, le=12)
+    autopay: bool | None = None
+    link_url: str | None = Field(default=None, max_length=2048)
+    notes: str | None = Field(default=None, max_length=1000)
+    remind_days: int | None = Field(default=None, ge=0, le=14)
+    active: bool | None = None
+    tz: str | None = Field(default="UTC", max_length=64)
+
+
+@router.get("/bills")
+def list_bills(tz: str = Query(default="UTC", max_length=64), all: bool = False, p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return {"bills": taskextra.bills(conn, p.organization_id, tz, include_inactive=all)}
+
+
+@router.get("/bills/summary")
+def bill_summary(tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return taskextra.bill_summary(conn, p.organization_id, tz)
+
+
+@router.post("/bills", status_code=201)
+def add_bill(body: BillIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.add_bill(p, body.model_dump(exclude={"tz"}, exclude_unset=True), body.tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.patch("/bills/{bid}")
+def edit_bill(bid: str, body: BillIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.edit_bill(p, bid, body.model_dump(exclude={"tz"}, exclude_unset=True), body.tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.delete("/bills/{bid}")
+def remove_bill(bid: str, p: Principal = Depends(operator)) -> dict:
+    try:
+        taskextra.remove_bill(p, bid)
+    except Errors as exc:
+        raise _err(exc) from exc
+    return {"ok": True}
+
+
+class PaidIn(BaseModel):
+    period: str | None = Field(default=None, max_length=7)
+    amount: float | None = Field(default=None, ge=0, le=1_000_000)
+    tz: str | None = Field(default="UTC", max_length=64)
+
+
+@router.post("/bills/{bid}/paid")
+def bill_paid(bid: str, body: PaidIn, p: Principal = Depends(operator)) -> dict:
+    """You paid it somewhere else; this only records that."""
+    try:
+        return taskextra.mark_paid(p, bid, body.period, body.amount, body.tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.delete("/bills/{bid}/paid/{period}")
+def bill_unpaid(bid: str, period: str, tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.unmark_paid(p, bid, period, tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+# weekly goals (V6.106)
+
+class GoalIn(BaseModel):
+    text: str | None = Field(default=None, max_length=120)
+    done: bool | None = None
+    tz: str | None = Field(default="UTC", max_length=64)
+
+
+@router.get("/goals")
+def list_goals(tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return taskextra.goals(conn, p.organization_id, tz)
+
+
+@router.post("/goals", status_code=201)
+def add_goal(body: GoalIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.add_goal(p, body.text or "", body.tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.patch("/goals/{gid}")
+def edit_goal(gid: str, body: GoalIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.edit_goal(p, gid, body.model_dump(exclude={"tz"}, exclude_unset=True), body.tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.delete("/goals/{gid}")
+def remove_goal(gid: str, tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskextra.remove_goal(p, gid, tz)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+# list colors and icons (V6.110)
+
+class StyleIn(BaseModel):
+    color: str | None = Field(default=None, max_length=7)
+    icon: str | None = Field(default=None, max_length=40)
+
+
+@router.get("/lists/styles")
+def styles(p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return {"styles": taskextra.list_styles(conn, p.organization_id), "icons": list(taskextra.ICONS)}
+
+
+@router.put("/lists/{name}/style")
+def set_style(name: str, body: StyleIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        return {"styles": taskextra.set_list_style(p, name, body.color, body.icon)}
     except Errors as exc:
         raise _err(exc) from exc

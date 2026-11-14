@@ -262,6 +262,8 @@ def forget(conn: Connection, tid: str) -> None:
     conn.execute(delete(db.task_feedback).where(db.task_feedback.c.task_id == tid))
     conn.execute(delete(db.focus_sessions).where(db.focus_sessions.c.task_id == tid))
     conn.execute(delete(db.task_links).where(db.task_links.c.task_id == tid))
+    conn.execute(delete(db.task_goals).where(db.task_goals.c.task_id == tid))
+    conn.execute(delete(db.task_waiting).where(db.task_waiting.c.task_id == tid))
     conn.execute(update(db.task_meta).where(db.task_meta.c.blocked_by == tid).values(blocked_by=None))
 
 
@@ -333,10 +335,11 @@ def minutes_of(t: dict) -> int:
 
 
 def plan_day(conn: Connection, org: str, tz: str | None = "UTC", start: str = "09:00", end: str = "18:00",
-             now: datetime | None = None) -> dict:
+             now: datetime | None = None, busy: list | None = None) -> dict:
     """Today's tasks laid out as a timeline: what needs you first (5 minutes each), results to review (10 minutes),
     then overdue, due today and the rest by priority, each for its estimate (or a default by kind), from the later of
-    `start` and now until `end`. What doesn't fit is listed after. Snoozed, waiting and in-progress tasks stay off."""
+    `start` and now until `end`. What doesn't fit is listed after. Snoozed, waiting and in-progress tasks stay off.
+    `busy` (V6.103): (start, end) times from your calendar; work goes around them and they show as "Busy"."""
     from .mytasks import PRIORITY_RANK, listing
     zone = _zone(tz)
     now = (now or _now()).astimezone(zone)
@@ -364,20 +367,45 @@ def plan_day(conn: Connection, org: str, tz: str | None = "UTC", start: str = "0
         return (not t["overdue"], not due_today, PRIORITY_RANK.get(t["priority"], 1), t["due_at"] or "9999", t["created_at"])
     rest.sort(key=rank)
     blocks, later = [], []
+    busy = [(s.astimezone(zone), e.astimezone(zone)) for s, e in (busy or []) if e.astimezone(zone) > day_start and s.astimezone(zone) < day_end]
+    busy_minutes = 0
+    for s, e in busy:
+        s2, e2 = max(s, day_start), min(e, day_end)
+        busy_minutes += int((e2 - s2).total_seconds() // 60)
+        if e2 > cursor:
+            blocks.append({"task_id": None, "title": "Busy", "verb": "Busy", "minutes": int((e2 - max(s2, cursor)).total_seconds() // 60),
+                           "kind": "busy", "priority": "normal", "overdue": False, "list_name": None, "estimated": False,
+                           "start": max(s2, cursor).astimezone(timezone.utc).isoformat(), "end": e2.astimezone(timezone.utc).isoformat()})
+
+    def clear(at: datetime, mins: int) -> datetime:
+        """The first start at or after `at` where `mins` minutes don't run into a busy time."""
+        moved = True
+        while moved:
+            moved = False
+            for s, e in busy:
+                if at < e and at + timedelta(minutes=mins) > s:
+                    at, moved = e, True
+        return at
+
     queue = [(t, 5, "Decide") for t in needs] + [(t, 10, "Review") for t in review] + [(t, minutes_of(t), "Do") for t in rest]
     for t, mins, verb in queue:
-        if cursor + timedelta(minutes=mins) > day_end:
+        slot = clear(cursor, mins)
+        if slot + timedelta(minutes=mins) > day_end:
             later.append({"task_id": t["id"], "title": t["title"], "minutes": mins})
             continue
+        cursor = slot
         blocks.append({"task_id": t["id"], "title": t["title"], "verb": verb, "minutes": mins, "kind": t["kind"],
                        "priority": t["priority"], "overdue": t["overdue"], "list_name": t.get("list_name"),
                        "estimated": not t.get("estimate_minutes") and verb == "Do",
                        "start": cursor.astimezone(timezone.utc).isoformat(),
                        "end": (cursor + timedelta(minutes=mins)).astimezone(timezone.utc).isoformat()})
         cursor += timedelta(minutes=mins)
-    planned = sum(b["minutes"] for b in blocks)
-    return {"blocks": blocks, "later": later, "planned_minutes": planned,
-            "free_minutes": max(0, int((day_end - cursor).total_seconds() // 60)) if cursor < day_end else 0,
+    blocks.sort(key=lambda b: b["start"])
+    planned = sum(b["minutes"] for b in blocks if b["verb"] != "Busy")
+    free = max(0, int((day_end - cursor).total_seconds() // 60)) if cursor < day_end else 0
+    free -= sum(int((min(e, day_end) - max(s, cursor)).total_seconds() // 60) for s, e in busy if e > cursor)
+    return {"blocks": blocks, "later": later, "planned_minutes": planned, "busy_minutes": busy_minutes,
+            "free_minutes": max(0, free),
             "day": {"start": day_start.astimezone(timezone.utc).isoformat(), "end": day_end.astimezone(timezone.utc).isoformat()}}
 
 

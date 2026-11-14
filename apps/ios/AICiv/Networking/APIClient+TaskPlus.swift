@@ -17,7 +17,7 @@ struct TaskTemplate: Decodable, Identifiable, Hashable {
 
 struct DayPlan: Decodable, Hashable {
     struct Block: Decodable, Hashable, Identifiable {
-        let taskId: String
+        let taskId: String?  // nil for a "Busy" block from your calendar (V6.103)
         let title: String
         let verb: String
         let minutes: Int
@@ -28,7 +28,8 @@ struct DayPlan: Decodable, Hashable {
         let estimated: Bool
         let start: String
         let end: String
-        var id: String { taskId + start }
+        var id: String { (taskId ?? "busy") + start }
+        var isBusy: Bool { verb == "Busy" }
         var startDate: Date? { ISODate.parse(start) }
         var endDate: Date? { ISODate.parse(end) }
     }
@@ -42,6 +43,7 @@ struct DayPlan: Decodable, Hashable {
     let later: [Later]
     let plannedMinutes: Int
     let freeMinutes: Int
+    var busyMinutes: Int? = nil
 }
 
 struct TaskEstimate: Decodable, Hashable {

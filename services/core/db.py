@@ -1402,6 +1402,81 @@ focus_sessions = Table(  # V6.76
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
+my_bills = Table(  # V6.100 bills you track and pay yourself (the app never pays anything); finance's `bills` is separate
+    "my_bills", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("amount_cents", Integer),                 # None: it varies
+    Column("currency", String, nullable=False, default="USD"),
+    Column("cadence", String, nullable=False, default="monthly"),   # monthly | yearly
+    Column("due_day", Integer, nullable=False),      # 1–31 (the 31st means the last day of shorter months)
+    Column("due_month", Integer),                    # yearly bills: 1–12
+    Column("autopay", Integer, nullable=False, default=0),
+    Column("link_url", String),
+    Column("notes", String, nullable=False, default=""),
+    Column("remind_days", Integer, nullable=False, default=3),
+    Column("active", Integer, nullable=False, default=1),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+my_bill_payments = Table(  # V6.101 a bill you marked paid for one period ("2026-11", or "2026" for a yearly bill)
+    "my_bill_payments", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("bill_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("period", String, nullable=False),
+    Column("amount_cents", Integer),
+    Column("paid_at", String, nullable=False),
+    Column("created_by", String(36), nullable=False),
+    UniqueConstraint("bill_id", "period", name="my_bill_payments_once"),
+)
+
+week_goals = Table(  # V6.106 up to three goals a week
+    "week_goals", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("week_start", String, nullable=False),    # the Monday, YYYY-MM-DD
+    Column("position", Integer, nullable=False, default=0),
+    Column("text", String, nullable=False),
+    Column("done", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+task_goals = Table(  # V6.106 a task counts toward one goal
+    "task_goals", metadata,
+    Column("task_id", String(36), primary_key=True),
+    Column("goal_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+)
+
+task_waiting = Table(  # V6.107 waiting for a person, with a date to follow up
+    "task_waiting", metadata,
+    Column("task_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("person", String, nullable=False),
+    Column("follow_up_at", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+day_notes = Table(  # V6.105 the note you leave yourself at the end of a day
+    "day_notes", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("day", String, primary_key=True),          # YYYY-MM-DD, your time zone
+    Column("note", String, nullable=False, default=""),
+    Column("moved", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+list_styles = Table(  # V6.110 a color and an icon for a #list
+    "list_styles", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("list_name", String, primary_key=True),
+    Column("color", String, nullable=False),          # #RRGGBB
+    Column("icon", String, nullable=False),           # one of a fixed set of symbols
+)
+
 task_links = Table(  # V6.93 web links on a task (shown and opened by you; agents don't fetch them)
     "task_links", metadata,
     Column("id", String(36), primary_key=True),

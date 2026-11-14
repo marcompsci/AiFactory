@@ -50,11 +50,15 @@ struct MyTask: Decodable, Identifiable, Hashable {
     var repeatLabel: String? = nil
     var links: [TaskLink]? = nil
     var streak: TaskStreak? = nil
+    // V6.106–V6.107: a weekly goal, and waiting for a person
+    var goalId: String? = nil
+    var waitingFor: WaitingFor? = nil
+    var followUpDue: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, title, notes, kind, priority, status, dueAt, repeats = "repeat", budgetUsd, repositoryId, missionId, runs, stage, overdue,
              mission, createdAt, doneAt, plan, result, listName, estimateMinutes, snoozedUntil, blockedBy, blockedByTitle,
-             itemsTotal, itemsDone, items, feedback, focusMinutes, repeatLabel, links, streak
+             itemsTotal, itemsDone, items, feedback, focusMinutes, repeatLabel, links, streak, goalId, waitingFor, followUpDue
     }
 
     var due: Date? { ISODate.parse(dueAt) }
@@ -68,6 +72,12 @@ struct TaskItem: Decodable, Identifiable, Hashable {
     let text: String
     let done: Bool
     var fromAgents: Bool = false
+}
+
+struct WaitingFor: Decodable, Hashable {
+    let person: String
+    let followUpAt: String
+    var followUp: Date? { ISODate.parse(followUpAt) }
 }
 
 struct TaskLink: Decodable, Identifiable, Hashable {

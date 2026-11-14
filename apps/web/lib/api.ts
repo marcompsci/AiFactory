@@ -282,6 +282,37 @@ export const myTasks = {
   agentQuality: () => call<{ agents: Json[] }>("/api/insights/agent-quality"),
   estimate: (id: string) => call<Json>(`/api/my-tasks/${id}/estimate`),
   feedback: (id: string, rating: number, reason?: string) => call<Json>(`/api/my-tasks/${id}/feedback`, post({ rating, reason: reason || null })),
+  // V6.98–V6.112
+  dump: (text: string, format = "lines", dryRun = true) => call<Json>("/api/my-tasks/dump", post({ text, format, tz: tz(), dry_run: dryRun })),
+  promote: (id: string, item: string) => call<Json>(`/api/my-tasks/${id}/items/${item}/promote`, post()),
+  month: (year: number, month: number) => call<Json>(`/api/my-tasks/month?${new URLSearchParams({ year: String(year), month: String(month), tz: tz() })}`),
+  fit: (minutes: number) => call<Json>(`/api/my-tasks/fit?${new URLSearchParams({ minutes: String(minutes), tz: tz() })}`),
+  shutdown: () => call<Json>(`/api/my-tasks/shutdown?tz=${encodeURIComponent(tz())}`),
+  closeDay: (move: boolean, note: string) => call<Json>("/api/my-tasks/shutdown", post({ tz: tz(), move, note })),
+  archive: (q: string) => call<{ tasks: Json[] }>(`/api/my-tasks/archive?${new URLSearchParams({ q })}`),
+  exportFile: async (format: "json" | "csv") => {
+    const { apiUrl, token } = loadConnection();
+    const res = await fetch(apiUrl.replace(/\/$/, "") + `/api/my-tasks/export?format=${format}`,
+      { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    return res.blob();
+  },
+  waiting: (id: string, person: string | null, followUpAt: string | null) =>
+    call<Json>(`/api/my-tasks/${id}/waiting`, post({ person, follow_up_at: followUpAt })),
+  linkGoal: (id: string, goalId: string | null) => call<Json>(`/api/my-tasks/${id}/goal`, post({ goal_id: goalId })),
+  goals: () => call<Json>(`/api/goals?tz=${encodeURIComponent(tz())}`),
+  addGoal: (text: string) => call<Json>("/api/goals", post({ text, tz: tz() })),
+  setGoal: (id: string, done: boolean) => call<Json>(`/api/goals/${id}`, { method: "PATCH", body: JSON.stringify({ done, tz: tz() }) }),
+  removeGoal: (id: string) => call<Json>(`/api/goals/${id}?tz=${encodeURIComponent(tz())}`, { method: "DELETE" }),
+  bills: () => call<{ bills: Json[] }>(`/api/bills?tz=${encodeURIComponent(tz())}`),
+  billSummary: () => call<Json>(`/api/bills/summary?tz=${encodeURIComponent(tz())}`),
+  addBill: (fields: Json) => call<Json>("/api/bills", post({ ...fields, tz: tz() })),
+  removeBill: (id: string) => call<Json>(`/api/bills/${id}`, { method: "DELETE" }),
+  billPaid: (id: string) => call<Json>(`/api/bills/${id}/paid`, post({ tz: tz() })),
+  billUnpaid: (id: string, period: string) => call<Json>(`/api/bills/${id}/paid/${period}?tz=${encodeURIComponent(tz())}`, { method: "DELETE" }),
+  styles: () => call<{ styles: Record<string, { color: string; icon: string }>; icons: string[] }>("/api/lists/styles"),
+  setStyle: (name: string, color: string | null, icon: string | null) =>
+    call<{ styles: Record<string, { color: string; icon: string }> }>(`/api/lists/${encodeURIComponent(name)}/style`, { method: "PUT", body: JSON.stringify({ color, icon }) }),
   // V6.88–V6.97
   search: (q: string) => call<{ tasks: Json[] }>(`/api/my-tasks?${new URLSearchParams({ q })}`),
   undoDone: (id: string) => call<Json>(`/api/my-tasks/${id}/undo-done`, post()),

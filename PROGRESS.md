@@ -657,3 +657,34 @@ Nothing starts, spends, sends or is marked done without you. Links are yours to 
   "Plan my day"; long-press the app icon for Add a task and Plan my day.
 
 Server: `services/management/taskmore.py`, tests in `tests/integration/test_v688_v697.py`.
+
+## V6.98–V6.112: Bills, your calendar, goals and the end of the day (iPhone, web, server)
+
+Nothing starts, spends, sends or is marked done without you. The app never pays a bill or moves money: you pay where you
+usually do and mark it paid here. Your calendar is read on the phone and only event start and end times reach your Mac.
+
+- **V6.98 Brain dump.** Paste a pile of lines (bullets, numbers and `[ ]` boxes are ignored), see each parsed like quick
+  capture, then add them all. `POST /api/my-tasks/dump` (preview by default).
+- **V6.99 A step becomes a task.** Swipe a checklist step › Make a task; it keeps the list and notes where it came from.
+- **V6.100 Bills.** Name, amount (or "varies"), monthly or yearly, due day (the 31st means the last day of shorter
+  months), autopay, a payment-page link. Stored in `my_bills` (finance's synced `bills` table is separate).
+- **V6.101 Bill reminders and totals.** Mark paid per period (`my_bill_payments`), undo it, this month's total, the next
+  30 days, past-due bills; phone reminders N days before (or, on autopay, a check on the day).
+- **V6.102 Month calendar.** Tasks by due day and bills by due date, in your time zone.
+- **V6.103 Plan around your calendar.** "Work around my calendar" in Plan my day reads today's busy events on the phone
+  (EventKit, full access asked once) and sends only start/end times; work goes around them and they show as Busy.
+- **V6.104 "I have N minutes".** The best open tasks that fit, overdue and due-today first.
+- **V6.105 End of day.** What you finished, what's still due (moved to the same time tomorrow if you say so), and a note
+  for the morning that shows up the next evening.
+- **V6.106 Weekly goals.** Up to three a week; link tasks to a goal and watch its progress.
+- **V6.107 Waiting for people.** "Waiting for Sam" with a follow-up date: the task waits in its own group and a reminder
+  comes on the date.
+- **V6.108 Archive.** Tasks closed over 30 days ago leave the list; search and restore them.
+- **V6.109 Export and import.** JSON or CSV export of every task (spreadsheet formulas neutralised); import a CSV or text
+  file through Brain dump.
+- **V6.110 List colors and icons.** Long-press a #list chip.
+- **V6.111 Website.** The same tools on the web.
+- **V6.112 Polish and checks.** Labels for VoiceOver, an independent review, then the phone install.
+
+Server: `services/management/taskextra.py`, migration `0021_bills_goals_waiting.sql`, tests in
+`tests/integration/test_v698_v712.py`. New events: `bill.changed`, `bill.paid`, `goal.changed`, `day.closed`.

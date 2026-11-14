@@ -4,11 +4,18 @@ import UserNotifications
 
 /// The task list's tools (V6.74–V6.84): plan my day, the weekly review, results, insights and templates.
 enum TaskTool: String, CaseIterable, Identifiable {
-    case plan, review, habits, digest, results, insights, templates
+    case plan, fit, endOfDay, goals, bills, month, dump, review, habits, digest, results, insights, templates, archive
     var id: String { rawValue }
     var label: String {
         switch self {
         case .plan: return "Plan my day"
+        case .fit: return "I have…"
+        case .endOfDay: return "End of day"
+        case .goals: return "Goals"
+        case .bills: return "Bills"
+        case .month: return "Month"
+        case .dump: return "Brain dump"
+        case .archive: return "Archive & export"
         case .review: return "Weekly review"
         case .habits: return "Habits"
         case .digest: return "Morning digest"
@@ -20,6 +27,13 @@ enum TaskTool: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .plan: return "calendar.day.timeline.left"
+        case .fit: return "hourglass"
+        case .endOfDay: return "moon.stars"
+        case .goals: return "target"
+        case .bills: return "dollarsign.circle"
+        case .month: return "calendar"
+        case .dump: return "text.badge.plus"
+        case .archive: return "archivebox"
         case .review: return "checklist.checked"
         case .habits: return "flame"
         case .digest: return "sun.horizon"
@@ -40,6 +54,13 @@ struct TaskToolSheet: View {
             Group {
                 switch tool {
                 case .plan: PlanDayView(changed: changed)
+                case .fit: FitView()
+                case .endOfDay: EndOfDayView(changed: changed)
+                case .goals: GoalsView()
+                case .bills: BillsView()
+                case .month: MonthCalendarView()
+                case .dump: BrainDumpView(changed: changed)
+                case .archive: ArchiveView(changed: changed)
                 case .review: ReviewView(changed: changed)
                 case .habits: HabitsView()
                 case .digest: DigestSettingsView()
@@ -68,14 +89,18 @@ struct PlanDayView: View {
     @State private var error: String?
     @State private var focusOn: MyTask?
     @State private var icsURL: URL?
+    @AppStorage("planUsesCalendar") private var useCalendar = false
+    @State private var calendarNote: String?
 
     var body: some View {
         List {
             Section {
                 DatePicker("Start", selection: $start, displayedComponents: .hourAndMinute)
                 DatePicker("End", selection: $end, displayedComponents: .hourAndMinute)
+                Toggle("Work around my calendar", isOn: $useCalendar)
+                if let calendarNote { Text(calendarNote).font(.caption).foregroundStyle(.secondary) }
             } footer: {
-                Text("What needs you comes first, then results to review, then overdue, due today and the rest by priority, each for its time estimate. Blocks marked \"default\" use a length by kind because you haven't set one.")
+                Text("What needs you comes first, then results to review, then overdue, due today and the rest by priority, each for its time estimate. Blocks marked \"default\" use a length by kind because you haven't set one. With your calendar on, only the start and end of your events are sent to your Mac; their names stay on this phone.")
             }
             if let error { Text(error).foregroundStyle(Theme.bad).font(.caption) }
             if let p = plan {
@@ -100,7 +125,7 @@ struct PlanDayView: View {
                             }
                             Spacer(minLength: 0)
                             if b.verb == "Do" {
-                                Button { Task { focusOn = try? await app.api?.myTask(b.taskId) } } label: { Image(systemName: "timer") }
+                                Button { Task { if let id = b.taskId { focusOn = try? await app.api?.myTask(id) } } } label: { Image(systemName: "timer") }
                                     .buttonStyle(.borderless).accessibilityLabel("Focus on \(b.title)")
                             }
                         }
@@ -123,7 +148,7 @@ struct PlanDayView: View {
                 ProgressView()
             }
         }
-        .task(id: "\(Int(start.timeIntervalSince1970 / 60))-\(Int(end.timeIntervalSince1970 / 60))") { await load() }
+        .task(id: "\(Int(start.timeIntervalSince1970 / 60))-\(Int(end.timeIntervalSince1970 / 60))-\(useCalendar)") { await load() }
         .sheet(item: $focusOn) { t in FocusView(task: t) { await load(); await changed() }.presentationDetents([.medium]) }
     }
 
@@ -135,7 +160,17 @@ struct PlanDayView: View {
     private func load() async {
         guard let api = app.api else { error = "Connect to your Mac to plan the day."; return }
         do {
-            let p = try await api.planDay(tz: phoneTZ, start: hhmm(start), end: hhmm(end))
+            var busy: [(Date, Date)] = []
+            if useCalendar {
+                if let b = await CalendarBusy.today(from: start, to: end) {
+                    busy = b
+                    calendarNote = b.isEmpty ? "Nothing on your calendar in these hours." : "Planned around \(Plural.of(b.count, "event"))."
+                } else {
+                    calendarNote = "Calendar access is off. Turn it on in Settings › Privacy › Calendars › AI Civ."
+                }
+            } else { calendarNote = nil }
+            let p = busy.isEmpty ? try await api.planDay(tz: phoneTZ, start: hhmm(start), end: hhmm(end))
+                                 : try await api.planDay(start: hhmm(start), end: hhmm(end), busy: busy)
             plan = p
             icsURL = p.blocks.isEmpty ? nil : DayPlanCalendar.file(p)  // written once per plan, not on every redraw
             error = nil

@@ -178,9 +178,9 @@ enum DayPlanCalendar {
                 .replacingOccurrences(of: "\r", with: "\\n").replacingOccurrences(of: "\n", with: "\\n")
         }
         var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//AI Civilization//Plan my day//EN", "CALSCALE:GREGORIAN"]
-        for b in plan.blocks {
-            guard let s = b.startDate, let e = b.endDate else { continue }
-            lines += ["BEGIN:VEVENT", "UID:\(b.taskId)-\(f.string(from: s))@aiciv", "DTSTAMP:\(stamp)",
+        for b in plan.blocks where !b.isBusy {  // your own events are already in your calendar
+            guard let s = b.startDate, let e = b.endDate, let tid = b.taskId else { continue }
+            lines += ["BEGIN:VEVENT", "UID:\(tid)-\(f.string(from: s))@aiciv", "DTSTAMP:\(stamp)",
                       "DTSTART:\(f.string(from: s))", "DTEND:\(f.string(from: e))",
                       "SUMMARY:\(esc("\(b.verb): \(b.title)"))",
                       "DESCRIPTION:\(esc(b.estimated ? "\(b.minutes) minutes (a default length, not your estimate)" : "\(b.minutes) minutes"))",

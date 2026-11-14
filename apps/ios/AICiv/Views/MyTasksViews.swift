@@ -21,6 +21,9 @@ struct MyTasksTab: View {
     @State private var search = ""
     @State private var found: [MyTask]?
     @State private var undo: UndoOffer?
+    @State private var styles: [String: ListStyle] = [:]
+    @State private var icons: [String] = []
+    @State private var styling: StyleTarget?
     @FocusState private var typing: Bool
 
     private var tz: String { TimeZone.current.identifier }
@@ -67,6 +70,9 @@ struct MyTasksTab: View {
         }
         .task(id: "\(app.openTaskId ?? "")|\(app.connection == .live)") { await openRequested() }
         .overlay(alignment: .bottom) { if let undo { undoBar(undo) } }
+        .sheet(item: $styling) { s in
+            ListStyleSheet(name: s.name, current: styles[s.name], icons: icons) { styles = $0 }.presentationDetents([.medium, .large])
+        }
         .task(id: undo?.id) {  // an undo offer lasts six seconds
             guard undo != nil else { return }
             try? await Task.sleep(for: .seconds(6))
@@ -244,9 +250,14 @@ struct MyTasksTab: View {
                     Button("All") { withAnimation(Motion.ui) { listFilter = nil } }
                         .buttonStyle(CityChip(fill: listFilter == nil ? Theme.gold.opacity(0.35) : Color.black.opacity(0.25)))
                     ForEach(names, id: \.self) { n in
-                        Button("#\(n)") { withAnimation(Motion.ui) { listFilter = listFilter == n ? nil : n } }
-                            .buttonStyle(CityChip(fill: listFilter == n ? Theme.gold.opacity(0.35) : Color.black.opacity(0.25)))
-                            .accessibilityAddTraits(listFilter == n ? .isSelected : [])
+                        let st = styles[n]
+                        let tint = st.map { Color(hexString: $0.color) } ?? Theme.gold
+                        Button { withAnimation(Motion.ui) { listFilter = listFilter == n ? nil : n } } label: {
+                            Label("#\(n)", systemImage: st?.icon ?? "number").labelStyle(.titleAndIcon)
+                        }
+                        .buttonStyle(CityChip(fill: listFilter == n ? tint.opacity(0.4) : Color.black.opacity(0.25)))
+                        .accessibilityAddTraits(listFilter == n ? .isSelected : [])
+                        .contextMenu { Button { styling = StyleTarget(name: n) } label: { Label("Color and icon", systemImage: "paintpalette") } }
                     }
                 }
             }
@@ -269,6 +280,7 @@ struct MyTasksTab: View {
             TaskGroup(name: "Coming up", color: Theme.ink, tasks: pending.filter { t in t.due.map { $0 >= endOfDay } ?? false }),
             TaskGroup(name: "Anytime", color: Theme.ink.opacity(0.7), tasks: pending.filter { $0.due == nil }),
             TaskGroup(name: "Waiting on something", color: Theme.violet, tasks: live.filter { $0.stage == "blocked" }),
+            TaskGroup(name: "Waiting for people", color: Theme.violet, tasks: live.filter { $0.stage == "waiting" }),
             TaskGroup(name: "Snoozed", color: .secondary, tasks: live.filter { $0.stage == "snoozed" }),
         ]
         if loaded && live.isEmpty {
@@ -309,7 +321,14 @@ struct MyTasksTab: View {
                     if let d = t.due { Text(TaskTime.label(d)).font(.caption2).foregroundStyle(t.overdue ? Theme.bad : .secondary) }
                     if t.repeats != "none" { Image(systemName: "repeat").font(.caption2).foregroundStyle(.secondary) }
                     if t.priority == "urgent" { Image(systemName: "exclamationmark").font(.caption2.bold()).foregroundStyle(Theme.bad) }
-                    if let l = t.listName, listFilter == nil { Text("#\(l)").font(.caption2).foregroundStyle(Theme.gold) }
+                    if let l = t.listName, listFilter == nil {
+                        Label("#\(l)", systemImage: styles[l]?.icon ?? "number").labelStyle(.titleAndIcon).font(.caption2)
+                            .foregroundStyle(styles[l].map { Color(hexString: $0.color) } ?? Theme.gold)
+                    }
+                    if let w = t.waitingFor {
+                        Text(t.followUpDue == true ? "follow up with \(w.person)" : "waiting for \(w.person)").font(.caption2)
+                            .foregroundStyle(t.followUpDue == true ? Theme.gold : Theme.violet)
+                    }
                     if let m = t.estimateMinutes { Text(TaskTime.minutes(m)).font(.caption2).foregroundStyle(.secondary) }
                     if let n = t.itemsTotal, n > 0 {
                         Label("\(t.itemsDone ?? 0)/\(n)", systemImage: "checklist").font(.caption2).foregroundStyle(.secondary)
@@ -359,6 +378,13 @@ struct MyTasksTab: View {
             TaskReminders.sync(list)
             TaskSpotlight.index(list)
             Task { await DigestScheduler.refreshIfDue(api) }
+            if styles.isEmpty, let s = try? await api.listStyles() { styles = s.styles; icons = s.icons }
+            Task {  // V6.101: keep bill reminders current, at most every 30 minutes
+                let last = UserDefaults.standard.double(forKey: "billsSyncedAt")
+                guard Date().timeIntervalSince1970 - last > 30 * 60, let b = try? await api.bills() else { return }
+                UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "billsSyncedAt")
+                BillReminders.sync(b)
+            }
         }
     }
 
@@ -463,6 +489,7 @@ struct StageChip: View {
             case "dropped": return ("Dropped", .secondary)
             case "blocked": return ("Waiting", Theme.violet)
             case "snoozed": return ("Snoozed", .secondary)
+            case "waiting": return ("Waiting", Theme.violet)
             default: return ("To do", Theme.ink.opacity(0.6))
             }
         }()
@@ -518,6 +545,9 @@ struct TaskDetailView: View {
     @State private var confirmDelete = false
     @State private var newItem = ""
     @State private var newLink = ""
+    @State private var waitPerson = ""
+    @State private var waitDate = Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date()
+    @State private var weekGoals: [WeekGoals.Goal] = []
     @State private var listText = ""
     @State private var estimate: TaskEstimate?
     @State private var others: [MyTask] = []
@@ -581,7 +611,7 @@ struct TaskDetailView: View {
                     }
                     checklist(t)
                     linkSection(t)
-                    if t.isOpen { organize(t) }
+                    if t.isOpen { organize(t); peopleAndGoals(t) }
                     Section {
                         NavigationLink { TaskHistoryView(taskId: taskId, title: t.title) } label: {
                             Label("History", systemImage: "clock.arrow.circlepath")
@@ -685,7 +715,13 @@ struct TaskDetailView: View {
                         Spacer()
                         if i.fromAgents { Image(systemName: "sparkles").font(.caption2).foregroundStyle(.secondary).accessibilityLabel("From the agents' plan") }
                     }
-                    .swipeActions { Button(role: .destructive) { Task { await run { _ = try await $0.removeItem(taskId, item: i.id) } } } label: { Label("Remove", systemImage: "trash") } }
+                    .swipeActions {
+                        Button(role: .destructive) { Task { await run { _ = try await $0.removeItem(taskId, item: i.id) } } } label: { Label("Remove", systemImage: "trash") }
+                        if t.isOpen {  // V6.99: a step that deserves its own task
+                            Button { Task { await run { _ = try await $0.promoteItem(taskId, item: i.id) } } } label: { Label("Make a task", systemImage: "arrow.up.forward.square") }
+                                .tint(Theme.violet)
+                        }
+                    }
                 }
                 if t.isOpen {
                     HStack {
@@ -706,6 +742,41 @@ struct TaskDetailView: View {
         guard !s.isEmpty else { return }
         newItem = ""
         Task { await run { _ = try await $0.addItems(taskId, [s]) } }
+    }
+
+    // MARK: waiting for a person (V6.107) and this week's goal (V6.106)
+
+    @ViewBuilder private func peopleAndGoals(_ t: MyTask) -> some View {
+        Section {
+            if let w = t.waitingFor {
+                LabeledContent("Waiting for", value: w.person)
+                if let d = w.followUp {
+                    LabeledContent("Follow up", value: d.formatted(date: .abbreviated, time: .shortened))
+                        .foregroundStyle(t.followUpDue == true ? Theme.gold : Theme.ink)
+                }
+                Button("No longer waiting") { Task { await run { _ = try await $0.setWaiting(taskId, person: nil, followUp: nil) } } }
+            } else {
+                TextField("Waiting for someone? (Sam, the landlord)", text: $waitPerson)
+                if !waitPerson.trimmingCharacters(in: .whitespaces).isEmpty {
+                    DatePicker("Follow up", selection: $waitDate, in: Date()...)
+                    Button("Save") {
+                        let who = waitPerson.trimmingCharacters(in: .whitespaces)
+                        waitPerson = ""
+                        Task { await run { _ = try await $0.setWaiting(taskId, person: who, followUp: waitDate) } }
+                    }
+                }
+            }
+            if !weekGoals.isEmpty {
+                Picker("Counts toward", selection: Binding(get: { t.goalId ?? "" }, set: { v in
+                    Task { await run { _ = try await $0.linkGoal(taskId, goal: v.isEmpty ? nil : v) } }
+                })) {
+                    Text("No goal").tag("")
+                    ForEach(weekGoals) { g in Text(g.text).lineLimit(1).tag(g.id) }
+                }
+            }
+        } header: { Text("People and goals") } footer: {
+            Text("You'll get a reminder on the follow-up date. While you wait, the task sits in \"Waiting for people\".")
+        }
     }
 
     static let repeatChoices: [(String, String)] = [
@@ -828,6 +899,7 @@ struct TaskDetailView: View {
             hasDue = x.due != nil
             if let d = x.due { due = d }
             if x.isOpen && (x.stage == "open" || x.stage == "problem") { estimate = try? await api.taskEstimate(taskId) }
+            if x.isOpen, weekGoals.isEmpty, let g = try? await api.goals() { weekGoals = g.goals }
             if x.isOpen, others.isEmpty {
                 others = ((try? await api.myTasks()) ?? []).filter { $0.isOpen && $0.id != taskId }.prefix(40).map { $0 }
             }
@@ -858,12 +930,16 @@ enum TaskReminders {
 
     static func sync(_ tasks: [MyTask]) {
         let now = Date()
-        let wanted: [(String, MyTask, Date)] = tasks.compactMap { t in
+        let due: [(String, MyTask, Date)] = tasks.compactMap { t in
             guard t.isOpen, t.stage == "open" || t.stage == "working", let d = t.due, d > now, d < now.addingTimeInterval(30 * 86_400) else { return nil }
             return ("\(prefix)v2-\(t.id)-\(Int(d.timeIntervalSince1970))", t, d)
         }
-        .sorted { $0.2 < $1.2 }
-        .prefix(40).map { $0 }
+        // V6.107: the day to follow up with someone you're waiting for
+        let followUps: [(String, MyTask, Date)] = tasks.compactMap { t in
+            guard t.isOpen, let w = t.waitingFor, let d = w.followUp, d > now, d < now.addingTimeInterval(60 * 86_400) else { return nil }
+            return ("\(prefix)follow-\(t.id)-\(Int(d.timeIntervalSince1970))", t, d)
+        }
+        let wanted = (due + followUps).sorted { $0.2 < $1.2 }.prefix(50).map { $0 }
         let center = UNUserNotificationCenter.current()
         center.getPendingNotificationRequests { pending in
             let have = Set(pending.map(\.identifier).filter { $0.hasPrefix(prefix) })
@@ -871,7 +947,11 @@ enum TaskReminders {
             center.removePendingNotificationRequests(withIdentifiers: Array(have.subtracting(want)))
             for (id, t, d) in wanted where !have.contains(id) {
                 let c = UNMutableNotificationContent()
-                c.title = t.priority == "urgent" ? "Due now (urgent)" : "Due now"
+                if id.hasPrefix("\(prefix)follow-"), let w = t.waitingFor {
+                    c.title = "Follow up with \(w.person)"
+                } else {
+                    c.title = t.priority == "urgent" ? "Due now (urgent)" : "Due now"
+                }
                 c.body = t.title
                 c.sound = .default
                 c.categoryIdentifier = AppDelegate.taskCategory  // Done (after unlocking), Snooze 1 hour, Open
@@ -889,3 +969,5 @@ struct UndoOffer: Identifiable {
     let label: String
     let action: () async throws -> Void
 }
+
+struct StyleTarget: Identifiable { let name: String; var id: String { name } }

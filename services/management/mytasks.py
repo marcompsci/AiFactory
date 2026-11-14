@@ -155,7 +155,7 @@ def stage(task, mission: dict | None) -> str:
 
 
 def _view(task, mission: dict | None, now: datetime, meta: dict | None = None, items: list | None = None,
-          open_ids: set | None = None) -> dict:
+          open_ids: set | None = None, waiting: dict | None = None, goal_id: str | None = None) -> dict:
     d = dict(task._mapping)
     d["stage"] = stage(task, mission)
     d["mission"] = mission
@@ -168,11 +168,16 @@ def _view(task, mission: dict | None, now: datetime, meta: dict | None = None, i
     d["snoozed_until"] = snoozed if snoozed and snoozed > now.isoformat() else None
     blocker = meta.get("blocked_by")
     d["blocked_by"] = blocker if blocker and (open_ids is None or blocker in open_ids) else None
-    if d["stage"] == "open":  # V6.70/V6.71: set aside until later, or waiting on another task
+    d["waiting_for"] = waiting  # V6.107 {person, follow_up_at}
+    d["follow_up_due"] = bool(waiting and waiting["follow_up_at"] <= now.isoformat())
+    d["goal_id"] = goal_id
+    if d["stage"] == "open":  # V6.70/V6.71/V6.107: set aside until later, waiting on a task, or waiting for a person
         if d["blocked_by"]:
             d["stage"] = "blocked"
         elif d["snoozed_until"]:
             d["stage"] = "snoozed"
+        elif waiting and not d["follow_up_due"]:
+            d["stage"] = "waiting"
     items = items or []
     d["items_total"] = len(items)
     d["items_done"] = sum(1 for i in items if i["done"])
@@ -184,24 +189,32 @@ def _open_ids(conn: Connection, org: str) -> set:
     return {r.id for r in conn.execute(select(T.c.id).where(T.c.organization_id == org, T.c.status == "OPEN"))}
 
 
-def listing(conn: Connection, org: str, include_done: bool = True) -> list[dict]:
-    from . import taskplus
+def listing(conn: Connection, org: str, include_done: bool = True, archived: bool = False) -> list[dict]:
+    """Open tasks, plus those closed in the last 30 days (older ones are in the archive, V6.108, unless `archived`)."""
+    from . import taskextra, taskplus
     T = db.my_tasks
     q = select(T).where(T.c.organization_id == org)
     if not include_done:
         q = q.where(T.c.status == "OPEN")
-    rows = conn.execute(q.order_by(T.c.created_at.desc()).limit(1000)).fetchall()
+    rows = conn.execute(q.order_by(T.c.created_at.desc()).limit(2000)).fetchall()
+    if include_done and not archived:
+        cut = taskextra.archive_cutoff()
+        rows = [r for r in rows if r.status == "OPEN" or ((r.done_at or r.updated_at) or "") >= cut]
+    rows = rows[:1000]
     ms = _missions(conn, [r.mission_id for r in rows if r.mission_id])
     ids = [r.id for r in rows]
     metas, items, open_ids = taskplus.meta_for(conn, org, ids), taskplus.items_for(conn, org, ids), _open_ids(conn, org)
+    waits, goals = taskextra.waiting_for(conn, org, ids), taskextra.goal_for(conn, org, ids)
     now = _now()
-    out = [_view(r, ms.get(r.mission_id) if r.mission_id else None, now, metas.get(r.id), items.get(r.id), open_ids) for r in rows]
+    out = [_view(r, ms.get(r.mission_id) if r.mission_id else None, now, metas.get(r.id), items.get(r.id), open_ids,
+                 waits.get(r.id), goals.get(r.id)) for r in rows]
     out.sort(key=sort_key)
     return out
 
 
 def sort_key(t: dict):
-    order = {"needs_you": 0, "review": 1, "problem": 2, "working": 3, "open": 4, "blocked": 5, "snoozed": 6, "done": 7, "dropped": 8}
+    order = {"needs_you": 0, "review": 1, "problem": 2, "working": 3, "open": 4, "blocked": 5, "waiting": 6, "snoozed": 7,
+             "done": 8, "dropped": 9}
     return (order.get(t["stage"], 9), t["due_at"] is None, t["due_at"] or "", PRIORITY_RANK.get(t["priority"], 1), t["created_at"])
 
 
@@ -210,8 +223,9 @@ def get(conn: Connection, org: str, tid: str, tz: str | None = "UTC") -> dict:
     r = _row(conn, org, tid)
     ms = _missions(conn, [r.mission_id] if r.mission_id else [])
     items = taskplus.items_for(conn, org, [tid]).get(tid, [])
+    from . import taskextra
     d = _view(r, ms.get(r.mission_id) if r.mission_id else None, _now(), taskplus.meta_for(conn, org, [tid]).get(tid), items,
-              _open_ids(conn, org))
+              _open_ids(conn, org), taskextra.waiting_for(conn, org, [tid]).get(tid), taskextra.goal_for(conn, org, [tid]).get(tid))
     d["items"] = items
     d["feedback"] = taskplus.feedback_for(conn, r.mission_id)
     d["focus_minutes"] = taskplus.focus_total(conn, tid)

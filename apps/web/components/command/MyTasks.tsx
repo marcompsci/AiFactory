@@ -16,6 +16,7 @@ const STAGE: Record<string, { text: string; color: string }> = {
   dropped: { text: "Dropped", color: "#8a93b8" },
   blocked: { text: "Waiting", color: "#A66BFF" },
   snoozed: { text: "Snoozed", color: "#8a93b8" },
+  waiting: { text: "Waiting for someone", color: "#A66BFF" },
 };
 const SNOOZE: [string, string][] = [["later", "Later today"], ["tonight", "Tonight"], ["tomorrow", "Tomorrow"], ["next_week", "Next week"]];
 const mins = (m: number) => (m < 60 ? `${m}m` : m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`);
@@ -51,6 +52,7 @@ export function MyTasksPanel() {
   useEffect(() => { if (!undo) return; const h = window.setTimeout(() => setUndo(null), 6_000); return () => clearTimeout(h); }, [undo]);
   const found = useQuery({ queryKey: ["my-tasks", "search", q], queryFn: () => myTasks.search(q), enabled: status === "live" && q.length > 0 });
   const list = useQuery({ queryKey: ["my-tasks"], queryFn: myTasks.list, enabled: status === "live", refetchInterval: 5_000 });
+  useListStyles();
   const refresh = () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); qc.invalidateQueries({ queryKey: ["my-task"] }); };
   const add = useMutation({ mutationFn: () => myTasks.add(text), onSuccess: () => { setText(""); setPreview(null); refresh(); } });
   const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: refresh });
@@ -82,6 +84,7 @@ export function MyTasksPanel() {
     ["Coming up", pending.filter((t) => t.due_at && new Date(t.due_at) > endOfDay)],
     ["Anytime", pending.filter((t) => !t.due_at)],
     ["Waiting on something", live.filter((t) => t.stage === "blocked")],
+    ["Waiting for people", live.filter((t) => t.stage === "waiting")],
     ["Snoozed", live.filter((t) => t.stage === "snoozed")],
   ];
   const done = tasks.filter((t) => t.stage === "done");
@@ -115,7 +118,7 @@ export function MyTasksPanel() {
         <ErrorNote error={add.error ?? act.error} />
       </form>
       <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Task tools">
-        {[["plan", "Plan my day"], ["review", "Weekly review"], ["habits", "Habits"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"]].map(([k, label]) => (
+        {[["plan", "Plan my day"], ["fit", "I have…"], ["eod", "End of day"], ["goals", "Goals"], ["bills", "Bills"], ["month", "Month"], ["dump", "Brain dump"], ["review", "Weekly review"], ["habits", "Habits"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"], ["archive", "Archive & export"]].map(([k, label]) => (
           <Button key={k} aria-pressed={tool === k} variant={tool === k ? "primary" : "quiet"} onClick={() => setTool(tool === k ? null : k)}>{label}</Button>
         ))}
       </div>
@@ -186,7 +189,8 @@ function TaskRow({ t, open, onOpen, act, busy, onDone }: { t: Json; open: boolea
             {t.due_at ? <span className={t.overdue ? "text-bad" : ""}>{dueLabel(t.due_at)}</span> : null}
             {t.repeat !== "none" ? <span>↻ {t.repeat_label || t.repeat}</span> : null}
             {t.priority === "urgent" ? <span className="text-bad">urgent</span> : null}
-            {t.list_name ? <span className="text-[#FFBD69]">#{t.list_name}</span> : null}
+            {t.list_name ? <span style={{ color: styleOf(t.list_name)?.color ?? "#FFBD69" }}>#{t.list_name}</span> : null}
+            {t.waiting_for ? <span className={t.follow_up_due ? "text-[#FFBD69]" : "text-[#A66BFF]"}>{t.follow_up_due ? "follow up with" : "waiting for"} {t.waiting_for.person}</span> : null}
             {t.estimate_minutes ? <span>{mins(t.estimate_minutes)}</span> : null}
             {t.items_total ? <span aria-label={`${t.items_done} of ${t.items_total} steps done`}>☑ {t.items_done}/{t.items_total}</span> : null}
             {t.stage === "snoozed" && t.snoozed_until ? <span>until {dueLabel(t.snoozed_until)}</span> : null}
@@ -235,6 +239,7 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
                   onChange={() => act(() => myTasks.setItem(id, i.id, { done: !i.done }))} className="size-3.5 accent-[#5BF2A5]" />
                 <span className={i.done ? "text-ink-3 line-through" : ""}>{i.text}</span>
                 {i.from_agents ? <span className="text-ink-3" title="From the agents' plan">✦</span> : null}
+                {t.status === "OPEN" ? <button type="button" className="text-ink-3 hover:text-ink" title="Make this step its own task" aria-label={`Make "${i.text}" its own task`} onClick={() => act(() => myTasks.promote(id, i.id))}>↗</button> : null}
                 <button type="button" className="ml-auto text-ink-3 hover:text-bad" aria-label={`Remove ${i.text}`} onClick={() => act(() => myTasks.removeItem(id, i.id))}>×</button>
               </li>
             ))}
@@ -345,6 +350,7 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
           ) : null}
         </div>
       ) : null}
+      {t.status === "OPEN" ? <PeopleAndGoals t={t} act={act} /> : null}
       <details onToggle={(e) => setShowHistory((e.target as HTMLDetailsElement).open)}>
         <summary className="cursor-pointer text-xs text-ink-2">History</summary>
         <ol className="mt-1 space-y-0.5 text-xs text-ink-3">
@@ -366,6 +372,13 @@ function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
   if (tool === "plan") return <PlanDay />;
   if (tool === "review") return <Review refresh={refresh} />;
   if (tool === "habits") return <Habits />;
+  if (tool === "fit") return <Fit />;
+  if (tool === "eod") return <EndOfDay refresh={refresh} />;
+  if (tool === "goals") return <Goals />;
+  if (tool === "bills") return <Bills />;
+  if (tool === "month") return <Month />;
+  if (tool === "dump") return <Dump refresh={refresh} />;
+  if (tool === "archive") return <Archive refresh={refresh} />;
   if (tool === "results") return <Results />;
   if (tool === "insights") return <Insights />;
   return <Templates refresh={refresh} />;
@@ -567,6 +580,258 @@ function Habits() {
           <p className="text-xs text-ink-3">{h.repeat_label} · best {h.best} in a row{h.on_time_rate != null ? ` · ${Math.round(h.on_time_rate * 100)}% on time` : ""}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** V6.110: list colors, shared by every row (loaded once). */
+let STYLES: Record<string, { color: string; icon: string }> = {};
+function styleOf(name: string) { return STYLES[name]; }
+export function useListStyles() {
+  const q = useQuery({ queryKey: ["list-styles"], queryFn: myTasks.styles, staleTime: 60_000 });
+  if (q.data) STYLES = q.data.styles;
+  return q;
+}
+
+function PeopleAndGoals({ t, act }: { t: Json; act: (f: () => Promise<Json>) => void }) {
+  const goals = useQuery({ queryKey: ["goals"], queryFn: myTasks.goals });
+  const [person, setPerson] = useState("");
+  const [when, setWhen] = useState("");
+  return (
+    <div className="space-y-1 text-xs text-ink-2">
+      {t.waiting_for ? (
+        <p>Waiting for <b>{t.waiting_for.person}</b>, follow up {new Date(t.waiting_for.follow_up_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{" "}
+          <button type="button" className="underline" onClick={() => act(() => myTasks.waiting(t.id, null, null))}>no longer waiting</button></p>
+      ) : (
+        <form className="flex flex-wrap items-center gap-1.5" onSubmit={(e) => { e.preventDefault(); if (person.trim() && when) { act(() => myTasks.waiting(t.id, person.trim(), new Date(when).toISOString())); setPerson(""); } }}>
+          <input aria-label="Waiting for someone" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Waiting for someone?" className="w-40 rounded-md border border-line bg-ground/60 px-2 py-1 text-ink" />
+          <input aria-label="Follow-up date" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="rounded-md border border-line bg-ground/60 px-1 py-0.5 text-ink" />
+          <Button type="submit" disabled={!person.trim() || !when}>Save</Button>
+        </form>
+      )}
+      {goals.data?.goals?.length ? (
+        <label className="flex items-center gap-1">Counts toward
+          <select value={t.goal_id ?? ""} aria-label="Weekly goal" onChange={(e) => act(() => myTasks.linkGoal(t.id, e.target.value || null))} className="rounded-md border border-line bg-ground/60 px-1 py-0.5 text-ink">
+            <option value="">no goal</option>
+            {goals.data.goals.map((g: Json) => <option key={g.id} value={g.id}>{g.text}</option>)}
+          </select>
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
+const money = (n: number | null | undefined) => (n == null ? "varies" : n.toLocaleString(undefined, { style: "currency", currency: "USD" }));
+
+function Fit() {
+  const [m, setM] = useState(30);
+  const q = useQuery({ queryKey: ["fit", m], queryFn: () => myTasks.fit(m) });
+  return (
+    <div className="space-y-1 rounded-lg border border-line p-2 text-sm">
+      <div className="flex gap-1.5">{[15, 30, 60, 90].map((x) => <Button key={x} aria-pressed={m === x} variant={m === x ? "primary" : "quiet"} onClick={() => setM(x)}>{mins(x)}</Button>)}</div>
+      <ErrorNote error={q.error} />
+      {q.data && !q.data.picks.length ? <Empty>Nothing on your list fits in {mins(m)}.</Empty> : null}
+      <ul>{(q.data?.picks ?? []).map((p: Json) => <li key={p.task_id}>{p.title} <span className="text-xs text-ink-3">{mins(p.minutes)}{p.estimated ? " (default)" : ""}{p.overdue ? " · overdue" : ""}</span></li>)}</ul>
+    </div>
+  );
+}
+
+function EndOfDay({ refresh }: { refresh: () => void }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["shutdown"], queryFn: myTasks.shutdown });
+  const [note, setNote] = useState("");
+  const [move, setMove] = useState(true);
+  const close = useMutation({ mutationFn: () => myTasks.closeDay(move && !!q.data?.still_due?.length, note), onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: ["shutdown"] }); } });
+  const s = q.data;
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={q.error ?? close.error} />
+      {s?.yesterdays_note ? <p className="text-xs text-ink-2">Yesterday's note: {s.yesterdays_note}</p> : null}
+      {s ? <p className="text-xs">Done today: {s.done.length ? s.done.map((x: Json) => x.title).join(", ") : "nothing yet"}</p> : null}
+      {s?.still_due?.length ? (
+        <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={move} onChange={(e) => setMove(e.target.checked)} />
+          Move {s.still_due.length} still due ({s.still_due.map((x: Json) => x.title).join(", ")}) to tomorrow</label>
+      ) : null}
+      <input aria-label="A note for tomorrow" value={note} onChange={(e) => setNote(e.target.value)} placeholder={s?.note || "A note for tomorrow"} className="w-full rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+      <Button variant="primary" disabled={close.isPending || !s} onClick={() => close.mutate()}>Close the day</Button>
+      {close.isSuccess ? <p className="text-xs text-[#5BF2A5]">Closed. Moved {close.data.moved.length}.</p> : null}
+    </div>
+  );
+}
+
+function Goals() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["goals"], queryFn: myTasks.goals });
+  const [text, setText] = useState("");
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["goals"] }) });
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={q.error ?? act.error} />
+      {q.data ? <p className="text-xs text-ink-3">Week of {q.data.week_start}</p> : null}
+      {(q.data?.goals ?? []).map((g: Json) => (
+        <div key={g.id}>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" checked={g.done} aria-label={`Reached: ${g.text}`} onChange={() => act.mutate(() => myTasks.setGoal(g.id, !g.done))} />
+            <b className={`min-w-0 flex-1 ${g.done ? "line-through" : ""}`}>{g.text}</b>
+            <button type="button" className="text-ink-3 hover:text-bad" aria-label={`Remove ${g.text}`} onClick={() => act.mutate(() => myTasks.removeGoal(g.id))}>×</button>
+          </div>
+          <div className="mt-1 h-1.5 rounded bg-white/10" role="progressbar" aria-valuenow={Math.round(g.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <div className="h-full rounded bg-[#FFBD69]" style={{ width: `${g.progress * 100}%` }} />
+          </div>
+          <p className="text-xs text-ink-3">{g.tasks.length ? `${g.tasks_done} of ${g.tasks.length} linked tasks done` : "Link tasks from their details."}</p>
+        </div>
+      ))}
+      {(q.data?.goals?.length ?? 0) < 3 ? (
+        <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { act.mutate(() => myTasks.addGoal(text.trim())); setText(""); } }}>
+          <input aria-label="A goal for this week" value={text} onChange={(e) => setText(e.target.value)} placeholder="A goal for this week (up to 3)" className="min-w-0 flex-1 rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+          <Button type="submit" disabled={!text.trim()}>Add</Button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
+function Bills() {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["bills"], queryFn: myTasks.bills });
+  const s = useQuery({ queryKey: ["bills", "summary"], queryFn: myTasks.billSummary });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["bills"] }) });
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [day, setDay] = useState("1");
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={q.error ?? act.error} />
+      {s.data ? <p className="text-xs text-ink-2">This month {money(s.data.total)}{s.data.varies_count ? ` + ${s.data.varies_count} that vary` : ""} · paid {money(s.data.paid)} · next 30 days {money(s.data.next_30_total)}{s.data.overdue.length ? ` · ${s.data.overdue.length} past due` : ""}</p> : null}
+      <p className="text-xs text-ink-3">AI Civ doesn't pay bills or move money. Pay wherever you normally do, then mark it paid.</p>
+      <ul className="space-y-1">{(q.data?.bills ?? []).map((b: Json) => (
+        <li key={b.id} className="flex flex-wrap items-center gap-2">
+          <b className="min-w-0 flex-1 truncate">{b.name}{b.autopay ? " (autopay)" : ""}</b>
+          <span>{money(b.amount)}</span>
+          <span className={`text-xs ${b.overdue ? "text-bad" : "text-ink-3"}`}>{b.overdue ? `was due ${b.next_due}` : `due ${b.next_due}`}</span>
+          {b.link_url ? <a href={b.link_url} target="_blank" rel="noopener noreferrer nofollow" className="text-xs text-[#32D8FF] underline">pay page</a> : null}
+          {b.paid_this_period && !b.overdue ? <span className="text-xs text-[#5BF2A5]">paid ✓ <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.billUnpaid(b.id, b.payments[0].period))}>undo</button></span>
+            : <Button disabled={act.isPending} onClick={() => act.mutate(() => myTasks.billPaid(b.id))}>Mark paid</Button>}
+          <button type="button" className="text-ink-3 hover:text-bad" aria-label={`Delete ${b.name}`} onClick={() => { if (window.confirm(`Delete the bill "${b.name}"?`)) act.mutate(() => myTasks.removeBill(b.id)); }}>×</button>
+        </li>
+      ))}</ul>
+      <form className="flex flex-wrap gap-1.5" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { act.mutate(() => myTasks.addBill({ name: name.trim(), amount: amount ? Number(amount) : null, due_day: Number(day) })); setName(""); setAmount(""); } }}>
+        <input aria-label="Bill name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bill (Rent, Phone…)" className="min-w-0 flex-1 rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+        <input aria-label="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" inputMode="decimal" className="w-20 rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+        <label className="flex items-center gap-1 text-xs text-ink-2">due on
+          <select aria-label="Due day" value={day} onChange={(e) => setDay(e.target.value)} className="rounded-md border border-line bg-ground/60 px-1 py-0.5 text-ink">
+            {Array.from({ length: 31 }, (_, i) => String(i + 1)).map((d) => <option key={d} value={d}>{d === "31" ? "31 (or last day)" : d}</option>)}
+          </select></label>
+        <Button type="submit" disabled={!name.trim() || (amount !== "" && Number.isNaN(Number(amount)))}>Add bill</Button>
+      </form>
+    </div>
+  );
+}
+
+function Month() {
+  const now = new Date();
+  const [ym, setYm] = useState({ y: now.getFullYear(), m: now.getMonth() + 1 });
+  const [picked, setPicked] = useState<string | null>(null);
+  const q = useQuery({ queryKey: ["month", ym.y, ym.m], queryFn: () => myTasks.month(ym.y, ym.m) });
+  const days = new Date(ym.y, ym.m, 0).getDate();
+  const lead = (new Date(ym.y, ym.m - 1, 1).getDay() + 6) % 7; // weeks start on Monday
+  const step = (n: number) => { const d = new Date(ym.y, ym.m - 1 + n, 1); setYm({ y: d.getFullYear(), m: d.getMonth() + 1 }); setPicked(null); };
+  const key = (d: number) => `${ym.y}-${String(ym.m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const day = picked ? q.data?.days?.[picked] : null;
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <div className="flex items-center justify-between">
+        <button type="button" aria-label="Previous month" onClick={() => step(-1)}>‹</button>
+        <b>{new Date(ym.y, ym.m - 1, 1).toLocaleString([], { month: "long", year: "numeric" })}</b>
+        <button type="button" aria-label="Next month" onClick={() => step(1)}>›</button>
+      </div>
+      <ErrorNote error={q.error} />
+      <div className="grid grid-cols-7 gap-0.5 text-center text-xs">
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => <span key={i} className="text-ink-3">{d}</span>)}
+        {Array.from({ length: lead }, (_, i) => <span key={`x${i}`} />)}
+        {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+          const info = q.data?.days?.[key(d)];
+          return (
+            <button key={d} type="button" onClick={() => setPicked(key(d))} aria-label={`${d}: ${info?.tasks.length ?? 0} tasks, ${info?.bills.length ?? 0} bills`}
+              className={`rounded py-1 ${picked === key(d) ? "bg-white/15" : "hover:bg-white/5"}`}>
+              {d}
+              <span className="flex justify-center gap-0.5">
+                {info?.tasks.length ? <span className="size-1 rounded-full bg-[#32D8FF]" /> : null}
+                {info?.bills.length ? <span className="size-1 rounded-full bg-[#FFBD69]" /> : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {day ? (
+        <ul className="text-xs">
+          {day.bills.map((b: Json) => <li key={b.id} className="text-[#FFBD69]">$ {b.name} {money(b.amount)}{b.paid ? " · paid" : ""}</li>)}
+          {day.tasks.map((t: Json) => <li key={t.id}>{t.stage === "done" ? "✓" : "○"} {t.title}</li>)}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function Dump({ refresh }: { refresh: () => void }) {
+  const [text, setText] = useState("");
+  const [format, setFormat] = useState("lines");
+  const [preview, setPreview] = useState<Json[]>([]);
+  useEffect(() => {
+    if (text.trim().length < 2) { setPreview([]); return; }
+    const h = window.setTimeout(() => { myTasks.dump(text, format).then((r) => setPreview(r.preview)).catch(() => setPreview([])); }, 400);
+    return () => clearTimeout(h);
+  }, [text, format]);
+  const add = useMutation({ mutationFn: () => myTasks.dump(text, format, false), onSuccess: () => { setText(""); setPreview([]); refresh(); } });
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <div className="flex gap-1.5">{[["lines", "One per line"], ["csv", "CSV"]].map(([k, l]) => <Button key={k} aria-pressed={format === k} variant={format === k ? "primary" : "quiet"} onClick={() => setFormat(k)}>{l}</Button>)}
+        <label className="ml-auto cursor-pointer text-xs text-ink-2 underline">Import a file
+          <input type="file" accept=".csv,.txt,text/plain,text/csv" className="hidden" onChange={async (e) => {
+            const f = e.target.files?.[0]; if (!f) return;
+            setText((await f.text()).slice(0, 40_000)); setFormat(f.name.toLowerCase().endsWith(".csv") ? "csv" : "lines");
+          }} /></label>
+      </div>
+      <textarea aria-label="Tasks, one per line" value={text} onChange={(e) => setText(e.target.value)} rows={5}
+        placeholder={format === "csv" ? "title,list,due,notes,priority,estimate" : "call the bank tomorrow #money 15m\nbook flights by friday"}
+        className="w-full rounded-md border border-line bg-ground/60 px-2 py-1 font-mono text-xs text-ink" />
+      <ErrorNote error={add.error} />
+      {preview.length ? (
+        <>
+          <ul className="text-xs">{preview.map((p, i) => <li key={i}>• {p.title}{p.due_label ? ` · ${p.due_label}` : ""}{p.list_name ? ` · #${p.list_name}` : ""}</li>)}</ul>
+          <Button variant="primary" disabled={add.isPending} onClick={() => add.mutate()}>Add all {preview.length}</Button>
+        </>
+      ) : null}
+      {add.isSuccess ? <p className="text-xs text-[#5BF2A5]">Added {add.data.added.length}.{add.data.problems.length ? ` ${add.data.problems.length} couldn't be added.` : ""}</p> : null}
+    </div>
+  );
+}
+
+function Archive({ refresh }: { refresh: () => void }) {
+  const qc = useQueryClient();
+  const [q, setQ] = useState("");
+  const a = useQuery({ queryKey: ["archive", q], queryFn: () => myTasks.archive(q) });
+  const restore = useMutation({ mutationFn: (id: string) => myTasks.reopen(id), onSuccess: () => { refresh(); qc.invalidateQueries({ queryKey: ["archive"] }); } });
+  const [err, setErr] = useState<unknown>(null);
+  const download = async (format: "json" | "csv") => {
+    try {
+      const url = URL.createObjectURL(await myTasks.exportFile(format));
+      const el = document.createElement("a");
+      el.href = url; el.download = `my-tasks.${format}`; el.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { setErr(e); }
+  };
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      <div className="flex gap-1.5"><Button onClick={() => download("json")}>Export JSON</Button><Button onClick={() => download("csv")}>Export CSV</Button></div>
+      <ErrorNote error={err ?? a.error ?? restore.error} />
+      <input aria-label="Search the archive" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search the archive" className="w-full rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+      {a.data && !a.data.tasks.length ? <Empty>Nothing archived. Tasks closed more than 30 days ago land here.</Empty> : null}
+      <ul className="space-y-0.5 text-xs">{(a.data?.tasks ?? []).map((t) => (
+        <li key={t.id} className="flex items-center gap-2"><span className="min-w-0 flex-1 truncate">{t.title}</span>
+          <span className="text-ink-3">{t.status === "DONE" ? "done" : "dropped"}</span>
+          <button type="button" className="underline" onClick={() => restore.mutate(t.id)}>restore</button></li>
+      ))}</ul>
     </div>
   );
 }
