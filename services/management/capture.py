@@ -18,6 +18,38 @@ MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", 
 MONTH_RX = (r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?"
             r"|nov(?:ember)?|dec(?:ember)?")
 DEFAULT_HOUR = 17  # a date without a time means "by the end of the working day"
+# V6.94: how a task can repeat. "days:N" is every N days (2 to 365).
+# "monthly:29" and "monthly:30" keep that day through short months (plain "monthly" keeps the due date's day).
+REPEAT_RX = re.compile(r"^(none|daily|weekdays|weekly|biweekly|monthly|monthly:(29|30)|monthly_last|yearly"
+                       r"|days:([2-9]|[1-9]\d|[12]\d\d|3[0-5]\d|36[0-5]))$")
+_DOM = r"(3[01]|[12]\d|0?[1-9])"
+
+
+def valid_repeat(value: str | None) -> bool:
+    return bool(value) and bool(REPEAT_RX.match(value))
+
+
+def repeat_label(value: str) -> str:
+    """"every 2 weeks", "monthly on the last day"… for replies and previews."""
+    if value.startswith("days:"):
+        return f"every {value[5:]} days"
+    if value.startswith("monthly:"):
+        return f"every month on the {value[8:]}th"
+    return {"daily": "every day", "weekdays": "every weekday", "weekly": "every week", "biweekly": "every 2 weeks",
+            "monthly": "every month", "monthly_last": "on the last day of every month", "yearly": "every year"}.get(value, "")
+
+
+def _month_len(year: int, month: int) -> int:
+    nxt = datetime(year + (month == 12), month % 12 + 1, 1)
+    return (nxt - timedelta(days=1)).day
+
+
+def _add_months(d: datetime, n: int, day: int | None = None, last: bool = False) -> datetime:
+    """The same day of the month n months later (the 31st becomes the 30th in a shorter month), or its last day."""
+    y, m = divmod(d.month - 1 + n, 12)
+    year, month = d.year + y, m + 1
+    size = _month_len(year, month)
+    return d.replace(year=year, month=month, day=size if last else min(day or d.day, size))
 
 KIND_WORDS = {
     "code": r"\b(fix|bug|tests?|build|refactor|implement|code|deploy|repo|pull request|pr|crash|compile|ci)\b",
@@ -120,10 +152,31 @@ def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dic
             break
 
     weekly_day = None
-    if cut(r"\s(every ?day|daily|each day)(?=\s)"):
+    month_day = None  # a monthly repeat on a given day: "the 15th of every month"
+    if m := cut(r"\s(?:every|each) (\d{1,3}) days(?=\s)"):
+        n = int(m.group(1))
+        out["repeat"] = "daily" if n == 1 else f"days:{n}" if valid_repeat(f"days:{n}") else "none"
+    elif cut(r"\s(every ?day|daily|each day)(?=\s)"):
         out["repeat"] = "daily"
     elif cut(r"\s(every weekday|weekdays|each weekday)(?=\s)"):
         out["repeat"] = "weekdays"
+    elif m := cut(rf"\s(?:every (?:2|two|other) weeks?|biweekly|fortnightly)(?: on ({_WD}))?(?=\s)"):
+        out["repeat"] = "biweekly"
+        weekly_day = _weekday_index(m.group(1)) if m.group(1) else None
+    elif cut(r"\s(?:on )?(?:the )?last day of (?:the |every |each )?month(?=\s)") or cut(r"\s(?:every|each) month on the last day(?=\s)"):
+        out["repeat"] = "monthly_last"
+    elif m := (cut(rf"\s(?:on )?the {_DOM}(?:st|nd|rd|th)? of (?:every|each|the) month(?=\s)")
+               or cut(rf"\s(?:every|each) month on the {_DOM}(?:st|nd|rd|th)?(?=\s)")
+               or cut(rf"\smonthly on the {_DOM}(?:st|nd|rd|th)?(?=\s)")):
+        month_day = int(m.group(1))
+        # the 31st is the last day of every month; the 29th and 30th are remembered so February doesn't move them
+        out["repeat"] = "monthly_last" if month_day == 31 else f"monthly:{month_day}" if month_day >= 29 else "monthly"
+        if month_day == 31:
+            month_day = None
+    elif cut(r"\s(every month|monthly|each month)(?=\s)"):
+        out["repeat"] = "monthly"
+    elif cut(r"\s(every year|yearly|annually|each year)(?=\s)"):
+        out["repeat"] = "yearly"
     else:
         m = cut(rf"\s(?:every|each) ({_WD})(?=\s)")
         if m:
@@ -177,7 +230,15 @@ def parse(text: str, tz: str | None = "UTC", now: datetime | None = None) -> dic
             day += timedelta(days=7)
     if day is None and at is not None:  # only a time: today if it's still ahead, otherwise tomorrow
         day = now.date() if at > now.time() else now.date() + timedelta(days=1)
-    if day is None and out["repeat"] in ("daily", "weekdays"):
+    if day is None and month_day is not None:  # the next such day still ahead (the 31st in a short month: its last day)
+        start = datetime.combine(now.date(), at or time(DEFAULT_HOUR, 0), tzinfo=zone)
+        first = start.replace(day=min(month_day, _month_len(start.year, start.month)))
+        day = (first if first > now else _add_months(start, 1, day=month_day)).date()
+    if day is None and out["repeat"] == "monthly_last":
+        start = datetime.combine(now.date(), at or time(DEFAULT_HOUR, 0), tzinfo=zone)
+        first = start.replace(day=_month_len(start.year, start.month))
+        day = (first if first > now else _add_months(start, 1, last=True)).date()
+    if day is None and (out["repeat"] in ("daily", "weekdays", "biweekly", "monthly", "yearly") or out["repeat"].startswith("days:")):
         day = now.date()
         if (at or time(DEFAULT_HOUR, 0)) <= now.time():
             day += timedelta(days=1)  # every day, starting with the next one still ahead
@@ -215,14 +276,26 @@ def label(when: datetime, now: datetime) -> str:
 
 
 def next_due(due_at: str | None, repeat: str, tz: str | None = "UTC", after: datetime | None = None) -> str | None:
-    """When a repeating task comes round again: the next daily / weekday / weekly slot after `after` (default now),
-    keeping the same time of day in the person's time zone."""
-    if repeat == "none":
+    """When a repeating task comes round again: the next slot after `after` (default now) and after the last due date,
+    keeping the same time of day in the person's time zone. Months keep their day (or their last day); a missed stretch
+    is skipped rather than piled up."""
+    if repeat == "none" or not valid_repeat(repeat):
         return None
     zone = _zone(tz)
     after = (after or datetime.now(timezone.utc)).astimezone(zone)
     base = datetime.fromisoformat(due_at).astimezone(zone) if due_at else after.replace(hour=DEFAULT_HOUR, minute=0, second=0, microsecond=0)
-    step = timedelta(days=7 if repeat == "weekly" else 1)
+    if repeat.startswith("monthly") or repeat == "yearly":
+        months = 12 if repeat == "yearly" else 1
+        anchor = int(repeat[8:]) if repeat.startswith("monthly:") else None
+        last = repeat == "monthly_last"
+        n = 1
+        nxt = _add_months(base, months, day=anchor, last=last)
+        while nxt <= after:
+            n += 1
+            nxt = _add_months(base, months * n, day=anchor, last=last)
+        return nxt.astimezone(timezone.utc).isoformat()
+    days = {"weekly": 7, "biweekly": 14}.get(repeat) or (int(repeat[5:]) if repeat.startswith("days:") else 1)
+    step = timedelta(days=days)
     nxt = base + step
     while nxt <= after or (repeat == "weekdays" and nxt.weekday() >= 5):
         nxt += step if repeat != "weekdays" else timedelta(days=1)

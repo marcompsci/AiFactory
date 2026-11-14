@@ -632,3 +632,28 @@ unchanged, and every estimate is labelled as one.
 Server: migration `0019_task_details.sql` (task_meta, task_items, task_templates, task_feedback, focus_sessions), new
 event `my_task.rated`, `services/management/taskplus.py`, tests in `tests/integration/test_v668_v687.py`.
 Left out on purpose: the Home Screen widget and Live Activities (they need an app group and extra signing).
+
+## V6.88–V6.97: Staying signed in, finding things, and habits (iPhone, web, server)
+
+Nothing starts, spends, sends or is marked done without you. Links are yours to open; the agents never fetch them.
+
+- **V6.88 Stay signed in.** A network hiccup no longer signs you out: only Supabase refusing the saved sign-in does, and
+  then the sign-in card says why. A second expiry in one session gets its own refresh. Siri, reminder buttons and
+  background refresh renew the sign-in before they call your Mac. The sign-in card shows on the Tasks tab too.
+- **V6.89 Low-storage safety.** Smaller network caches from the start; when the phone has under 1 GB free, the app
+  clears its own caches (through their APIs) and temporary files, and Home says how much space is left.
+- **V6.90 Search.** `GET /api/my-tasks?q=` matches every word across titles, notes, lists, checklist steps and links.
+- **V6.91 Undo.** Six seconds to take back done, drop or snooze. `POST /my-tasks/{id}/undo-done` reopens a task and
+  removes the next occurrence a repeat queued if nothing has happened to it yet.
+- **V6.92 Task history.** Each task's own events (added, changed, snoozed, started, rated, done) plus how its runs ended.
+- **V6.93 Links.** Paste web addresses into quick capture or add them to a task; http and https only, no passwords in
+  links, 20 per task. They open in Safari or a new tab.
+- **V6.94 Smarter repeats.** Every 2 weeks, every N days, monthly (the 29th and 30th hold through February), the last
+  day of the month, yearly. A missed stretch is skipped, not piled up. Migration `0020_task_links_repeats.sql`.
+- **V6.95 Streaks.** For repeating tasks: done by its day keeps the streak; late or dropped starts it again. A Habits view.
+- **V6.96 Morning digest.** A daily notification at the time you choose with what's due, overdue and waiting for you,
+  worked out from your list when the app or background refresh last ran.
+- **V6.97 Siri and Home Screen.** "Mark a task done" (asks you to confirm, needs the phone unlocked), "Snooze a task",
+  "Plan my day"; long-press the app icon for Add a task and Plan my day.
+
+Server: `services/management/taskmore.py`, tests in `tests/integration/test_v688_v697.py`.

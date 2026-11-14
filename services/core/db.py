@@ -1321,7 +1321,7 @@ my_tasks = Table(
     Column("priority", String, nullable=False, default="normal"), # urgent | normal | low
     Column("status", String, nullable=False, default="OPEN"),     # OPEN | DONE | DROPPED (the run's state is read from its mission)
     Column("due_at", String),                                     # ISO time, UTC
-    Column("repeat", String, nullable=False, default="none"),     # none | daily | weekdays | weekly
+    Column("repeat", String, nullable=False, default="none"),     # see capture.REPEAT_RX (V6.94)
     Column("budget_usd", Float),
     Column("repository_id", String(36)),
     Column("mission_id", String(36)),                             # the latest run working on it
@@ -1398,6 +1398,17 @@ focus_sessions = Table(  # V6.76
     Column("task_id", String(36), nullable=False),
     Column("minutes", Integer, nullable=False),
     Column("started_at", String, nullable=False),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+task_links = Table(  # V6.93 web links on a task (shown and opened by you; agents don't fetch them)
+    "task_links", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("task_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("url", String, nullable=False),
+    Column("title", String, nullable=False, default=""),
     Column("created_by", String(36), nullable=False),
     Column("created_at", String, nullable=False, default=utcnow),
 )

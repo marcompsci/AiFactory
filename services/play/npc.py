@@ -420,7 +420,7 @@ def _task_add(conn: Connection, org: str, user: str, agent, t: str, raw: str, tz
     if len(parsed["title"]) < 2 or not _content_words(parsed["title"].lower()):
         return Reply("What's the task? For example: \"add a task: draft the Echo blurb by Friday\".")
     when = f", due {parsed['due_label']}" if parsed["due_label"] else ""
-    rep = {"daily": ", every day", "weekdays": ", every weekday", "weekly": ", every week"}.get(parsed["repeat"], "")
+    rep = (", " + capture.repeat_label(parsed["repeat"])) if parsed["repeat"] != "none" else ""
     prop = _propose(conn, org=org, user=user, agent=agent, kind="add_task", params={"text": text, "tz": tz},
                     summary=f"Add to your list: {parsed['title']}{when}{rep}.")
     return Reply(f"I'll add \"{parsed['title']}\"{when}{rep} to your list ({parsed['kind']} task"

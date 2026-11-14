@@ -199,3 +199,77 @@ extension APIClient {
                            as: TaskFeedback.self)
     }
 }
+
+// MARK: - V6.88–V6.97
+
+struct TaskHistoryEntry: Decodable, Hashable, Identifiable {
+    let at: String
+    let kind: String
+    let text: String
+    let missionId: String?
+    var id: String { at + kind + text }
+    var date: Date? { ISODate.parse(at) }
+}
+
+struct Habit: Decodable, Hashable, Identifiable {
+    struct Occurrence: Decodable, Hashable { let dueAt: String?; let outcome: String }
+    let taskId: String
+    let title: String
+    let repeatLabel: String
+    let dueAt: String?
+    let current: Int
+    let best: Int
+    let times: Int
+    let onTimeRate: Double?
+    let recent: [Occurrence]
+    var id: String { taskId }
+}
+
+struct DayDigest: Decodable, Hashable {
+    let day: String
+    let title: String
+    let body: String
+    let due: Int
+    let overdue: Int
+    let needsYou: Int
+    let plannedMinutes: Int
+}
+
+private struct TaskListBox: Decodable { let tasks: [MyTask] }
+private struct HistoryBox: Decodable { let history: [TaskHistoryEntry] }
+private struct HabitsBox: Decodable { let habits: [Habit] }
+private struct LinksBox: Decodable { let links: [TaskLink] }
+private struct UndoBox: Decodable { let task: MyTask }
+
+extension APIClient {
+    private func q(_ s: String) -> String {
+        s.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_."))) ?? ""
+    }
+
+    /// V6.90: tasks whose title, notes, list, checklist or links mention every word.
+    func searchTasks(_ text: String) async throws -> [MyTask] {
+        try await send(request("/api/my-tasks?q=\(q(text))"), as: TaskListBox.self).tasks
+    }
+    /// V6.91: take back "done" (and the untouched next occurrence of a repeating task).
+    func undoDone(_ id: String) async throws -> MyTask {
+        try await send(request("/api/my-tasks/\(id)/undo-done", method: "POST"), as: UndoBox.self).task
+    }
+    func taskHistory(_ id: String) async throws -> [TaskHistoryEntry] {
+        try await send(request("/api/my-tasks/\(id)/history"), as: HistoryBox.self).history
+    }
+    func addLink(_ id: String, url: String, title: String?) async throws -> [TaskLink] {
+        var b: [String: Any] = ["url": url]
+        if let title, !title.isEmpty { b["title"] = title }
+        return try await send(request("/api/my-tasks/\(id)/links", method: "POST", body: JSONSerialization.data(withJSONObject: b)),
+                              as: LinksBox.self).links
+    }
+    func removeLink(_ id: String, link: String) async throws -> [TaskLink] {
+        try await send(request("/api/my-tasks/\(id)/links/\(link)", method: "DELETE"), as: LinksBox.self).links
+    }
+    func habits(tz: String) async throws -> [Habit] {
+        try await send(request("/api/my-tasks/habits?tz=\(q(tz))"), as: HabitsBox.self).habits
+    }
+    func dayDigest(tz: String, day: String) async throws -> DayDigest {
+        try await send(request("/api/my-tasks/digest?tz=\(q(tz))&day=\(day)"), as: DayDigest.self)
+    }
+}

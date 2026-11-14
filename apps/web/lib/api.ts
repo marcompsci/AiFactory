@@ -282,5 +282,13 @@ export const myTasks = {
   agentQuality: () => call<{ agents: Json[] }>("/api/insights/agent-quality"),
   estimate: (id: string) => call<Json>(`/api/my-tasks/${id}/estimate`),
   feedback: (id: string, rating: number, reason?: string) => call<Json>(`/api/my-tasks/${id}/feedback`, post({ rating, reason: reason || null })),
+  // V6.88–V6.97
+  search: (q: string) => call<{ tasks: Json[] }>(`/api/my-tasks?${new URLSearchParams({ q })}`),
+  undoDone: (id: string) => call<Json>(`/api/my-tasks/${id}/undo-done`, post()),
+  history: (id: string) => call<{ history: Json[] }>(`/api/my-tasks/${id}/history`),
+  addLink: (id: string, url: string) => call<{ links: Json[] }>(`/api/my-tasks/${id}/links`, post({ url })),
+  removeLink: (id: string, lid: string) => call<{ links: Json[] }>(`/api/my-tasks/${id}/links/${lid}`, { method: "DELETE" }),
+  habits: () => call<{ habits: Json[] }>(`/api/my-tasks/habits?tz=${encodeURIComponent(tz())}`),
+  digest: (day = "today") => call<Json>(`/api/my-tasks/digest?${new URLSearchParams({ tz: tz(), day })}`),
   focus: (id: string, minutes: number, startedAt: string) => call<Json>(`/api/my-tasks/${id}/focus`, post({ minutes, started_at: startedAt })),
 };

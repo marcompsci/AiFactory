@@ -10,6 +10,7 @@ struct AICivApp: App {
 
     init() {
         BackgroundRefresh.register()
+        StorageGuard.limitCaches()
     }
 
     var body: some Scene {
@@ -25,9 +26,13 @@ struct AICivApp: App {
                     app.connect()
                     if !shots { app.startFinding() }
                     if let id = TaskActions.pendingOpen { TaskActions.pendingOpen = nil; open(id) }
+                    if let q = TaskActions.pendingQuick { TaskActions.pendingQuick = nil; quick(q) }
                 }
                 // a task found in Spotlight, or a reminder's Open button
                 .onContinueUserActivity(CSSearchableItemActionType) { a in if let id = TaskSpotlight.taskId(from: a) { open(id) } }
+                .onReceive(NotificationCenter.default.publisher(for: TaskActions.quickNote)) { n in
+                    if let q = n.object as? String { TaskActions.pendingQuick = nil; quick(q) }
+                }
                 .onReceive(NotificationCenter.default.publisher(for: TaskActions.openNote)) { n in
                     if let id = n.object as? String { TaskActions.pendingOpen = nil; open(id) }
                 }
@@ -37,8 +42,15 @@ struct AICivApp: App {
                 Task { await TaskOutbox.flush(api) }
             }
             if newPhase == .background { BackgroundRefresh.schedule() }
+            if newPhase == .active { Task { app.lowStorage = await StorageGuard.check() } }
             if newPhase == .active, app.connection != .live { app.connect(); app.startFinding() }
         }
+    }
+
+    /// A Home Screen quick action: the Tasks tab with the cursor in quick capture, or Plan my day.
+    private func quick(_ type: String) {
+        app.openTab = "home"
+        if type == "plan" { app.openTaskTool = TaskTool.plan.rawValue } else { app.focusCapture = true }
     }
 
     private func open(_ id: String) {
@@ -74,13 +86,12 @@ enum BackgroundRefresh {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: id, using: nil) { task in
             schedule()
             let work = Task {
-                let server = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"
-                guard let url = URL(string: server) else { return }
-                let api = APIClient(baseURL: url, token: Keychain.load())
+                guard let api = await SupabaseAuth.backgroundClient() else { task.setTaskCompleted(success: false); return }
                 let waiting = (try? await api.opportunities())?.filter { $0.status == "OWNER_APPROVAL" } ?? []
                 let seen = Set(UserDefaults.standard.stringArray(forKey: "notifiedReleases") ?? [])
                 for o in waiting where !seen.contains(o.id) { Notifier.releaseWaiting(title: o.title) }
                 UserDefaults.standard.set(Array(seen.union(waiting.map(\.id))), forKey: "notifiedReleases")
+                await DigestScheduler.refreshIfDue(api)  // V6.96: keep the morning digest current
                 task.setTaskCompleted(success: true)
             }
             task.expirationHandler = { work.cancel() }

@@ -143,7 +143,8 @@ def snooze(p: Principal, tid: str, preset: str | None, until: str | None, tz: st
         if r.status != "OPEN":
             raise PlusError("only open tasks can be snoozed", 409)
         set_meta(conn, p.organization_id, tid, snoozed_until=when)
-        emit(conn, "my_task.updated", org_id=p.organization_id, payload={"task_id": tid, "fields": ["snoozed_until"]})
+        emit(conn, "my_task.updated", org_id=p.organization_id,
+             payload={"task_id": tid, "fields": ["snoozed_until"], "snoozed_until": when})
 
 
 # ---------------------------------------------------------------- V6.68 checklists
@@ -256,6 +257,7 @@ def forget(conn: Connection, tid: str) -> None:
     conn.execute(delete(db.task_meta).where(db.task_meta.c.task_id == tid))
     conn.execute(delete(db.task_feedback).where(db.task_feedback.c.task_id == tid))
     conn.execute(delete(db.focus_sessions).where(db.focus_sessions.c.task_id == tid))
+    conn.execute(delete(db.task_links).where(db.task_links.c.task_id == tid))
     conn.execute(update(db.task_meta).where(db.task_meta.c.blocked_by == tid).values(blocked_by=None))
 
 

@@ -17,12 +17,17 @@ struct MyTasksTab: View {
     @State private var listFilter: String?
     @State private var tool: TaskTool?
     @State private var queued = TaskOutbox.count
+    @State private var searching = false
+    @State private var search = ""
+    @State private var found: [MyTask]?
+    @State private var undo: UndoOffer?
     @FocusState private var typing: Bool
 
     private var tz: String { TimeZone.current.identifier }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if case .failed(let why) = app.connection, why.contains("Sign in") { SignInCard() }
             if app.connection != .live {
                 VStack(alignment: .leading, spacing: 6) {
                     PixelHeader(text: "My tasks", color: Theme.gold, trailing: queued > 0 ? "\(queued) waiting" : nil)
@@ -44,8 +49,13 @@ struct MyTasksTab: View {
                 capture
                 if let error { Text(error).font(.caption).foregroundStyle(Theme.bad) }
                 tools
-                listChips
-                list
+                if searching { searchField }
+                if searching, !search.trimmingCharacters(in: .whitespaces).isEmpty {
+                    results
+                } else {
+                    listChips
+                    list
+                }
             }
         }
         .task(id: app.connection == .live ? app.ledger.lastSequence / 3 : -1) { await load() }
@@ -56,6 +66,81 @@ struct MyTasksTab: View {
             TaskToolSheet(tool: k) { await load() }.presentationDetents([.large])
         }
         .task(id: "\(app.openTaskId ?? "")|\(app.connection == .live)") { await openRequested() }
+        .overlay(alignment: .bottom) { if let undo { undoBar(undo) } }
+        .task(id: undo?.id) {  // an undo offer lasts six seconds
+            guard undo != nil else { return }
+            try? await Task.sleep(for: .seconds(6))
+            if !Task.isCancelled { withAnimation(Motion.ui) { undo = nil } }
+        }
+        .onChange(of: app.openTaskTool) { _, k in
+            guard let k, let t = TaskTool(rawValue: k) else { return }
+            app.openTaskTool = nil
+            tool = t
+        }
+        .onChange(of: app.focusCapture) { _, on in if on { app.focusCapture = false; typing = true } }
+        .onAppear {  // asked for before this tab was on screen
+            if let k = app.openTaskTool, let t = TaskTool(rawValue: k) { app.openTaskTool = nil; tool = t }
+            if app.focusCapture { app.focusCapture = false; typing = true }
+        }
+    }
+
+    // MARK: search (V6.90) and undo (V6.91)
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            TextField("Search titles, notes, lists, steps and links", text: $search)
+                .font(.subheadline).submitLabel(.search).autocorrectionDisabled()
+            if !search.isEmpty {
+                Button { search = "" } label: { Image(systemName: "xmark.circle.fill") }.buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel("Clear the search")
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .background(Color.black.opacity(0.28), in: RoundedRectangle(cornerRadius: 8))
+        .task(id: search) {
+            let q = search.trimmingCharacters(in: .whitespaces)
+            guard !q.isEmpty, let api = app.api else { found = nil; return }
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            found = try? await api.searchTasks(q)
+        }
+    }
+
+    @ViewBuilder private var results: some View {
+        let list = found ?? []
+        PixelHeader(text: "Search", color: Theme.cyan, trailing: found == nil ? "…" : "\(list.count)")
+        if found != nil && list.isEmpty {
+            Text("Nothing matches \"\(search)\".").font(.caption).foregroundStyle(.secondary)
+        }
+        ForEach(list) { t in row(t) }
+    }
+
+    private func undoBar(_ u: UndoOffer) -> some View {
+        HStack {
+            Text(u.label).font(.subheadline).lineLimit(1)
+            Spacer()
+            Button("Undo") {
+                let act = u.action
+                withAnimation(Motion.ui) { undo = nil }
+                Task {
+                    do { try await act(); Haptics.light() } catch { self.error = (error as? APIError)?.detail ?? "Couldn't undo that." }
+                    await load()
+                }
+            }
+            .font(.subheadline.bold()).foregroundStyle(Theme.gold)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(.ultraThinMaterial, in: Capsule())
+        .padding(.horizontal, 8).padding(.bottom, 6)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .accessibilityElement(children: .combine)
+        .accessibilityAction(named: "Undo") { Task { try? await u.action(); await load() } }
+    }
+
+    private func offerUndo(_ label: String, _ action: @escaping () async throws -> Void) {
+        withAnimation(Motion.ui) { undo = UndoOffer(label: label, action: action) }
+        UIAccessibility.post(notification: .announcement, argument: "\(label). Undo is available.")
     }
 
     // MARK: quick capture
@@ -80,7 +165,8 @@ struct MyTasksTab: View {
                     Chip(text: p.kind, color: Self.kindColor(p.kind))
                     if p.priority != "normal" { Chip(text: p.priority, color: p.priority == "urgent" ? Theme.bad : .secondary) }
                     if let b = p.budgetUsd { Chip(text: String(format: "$%.2f", b), color: Theme.ok) }
-                    if p.repeats != "none" { Chip(text: p.repeats, color: Theme.violet) }
+                    if p.repeats != "none" { Chip(text: p.repeatLabel ?? p.repeats, color: Theme.violet) }
+                    if let n = p.links?.count, n > 0 { Chip(text: n == 1 ? "1 link" : "\(n) links", color: Theme.cyan) }
                     if let l = p.listName { Chip(text: "#\(l)", color: Theme.gold) }
                     if let m = p.estimateMinutes { Chip(text: TaskTime.minutes(m), color: .secondary) }
                 }
@@ -137,6 +223,11 @@ struct MyTasksTab: View {
     private var tools: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
+                Button { withAnimation(Motion.ui) { searching.toggle(); if !searching { search = "" } } } label: {
+                    Image(systemName: searching ? "xmark" : "magnifyingglass").font(.caption.weight(.semibold))
+                }
+                .buttonStyle(CityChip(fill: searching ? Theme.cyan.opacity(0.35) : Theme.violet.opacity(0.22)))
+                .accessibilityLabel(searching ? "Close search" : "Search tasks")
                 ForEach(TaskTool.allCases) { k in
                     Button { tool = k } label: { Label(k.label, systemImage: k.icon).font(.caption.weight(.semibold)) }
                         .buttonStyle(CityChip(fill: Theme.violet.opacity(0.22)))
@@ -267,6 +358,7 @@ struct MyTasksTab: View {
             loaded = true
             TaskReminders.sync(list)
             TaskSpotlight.index(list)
+            Task { await DigestScheduler.refreshIfDue(api) }
         }
     }
 
@@ -285,14 +377,26 @@ struct MyTasksTab: View {
 
     private func snooze(_ t: MyTask, _ preset: String) async {
         guard let api = app.api else { return }
-        do { _ = try await api.snoozeTask(t.id, preset: preset, tz: tz); Haptics.light(); await load() }
-        catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
+        let before = t.snoozed
+        do {
+            _ = try await api.snoozeTask(t.id, preset: preset, tz: tz)
+            Haptics.light()
+            await load()
+            if preset != "wake" {
+                offerUndo("Snoozed \"\(t.title)\"") {
+                    _ = try await api.snoozeTask(t.id, preset: before == nil ? "wake" : nil, until: before, tz: TimeZone.current.identifier)
+                }
+            }
+        } catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
     }
 
     private func drop(_ t: MyTask) async {
         guard let api = app.api else { return }
-        do { _ = try await api.dropTask(t.id); await load() }
-        catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
+        do {
+            _ = try await api.dropTask(t.id)
+            await load()
+            offerUndo("Dropped \"\(t.title)\"") { _ = try await api.reopenTask(t.id) }
+        } catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
     }
 
     private func finish(_ t: MyTask) async {
@@ -303,6 +407,7 @@ struct MyTasksTab: View {
             try await api.finishTask(t.id, tz: tz)
             Haptics.success()
             await load()
+            offerUndo("Done: \(t.title)") { _ = try await api.undoDone(t.id) }
         } catch { self.error = (error as? APIError)?.detail ?? "Couldn't reach your Mac." }
     }
 
@@ -412,6 +517,7 @@ struct TaskDetailView: View {
     @State private var error: String?
     @State private var confirmDelete = false
     @State private var newItem = ""
+    @State private var newLink = ""
     @State private var listText = ""
     @State private var estimate: TaskEstimate?
     @State private var others: [MyTask] = []
@@ -448,7 +554,13 @@ struct TaskDetailView: View {
                                 Text("Write").tag("write"); Text("Research").tag("research"); Text("Code").tag("code"); Text("Other").tag("personal")
                             }
                             Picker("Repeats", selection: Binding(get: { t.repeats }, set: { v in Task { await edit(["repeat": v]) } })) {
-                                Text("Never").tag("none"); Text("Every day").tag("daily"); Text("Weekdays").tag("weekdays"); Text("Every week").tag("weekly")
+                                ForEach(Self.repeatChoices, id: \.0) { Text($0.1).tag($0.0) }
+                                if !Self.repeatChoices.contains(where: { $0.0 == t.repeats }) {
+                                    Text(t.repeatLabel ?? t.repeats).tag(t.repeats)  // "every 3 days", typed in quick capture
+                                }
+                            }
+                            if let s = t.streak, s.times > 0 {
+                                LabeledContent("Streak", value: s.current == 0 ? "Best \(s.best) in a row" : "\(s.current) in a row (best \(s.best))")
                             }
                             Toggle("Due date", isOn: Binding(get: { hasDue }, set: { on in
                                 hasDue = on
@@ -468,7 +580,13 @@ struct TaskDetailView: View {
                         }
                     }
                     checklist(t)
+                    linkSection(t)
                     if t.isOpen { organize(t) }
+                    Section {
+                        NavigationLink { TaskHistoryView(taskId: taskId, title: t.title) } label: {
+                            Label("History", systemImage: "clock.arrow.circlepath")
+                        }
+                    }
                     if let r = t.result {
                         Section {
                             Text(markdown(r.content)).font(.callout).textSelection(.enabled)
@@ -588,6 +706,50 @@ struct TaskDetailView: View {
         guard !s.isEmpty else { return }
         newItem = ""
         Task { await run { _ = try await $0.addItems(taskId, [s]) } }
+    }
+
+    static let repeatChoices: [(String, String)] = [
+        ("none", "Never"), ("daily", "Every day"), ("weekdays", "Weekdays"), ("weekly", "Every week"), ("biweekly", "Every 2 weeks"),
+        ("monthly", "Every month"), ("monthly_last", "Last day of the month"), ("yearly", "Every year"),
+    ]
+
+    // MARK: links (V6.93): yours to open; the agents never fetch them
+
+    @ViewBuilder private func linkSection(_ t: MyTask) -> some View {
+        let links = t.links ?? []
+        if !links.isEmpty || t.isOpen {
+            Section {
+                ForEach(links) { l in
+                    if let u = l.link {
+                        Link(destination: u) {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(l.title.isEmpty ? l.host : l.title).lineLimit(1)
+                                Text(l.url).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                        }
+                        .swipeActions { Button(role: .destructive) { Task { await run { _ = try await $0.removeLink(taskId, link: l.id) } } } label: { Label("Remove", systemImage: "trash") } }
+                        .accessibilityHint("Opens in Safari")
+                    }
+                }
+                if t.isOpen {
+                    HStack {
+                        TextField("Paste a link (https://…)", text: $newLink)
+                            .keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            .onSubmit { addLink() }
+                        Button("Add") { addLink() }.disabled(!newLink.lowercased().hasPrefix("http"))
+                    }
+                }
+            } header: { Text("Links") } footer: {
+                Text("Links open in Safari when you tap them. The agents don't visit them.")
+            }
+        }
+    }
+
+    private func addLink() {
+        let u = newLink.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard u.lowercased().hasPrefix("http") else { return }
+        newLink = ""
+        Task { await run { _ = try await $0.addLink(taskId, url: u, title: nil) } }
     }
 
     // MARK: list, estimate, waiting on, snooze (V6.69–V6.71, V6.73)
@@ -719,4 +881,11 @@ enum TaskReminders {
             }
         }
     }
+}
+
+/// V6.91: a few seconds to take back done, drop or snooze.
+struct UndoOffer: Identifiable {
+    let id = UUID()
+    let label: String
+    let action: () async throws -> Void
 }

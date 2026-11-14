@@ -12,6 +12,7 @@ struct HomeOverviewTab: View {
             if case .failed(let why) = app.connection {
                 if why.contains("Sign in") { SignInCard() } else { RetryCard(message: why) }
             }
+            if let low = app.lowStorage { LowStorageCard(report: low) }
             if app.connection == .live { BriefCard().pixelPanel() }
             more
             activity
@@ -176,6 +177,7 @@ struct SignInCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             PixelHeader(text: "Sign in", color: Theme.gold)
+            if let why = app.signInReason { Text(why).font(.caption.bold()).foregroundStyle(Theme.gold) }
             Text("This server needs you to sign in. Use the same Google or GitHub account as on the web.").font(.caption).foregroundStyle(.secondary)
             HStack {
                 Button("Google") { Task { await app.signIn(provider: "google") } }.buttonStyle(.borderedProminent)
@@ -185,5 +187,25 @@ struct SignInCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .pixelPanel(Theme.gold.opacity(0.6))
+    }
+}
+
+/// V6.89: the phone is nearly full.
+struct LowStorageCard: View {
+    @Environment(AppState.self) private var app
+    let report: StorageGuard.Report
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                PixelHeader(text: "iPhone almost full", color: Theme.gold)
+                Spacer()
+                Button { app.lowStorage = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss")
+            }
+            Text("\(report.free) free. AI Civ cleared \(report.cleared) of its own cache; your tasks are safe on your Mac. "
+                 + "Free more space in Settings › General › iPhone Storage so the app (and iOS) can keep working.")
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .pixelPanel(Theme.gold.opacity(0.5))
     }
 }

@@ -26,6 +26,9 @@ final class AppState {
     var openTab: String?
     /// Set to open one of your tasks (from Spotlight or a reminder): Home switches to the Tasks tab and shows it.
     var openTaskId: String?
+    /// Set from a Home Screen quick action or Siri (V6.97): open one of the task tools, or put the cursor in quick capture.
+    var openTaskTool: String?
+    var focusCapture = false
     var health: Health?
     var ledger = EventLedger()
     /// The city's live picture from events (bubbles, busy desks, the offline demo), shared by the home city and its overlays.
@@ -42,6 +45,10 @@ final class AppState {
     var supabaseKey: String = UserDefaults.standard.string(forKey: "supabaseKey") ?? ""
     var session: SupabaseAuth.Session? = SupabaseAuth.load()
     var authError: String?
+    /// Why you're being asked to sign in again (V6.88), shown on the sign-in card.
+    var signInReason: String?
+    /// Set when the phone is nearly full (V6.89); the Home screen says so.
+    var lowStorage: StorageGuard.Report?
     let finder = ServerFinder()
     /// The address was set automatically from a Mac found on the network.
     var autoConnectedTo: String?
@@ -125,6 +132,7 @@ final class AppState {
             session = s
             SupabaseAuth.save(s)
             tokenSet = true
+            signInReason = nil
             connect()
         } catch {
             authError = error.localizedDescription
@@ -138,26 +146,39 @@ final class AppState {
         connect()
     }
 
-    /// Refreshes the session now (the server said the token expired).
-    func forceRefresh() async {
-        guard let s = session, let auth else { return }
-        if let fresh = try? await auth.refresh(s) {
+    /// Refreshes the session now (the server said the token expired or wasn't accepted). Returns whether it worked.
+    /// Only a refusal from Supabase ends the sign-in; a network hiccup (the phone just woke up, Wi-Fi switching)
+    /// keeps it, so you aren't signed out by bad timing.
+    @discardableResult
+    func forceRefresh() async -> Bool {
+        guard let s = session else { return false }
+        if auth == nil { await loadPublicConfig() }
+        guard let auth else { return false }
+        do {
+            let fresh = try await auth.refresh(s)
             session = fresh
             SupabaseAuth.save(fresh)
-        } else {
-            session = nil
-            SupabaseAuth.save(nil)
-            tokenSet = false
+            signInReason = nil
+            return true
+        } catch SupabaseAuth.AuthFailure.rejected(_) {
+            endSession("Your sign-in ended, so sign in again. Nothing on your Mac changed.")
+            return false
+        } catch {
+            return false
         }
     }
 
-    /// Refreshes the Supabase access token a minute before it expires.
+    private func endSession(_ why: String) {
+        session = nil
+        SupabaseAuth.save(nil)
+        tokenSet = false
+        signInReason = why
+    }
+
+    /// Refreshes the Supabase access token a few minutes before it expires (and straight away if it already has).
     func ensureFreshToken() async {
-        guard let s = session, s.expiresAt.timeIntervalSinceNow < 300, let auth else { return }
-        if let fresh = try? await auth.refresh(s) {
-            session = fresh
-            SupabaseAuth.save(fresh)
-        }
+        guard let s = session, s.expiresAt.timeIntervalSinceNow < 300 else { return }
+        await forceRefresh()
     }
 
     /// Look for a Mac running AI Civilization; if the app isn't pointed anywhere yet (or its Mac went away), use it.
@@ -281,7 +302,10 @@ final class AppState {
                         let text = String(decoding: line, as: UTF8.self)
                         line.removeAll(keepingCapacity: true)
                         guard let msg = parser.consume(line: text) else { continue }
-                        if msg.event == "ready" { connection = .live; attempt = 0; Task { await refreshInbox(api: api) }; continue }
+                        if msg.event == "ready" {
+                            connection = .live; attempt = 0; triedRefresh = false  // a later expiry gets its own refresh
+                            Task { await refreshInbox(api: api) }; continue
+                        }
                         guard msg.event == "envelope", let data = msg.data.data(using: .utf8),
                               let event = try? APIClient.decoder.decode(EventEnvelope.self, from: data),
                               event.schemaVersion == 1 else { continue }
@@ -290,12 +314,23 @@ final class AppState {
                         line.append(byte)
                     }
                 }
-            } catch let e as APIError where e.status == 401 && e.detail.contains("expired") && session != nil && !triedRefresh {
-                // an hour-old session: refresh it once and carry on
+            } catch let e as APIError where e.status == 401 && session != nil && !triedRefresh {
+                // an old or refused session: refresh it once and carry on (a network failure keeps retrying below)
                 triedRefresh = true
-                await forceRefresh()
-                continue
+                if await forceRefresh() { continue }
+                if session != nil {  // couldn't reach Supabase: try again shortly rather than giving up
+                    attempt += 1
+                    connection = .reconnecting(attempt)
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    triedRefresh = false
+                    continue
+                }
+                connection = .failed("Sign in to connect")
+                return
             } catch let e as APIError where e.status == 401 || e.status == 403 {
+                if e.status == 401 && session != nil {
+                    endSession("Your Mac didn't accept your sign-in, so sign in again. Nothing on your Mac changed.")
+                }
                 if e.status == 401 && session == nil && tokenSet {
                     // a token saved by hand earlier that the server no longer accepts: drop it so the app stops sending it
                     Keychain.save("")

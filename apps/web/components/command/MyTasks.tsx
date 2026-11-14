@@ -44,10 +44,19 @@ export function MyTasksPanel() {
   const [showDone, setShowDone] = useState(false);
   const [listFilter, setListFilter] = useState<string | null>(null);
   const [tool, setTool] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  const [undo, setUndo] = useState<{ label: string; run: () => Promise<Json> } | null>(null);
+  useEffect(() => { const h = window.setTimeout(() => setQ(search.trim()), 250); return () => clearTimeout(h); }, [search]);
+  useEffect(() => { if (!undo) return; const h = window.setTimeout(() => setUndo(null), 6_000); return () => clearTimeout(h); }, [undo]);
+  const found = useQuery({ queryKey: ["my-tasks-search", q], queryFn: () => myTasks.search(q), enabled: status === "live" && q.length > 0 });
   const list = useQuery({ queryKey: ["my-tasks"], queryFn: myTasks.list, enabled: status === "live", refetchInterval: 5_000 });
   const refresh = () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); qc.invalidateQueries({ queryKey: ["my-task"] }); };
   const add = useMutation({ mutationFn: () => myTasks.add(text), onSuccess: () => { setText(""); setPreview(null); refresh(); } });
   const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: refresh });
+  const finish = (t: Json) => {
+    act.mutate(() => myTasks.done(t.id), { onSuccess: () => setUndo({ label: `Done: ${t.title}`, run: () => myTasks.undoDone(t.id) }) });
+  };
 
   useEffect(() => {
     const t = text.trim();
@@ -97,7 +106,8 @@ export function MyTasksPanel() {
             <Pill color={KIND_COLOR[preview.kind] ?? "#A66BFF"}>{preview.kind}</Pill>
             {preview.priority !== "normal" ? <Pill color={preview.priority === "urgent" ? "#FF6178" : "#8a93b8"}>{preview.priority}</Pill> : null}
             {preview.budget_usd ? <Pill color="#5BF2A5">${Number(preview.budget_usd).toFixed(2)}</Pill> : null}
-            {preview.repeat !== "none" ? <Pill color="#A66BFF">{preview.repeat}</Pill> : null}
+            {preview.repeat !== "none" ? <Pill color="#A66BFF">{preview.repeat_label || preview.repeat}</Pill> : null}
+            {preview.links?.length ? <Pill color="#32D8FF">{preview.links.length === 1 ? "1 link" : `${preview.links.length} links`}</Pill> : null}
             {preview.list_name ? <Pill color="#FFBD69">#{preview.list_name}</Pill> : null}
             {preview.estimate_minutes ? <Pill color="#8a93b8">{mins(preview.estimate_minutes)}</Pill> : null}
           </p>
@@ -105,11 +115,27 @@ export function MyTasksPanel() {
         <ErrorNote error={add.error ?? act.error} />
       </form>
       <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Task tools">
-        {[["plan", "Plan my day"], ["review", "Weekly review"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"]].map(([k, label]) => (
+        {[["plan", "Plan my day"], ["review", "Weekly review"], ["habits", "Habits"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"]].map(([k, label]) => (
           <Button key={k} aria-pressed={tool === k} variant={tool === k ? "primary" : "quiet"} onClick={() => setTool(tool === k ? null : k)}>{label}</Button>
         ))}
       </div>
       {tool ? <TaskTools tool={tool} refresh={refresh} /> : null}
+      <input aria-label="Search tasks" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search titles, notes, lists, steps and links"
+        className="w-full rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink" />
+      {undo ? (
+        <div role="status" className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-xs">
+          <span className="min-w-0 flex-1 truncate">{undo.label}</span>
+          <button type="button" className="font-semibold text-[#FFBD69]" onClick={() => { const u = undo; setUndo(null); act.mutate(u.run); }}>Undo</button>
+        </div>
+      ) : null}
+      {q ? (
+        <div className="space-y-1">
+          <h4 className="pixel-title text-[11px] text-ink-2">Search ({found.data?.tasks.length ?? "…"})</h4>
+          <ErrorNote error={found.error} />
+          {found.data && !found.data.tasks.length ? <Empty>Nothing matches "{q}".</Empty> : null}
+          <ul className="space-y-1">{(found.data?.tasks ?? []).map((t) => <TaskRow key={t.id} t={t} open={open === t.id} onOpen={() => setOpen(open === t.id ? null : t.id)} act={act.mutate} busy={act.isPending} onDone={finish} />)}</ul>
+        </div>
+      ) : null}
       {lists.length ? (
         <div className="flex flex-wrap gap-1.5 text-xs" aria-label="Lists">
           <button type="button" aria-pressed={!listFilter} onClick={() => setListFilter(null)} className={`rounded-full px-2 py-0.5 ${!listFilter ? "bg-white/15 text-ink" : "text-ink-3"}`}>All</button>
@@ -124,7 +150,7 @@ export function MyTasksPanel() {
       {groups.filter(([, g]) => g.length).map(([name, g]) => (
         <div key={name} className="space-y-1">
           <h4 className="pixel-title text-[11px] text-ink-2">{name}</h4>
-          <ul className="space-y-1">{g.map((t) => <TaskRow key={t.id} t={t} open={open === t.id} onOpen={() => setOpen(open === t.id ? null : t.id)} act={act.mutate} busy={act.isPending} />)}</ul>
+          <ul className="space-y-1">{g.map((t) => <TaskRow key={t.id} t={t} open={open === t.id} onOpen={() => setOpen(open === t.id ? null : t.id)} act={act.mutate} busy={act.isPending} onDone={finish} />)}</ul>
         </div>
       ))}
       {done.length ? (
@@ -139,7 +165,7 @@ export function MyTasksPanel() {
   );
 }
 
-function TaskRow({ t, open, onOpen, act, busy }: { t: Json; open: boolean; onOpen: () => void; act: (f: () => Promise<Json>) => void; busy: boolean }) {
+function TaskRow({ t, open, onOpen, act, busy, onDone }: { t: Json; open: boolean; onOpen: () => void; act: (f: () => Promise<Json>) => void; busy: boolean; onDone?: (t: Json) => void }) {
   const st = STAGE[t.stage] ?? STAGE.open;
   const sim = t.mission?.execution_mode === "simulation";
   return (
@@ -150,7 +176,7 @@ function TaskRow({ t, open, onOpen, act, busy }: { t: Json; open: boolean; onOpe
           aria-label={t.stage === "done" ? "Done" : `Mark ${t.title} done`}
           checked={t.stage === "done"}
           disabled={t.stage === "done" || busy}
-          onChange={() => act(() => myTasks.done(t.id))}
+          onChange={() => (onDone ? onDone(t) : act(() => myTasks.done(t.id)))}
           className="mt-1 size-4 accent-[#5BF2A5]"
         />
         <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left" aria-expanded={open}>
@@ -158,7 +184,7 @@ function TaskRow({ t, open, onOpen, act, busy }: { t: Json; open: boolean; onOpe
           <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
             <Pill color={st.color}>{t.stage === "review" && sim ? "Template ready" : st.text}</Pill>
             {t.due_at ? <span className={t.overdue ? "text-bad" : ""}>{dueLabel(t.due_at)}</span> : null}
-            {t.repeat !== "none" ? <span>↻ {t.repeat}</span> : null}
+            {t.repeat !== "none" ? <span>↻ {t.repeat_label || t.repeat}</span> : null}
             {t.priority === "urgent" ? <span className="text-bad">urgent</span> : null}
             {t.list_name ? <span className="text-[#FFBD69]">#{t.list_name}</span> : null}
             {t.estimate_minutes ? <span>{mins(t.estimate_minutes)}</span> : null}
@@ -182,6 +208,9 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
   const [note, setNote] = useState("");
   const [step, setStep] = useState("");
   const [why, setWhy] = useState("");
+  const [link, setLink] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const hist = useQuery({ queryKey: ["my-task-history", id], queryFn: () => myTasks.history(id), enabled: showHistory });
   const t = q.data;
   const runnable = t?.status === "OPEN" && (t?.stage === "open" || t?.stage === "problem");
   const est = useQuery({ queryKey: ["my-task-estimate", id], queryFn: () => myTasks.estimate(id), enabled: !!runnable });
@@ -285,18 +314,58 @@ function TaskDetail({ id, act, busy }: { id: string; act: (f: () => Promise<Json
             <Button disabled={busy || !note.trim()} onClick={() => { act(() => myTasks.redo(id, note)); setNote(""); }}>Redo with note</Button>
           </>
         ) : null}
-        {t.status === "OPEN" ? <Button disabled={busy} onClick={() => act(() => myTasks.drop(id))}>Drop</Button> : <Button disabled={busy} onClick={() => act(() => myTasks.reopen(id))}>Reopen</Button>}
+        {t.status === "OPEN" ? <Button disabled={busy} onClick={() => act(() => myTasks.drop(id))}>Drop</Button> : t.status === "DONE" ? <Button disabled={busy} onClick={() => act(() => myTasks.undoDone(id))}>Undo done</Button> : <Button disabled={busy} onClick={() => act(() => myTasks.reopen(id))}>Reopen</Button>}
         <Button disabled={busy} onClick={() => { if (window.confirm("Delete this task from your list?")) act(() => myTasks.remove(id)); }}>Delete</Button>
       </div>
+      {t.status === "OPEN" ? (
+        <label className="flex items-center gap-1 text-xs text-ink-2">Repeats
+          <select value={t.repeat} aria-label="Repeats" onChange={(e) => act(() => myTasks.edit(id, { repeat: e.target.value }))}
+            className="rounded-md border border-line bg-ground/60 px-1 py-0.5 text-ink">
+            {REPEATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            {!REPEATS.some(([v]) => v === t.repeat) ? <option value={t.repeat}>{t.repeat_label || t.repeat}</option> : null}
+          </select>
+          {t.streak?.times ? <span className="ml-2">🔥 {t.streak.current} in a row (best {t.streak.best})</span> : null}
+        </label>
+      ) : null}
+      {t.links?.length || t.status === "OPEN" ? (
+        <div className="text-xs">
+          <p className="font-semibold text-ink-2">Links <span className="font-normal text-ink-3">(open in a new tab; the agents don't visit them)</span></p>
+          <ul>{(t.links ?? []).map((l: Json) => (
+            <li key={l.id} className="flex items-center gap-2">
+              <a href={l.url} target="_blank" rel="noopener noreferrer nofollow" className="min-w-0 flex-1 truncate text-[#32D8FF] underline">{l.title || l.url}</a>
+              <button type="button" className="text-ink-3 hover:text-bad" aria-label={`Remove ${l.url}`} onClick={() => act(() => myTasks.removeLink(id, l.id))}>×</button>
+            </li>
+          ))}</ul>
+          {t.status === "OPEN" ? (
+            <form className="mt-1 flex gap-1.5" onSubmit={(e) => { e.preventDefault(); if (/^https?:\/\//i.test(link.trim())) { act(() => myTasks.addLink(id, link.trim())); setLink(""); } }}>
+              <input aria-label="Add a link" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" type="url"
+                className="min-w-0 flex-1 rounded-md border border-line bg-ground/60 px-2 py-1 text-ink" />
+              <Button type="submit" disabled={!/^https?:\/\//i.test(link.trim()) || busy}>Add</Button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
+      <details onToggle={(e) => setShowHistory((e.target as HTMLDetailsElement).open)}>
+        <summary className="cursor-pointer text-xs text-ink-2">History</summary>
+        <ol className="mt-1 space-y-0.5 text-xs text-ink-3">
+          {(hist.data?.history ?? []).map((h: Json, i: number) => (
+            <li key={i}><span className="text-ink-2">{new Date(h.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span> · {h.text}</li>
+          ))}
+        </ol>
+      </details>
       <ErrorNote error={q.error} />
     </div>
   );
 }
 
+const REPEATS: [string, string][] = [["none", "Never"], ["daily", "Every day"], ["weekdays", "Weekdays"], ["weekly", "Every week"],
+  ["biweekly", "Every 2 weeks"], ["monthly", "Every month"], ["monthly_last", "Last day of the month"], ["yearly", "Every year"]];
+
 /** Plan my day, the weekly review, results, insights and templates (V6.74–V6.84). */
 function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
   if (tool === "plan") return <PlanDay />;
   if (tool === "review") return <Review refresh={refresh} />;
+  if (tool === "habits") return <Habits />;
   if (tool === "results") return <Results />;
   if (tool === "insights") return <Insights />;
   return <Templates refresh={refresh} />;
@@ -474,6 +543,28 @@ function Templates({ refresh }: { refresh: () => void }) {
           <span className="min-w-0 flex-1 truncate"><b>{t.name}</b> <span className="text-xs text-ink-3">{t.title}{t.items.length ? ` · ${t.items.length} steps` : ""}</span></span>
           <Button disabled={act.isPending} onClick={() => act.mutate(() => myTasks.useTemplate(t.id))}>Start a copy</Button>
           <Button disabled={act.isPending} onClick={() => { if (window.confirm(`Delete the template "${t.name}"?`)) act.mutate(() => myTasks.deleteTemplate(t.id)); }}>Delete</Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** V6.95: streaks on repeating tasks. */
+function Habits() {
+  const q = useQuery({ queryKey: ["habits"], queryFn: myTasks.habits });
+  const color: Record<string, string> = { done: "#5BF2A5", late: "#FFBD69", missed: "#FF6B6B", open: "transparent" };
+  return (
+    <div className="space-y-2 rounded-lg border border-line p-2 text-sm">
+      {q.isLoading ? <Skeleton lines={2} /> : null}
+      <ErrorNote error={q.error} />
+      {q.data && !q.data.habits.length ? <Empty>No repeating tasks yet. Try "stretch every day" or "pay rent on the 1st of every month".</Empty> : null}
+      {(q.data?.habits ?? []).map((h) => (
+        <div key={h.task_id}>
+          <div className="flex items-center gap-2"><b className="min-w-0 flex-1 truncate">{h.title}</b><span>🔥 {h.current}</span></div>
+          <div className="mt-0.5 flex gap-0.5" aria-hidden>
+            {h.recent.map((o: Json, i: number) => <span key={i} className="size-3 rounded-sm border border-white/10" style={{ background: color[o.outcome] }} />)}
+          </div>
+          <p className="text-xs text-ink-3">{h.repeat_label} · best {h.best} in a row{h.on_time_rate != null ? ` · ${Math.round(h.on_time_rate * 100)}% on time` : ""}</p>
         </div>
       ))}
     </div>

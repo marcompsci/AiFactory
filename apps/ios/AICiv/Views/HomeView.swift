@@ -71,7 +71,9 @@ struct HomeView: View {
         }
         .onChange(of: app.districts) { city.sync(districts: districts) }
         .onChange(of: app.openTaskId) { _, id in if id != nil { showTasks() } }
-        .onAppear { if app.openTaskId != nil { showTasks() } }  // asked for before Home was on screen (cold launch)
+        .onAppear { if app.openTaskId != nil || app.openTaskTool != nil || app.focusCapture { showTasks() } }
+        .onChange(of: app.openTaskTool) { _, k in if k != nil { showTasks() } }
+        .onChange(of: app.focusCapture) { _, on in if on { showTasks() } }  // asked for before Home was on screen (cold launch)
         .onChange(of: reduceMotion) { city.reduceMotion = reduceMotion }
         .onChange(of: camera) { _, m in
             if m == .follow, let id = selectedAgent { city.follow(id) } else if city.mode != m { city.mode = m }

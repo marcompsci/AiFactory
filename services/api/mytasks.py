@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from services.core import db
 from services.core.auth import Principal, authenticate
-from services.management import capture, mytasks, taskplus
+from services.management import capture, mytasks, taskmore, taskplus
 
 router = APIRouter(prefix="/api")
 
@@ -28,12 +28,13 @@ class TaskIn(BaseModel):
     kind: str | None = Field(default=None, pattern="^(code|research|write|personal)$")
     priority: str | None = Field(default=None, pattern="^(urgent|normal|low)$")
     due_at: str | None = Field(default=None, max_length=40)
-    repeat: str | None = Field(default=None, pattern="^(none|daily|weekdays|weekly)$")
+    repeat: str | None = Field(default=None, max_length=12)
     budget_usd: float | None = Field(default=None, gt=0, le=50)
     repository_id: str | None = Field(default=None, max_length=36)
     list_name: str | None = Field(default=None, max_length=41)
     estimate_minutes: int | None = Field(default=None, ge=5, le=600)
     items: list[str] | None = Field(default=None, max_length=50)
+    links: list[str] | None = Field(default=None, max_length=20)
     client_ref: str | None = Field(default=None, pattern="^[A-Za-z0-9-]{8,64}$")  # sending the same add twice makes one task
     tz: str | None = Field(default="UTC", max_length=64)
 
@@ -44,7 +45,7 @@ class TaskPatch(BaseModel):
     kind: str | None = Field(default=None, pattern="^(code|research|write|personal)$")
     priority: str | None = Field(default=None, pattern="^(urgent|normal|low)$")
     due_at: str | None = Field(default=None, max_length=40)
-    repeat: str | None = Field(default=None, pattern="^(none|daily|weekdays|weekly)$")
+    repeat: str | None = Field(default=None, max_length=12)
     budget_usd: float | None = Field(default=None, gt=0, le=50)
     repository_id: str | None = Field(default=None, max_length=36)
     list_name: str | None = Field(default=None, max_length=41)
@@ -69,9 +70,15 @@ Errors = (mytasks.TaskError, taskplus.PlusError)
 
 
 @router.get("/my-tasks")
-def list_tasks(include_done: bool = True, p: Principal = Depends(member)) -> dict:
+def list_tasks(include_done: bool = True, q: str | None = Query(default=None, max_length=120),
+               p: Principal = Depends(member)) -> dict:
+    """Your tasks; with `q`, only those whose title, notes, list, checklist or links mention every word (V6.90)."""
     with db.get_engine().connect() as conn:
-        return {"tasks": mytasks.listing(conn, p.organization_id, include_done=include_done)}
+        tasks = mytasks.listing(conn, p.organization_id, include_done=include_done)
+        if q and q.strip():
+            hits = taskmore.search_ids(conn, p.organization_id, q)
+            tasks = [t for t in tasks if t["id"] in hits]
+        return {"tasks": tasks}
 
 
 @router.get("/my-tasks/today")
@@ -84,7 +91,11 @@ def today(tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(
 def parse(text: str = Query(min_length=1, max_length=400), tz: str = Query(default="UTC", max_length=64),
           p: Principal = Depends(member)) -> dict:
     """The quick-capture preview: exactly what adding this text would save. Nothing is stored."""
-    return capture.parse(text, tz)
+    rest, urls = taskmore.take_urls(text)
+    out = capture.parse(rest, tz)
+    out["links"] = urls
+    out["repeat_label"] = capture.repeat_label(out["repeat"])
+    return out
 
 
 @router.post("/my-tasks", status_code=201)
@@ -207,6 +218,19 @@ def task_insights(tz: str = Query(default="UTC", max_length=64), days: int = Que
 def agent_quality(p: Principal = Depends(member)) -> dict:
     with db.get_engine().connect() as conn:
         return {"agents": taskplus.agent_quality(conn, p.organization_id)}
+
+
+@router.get("/my-tasks/habits")
+def habit_list(tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return {"habits": taskmore.habits(conn, p.organization_id, tz)}
+
+
+@router.get("/my-tasks/digest")
+def day_digest(tz: str = Query(default="UTC", max_length=64), day: str = Query(default="today", pattern="^(today|tomorrow)$"),
+               p: Principal = Depends(member)) -> dict:
+    with db.get_engine().connect() as conn:
+        return taskmore.digest(conn, p.organization_id, tz, day)
 
 
 @router.get("/my-tasks/{tid}")
@@ -343,5 +367,45 @@ def estimate(tid: str, p: Principal = Depends(member)) -> dict:
 def feedback(tid: str, body: FeedbackIn, p: Principal = Depends(operator)) -> dict:
     try:
         return taskplus.give_feedback(p, tid, body.rating, body.reason)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+# ---------------------------------------------------------------- V6.88–V6.97
+
+class LinkIn(BaseModel):
+    url: str = Field(min_length=10, max_length=2048)
+    title: str | None = Field(default=None, max_length=120)
+
+
+@router.post("/my-tasks/{tid}/undo-done")
+def undo_done(tid: str, p: Principal = Depends(operator)) -> dict:
+    try:
+        return taskmore.undo_done(p, tid)
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.get("/my-tasks/{tid}/history")
+def task_history(tid: str, p: Principal = Depends(member)) -> dict:
+    try:
+        with db.get_engine().connect() as conn:
+            return {"history": taskmore.history(conn, p.organization_id, tid)}
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.post("/my-tasks/{tid}/links", status_code=201)
+def add_link(tid: str, body: LinkIn, p: Principal = Depends(operator)) -> dict:
+    try:
+        return {"links": taskmore.add_link(p, tid, body.url, body.title)}
+    except Errors as exc:
+        raise _err(exc) from exc
+
+
+@router.delete("/my-tasks/{tid}/links/{lid}")
+def remove_link(tid: str, lid: str, p: Principal = Depends(operator)) -> dict:
+    try:
+        return {"links": taskmore.remove_link(p, tid, lid)}
     except Errors as exc:
         raise _err(exc) from exc

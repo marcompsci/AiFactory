@@ -10,6 +10,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     static let taskCategory = "TASK_DUE"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        // V6.97: long-press the app icon
+        application.shortcutItems = [
+            UIApplicationShortcutItem(type: "add-task", localizedTitle: "Add a task", localizedSubtitle: nil,
+                                      icon: UIApplicationShortcutIcon(systemImageName: "plus.circle"), userInfo: nil),
+            UIApplicationShortcutItem(type: "plan", localizedTitle: "Plan my day", localizedSubtitle: nil,
+                                      icon: UIApplicationShortcutIcon(systemImageName: "calendar.day.timeline.left"), userInfo: nil),
+        ]
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         let done = UNNotificationAction(identifier: "done", title: "Done", options: [.authenticationRequired])
@@ -18,6 +25,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         center.setNotificationCategories([UNNotificationCategory(identifier: Self.taskCategory, actions: [done, snooze, open],
                                                                  intentIdentifiers: [], options: [])])
         return true
+    }
+
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let config = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        config.delegateClass = QuickActionSceneDelegate.self
+        return config
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
@@ -38,18 +52,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 /// reached the action waits in the outbox and runs the next time the app connects; nothing is lost or guessed.
 enum TaskActions {
     static let openNote = Notification.Name("openTask")
+    static let quickNote = Notification.Name("quickAction")
     @MainActor static var pendingOpen: String?
+    @MainActor static var pendingQuick: String?
 
-    static func client() -> APIClient? {
-        let server = UserDefaults.standard.string(forKey: "serverURL") ?? "http://localhost:8000"
-        guard let url = URL(string: server) else { return nil }
-        return APIClient(baseURL: url, token: Keychain.load())
-    }
+    static func client() async -> APIClient? { await SupabaseAuth.backgroundClient() }
 
     static func run(id: String, action: String) async {
         let tz = TimeZone.current.identifier
         do {
-            guard let api = client() else { throw APIError(status: 0, detail: "no server") }
+            guard let api = await client() else { throw APIError(status: 0, detail: "no server") }
             if action == "done" { try await api.finishTask(id, tz: tz) }
             else { _ = try await api.snoozeTask(id, preset: nil, until: Date().addingTimeInterval(3600), tz: tz) }
         } catch let e as APIError where TaskOutbox.isFinal(e) {
@@ -200,5 +212,23 @@ enum DayPlanCalendar {
     static func file(_ plan: DayPlan) -> URL? {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("plan-my-day.ics")
         do { try ics(plan).write(to: url, atomically: true, encoding: .utf8); return url } catch { return nil }
+    }
+}
+
+/// Home Screen quick actions (V6.97): handed to the app as it opens, or while it's running. SwiftUI still builds the
+/// window; this only passes the action along.
+final class QuickActionSceneDelegate: NSObject, UIWindowSceneDelegate {
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        if let item = connectionOptions.shortcutItem { Task { @MainActor in TaskActions.pendingQuick = item.type } }
+    }
+
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
+                     completionHandler: @escaping (Bool) -> Void) {
+        let type = shortcutItem.type
+        Task { @MainActor in
+            TaskActions.pendingQuick = type
+            NotificationCenter.default.post(name: TaskActions.quickNote, object: type)
+            completionHandler(true)
+        }
     }
 }

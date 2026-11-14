@@ -46,11 +46,15 @@ struct MyTask: Decodable, Identifiable, Hashable {
     var items: [TaskItem]? = nil
     var feedback: TaskFeedback? = nil
     var focusMinutes: Int? = nil
+    // V6.93–V6.95: links, a readable repeat, and the streak of a repeating task
+    var repeatLabel: String? = nil
+    var links: [TaskLink]? = nil
+    var streak: TaskStreak? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, title, notes, kind, priority, status, dueAt, repeats = "repeat", budgetUsd, repositoryId, missionId, runs, stage, overdue,
              mission, createdAt, doneAt, plan, result, listName, estimateMinutes, snoozedUntil, blockedBy, blockedByTitle,
-             itemsTotal, itemsDone, items, feedback, focusMinutes
+             itemsTotal, itemsDone, items, feedback, focusMinutes, repeatLabel, links, streak
     }
 
     var due: Date? { ISODate.parse(dueAt) }
@@ -64,6 +68,20 @@ struct TaskItem: Decodable, Identifiable, Hashable {
     let text: String
     let done: Bool
     var fromAgents: Bool = false
+}
+
+struct TaskLink: Decodable, Identifiable, Hashable {
+    let id: String
+    let url: String
+    let title: String
+    let host: String
+    var link: URL? { URL(string: url) }
+}
+
+struct TaskStreak: Decodable, Hashable {
+    let current: Int
+    let best: Int
+    let times: Int
 }
 
 struct TaskFeedback: Decodable, Hashable {
@@ -83,8 +101,12 @@ struct TaskPreview: Decodable, Hashable {
     let repeats: String
     var listName: String? = nil
     var estimateMinutes: Int? = nil
+    var links: [String]? = nil
+    var repeatLabel: String? = nil
 
-    enum CodingKeys: String, CodingKey { case title, dueAt, dueLabel, priority, budgetUsd, kind, repeats = "repeat", listName, estimateMinutes }
+    enum CodingKeys: String, CodingKey {
+        case title, dueAt, dueLabel, priority, budgetUsd, kind, repeats = "repeat", listName, estimateMinutes, links, repeatLabel
+    }
 }
 
 private struct TaskList: Decodable { let tasks: [MyTask] }

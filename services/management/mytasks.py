@@ -28,7 +28,7 @@ from . import capture
 
 KINDS = ("code", "research", "write", "personal")
 PRIORITIES = ("urgent", "normal", "low")
-REPEATS = ("none", "daily", "weekdays", "weekly")
+REPEATS = ("none", "daily", "weekdays", "weekly", "biweekly", "monthly", "monthly_last", "yearly")  # plus "days:N" (capture.valid_repeat)
 MAX_OPEN = 500
 STARTING_TIMEOUT = __import__("datetime").timedelta(minutes=2)
 TERMINAL = {"COMPLETED", "FAILED", "CANCELLED"}
@@ -84,7 +84,11 @@ def _clean(fields: dict) -> dict:
         out["title"] = t
     if "notes" in fields:
         out["notes"] = str(fields["notes"] or "")[:4000]
-    for key, allowed in (("kind", KINDS), ("priority", PRIORITIES), ("repeat", REPEATS)):
+    if fields.get("repeat") is not None and not capture.valid_repeat(fields["repeat"]):
+        raise TaskError("repeat must be none, daily, weekdays, weekly, biweekly, monthly, monthly_last, yearly or days:N (2 to 365)")
+    if fields.get("repeat") is not None:
+        out["repeat"] = fields["repeat"]
+    for key, allowed in (("kind", KINDS), ("priority", PRIORITIES)):
         if key in fields and fields[key] is not None:
             if fields[key] not in allowed:
                 raise TaskError(f"{key} must be one of {', '.join(allowed)}")
@@ -155,6 +159,7 @@ def _view(task, mission: dict | None, now: datetime, meta: dict | None = None, i
     d = dict(task._mapping)
     d["stage"] = stage(task, mission)
     d["mission"] = mission
+    d["repeat_label"] = capture.repeat_label(task.repeat)
     d["overdue"] = bool(task.due_at and task.status == "OPEN" and datetime.fromisoformat(task.due_at) < now)
     meta = meta or {}
     d["list_name"] = meta.get("list_name")
@@ -210,6 +215,9 @@ def get(conn: Connection, org: str, tid: str) -> dict:
     d["items"] = items
     d["feedback"] = taskplus.feedback_for(conn, r.mission_id)
     d["focus_minutes"] = taskplus.focus_total(conn, tid)
+    from . import taskmore
+    d["links"] = taskmore.links_for(conn, org, [tid]).get(tid, [])
+    d["streak"] = taskmore.streak_for(conn, org, r)
     if d["blocked_by"]:
         d["blocked_by_title"] = conn.execute(select(db.my_tasks.c.title).where(db.my_tasks.c.id == d["blocked_by"])).scalar()
     m = d["mission"] or {}
@@ -230,6 +238,13 @@ def create(p: Principal, fields: dict) -> dict:
              "estimate_minutes": taskplus.clean_estimate(fields.pop("estimate_minutes", None))}
     steps = [s for s in (fields.pop("items", None) or []) if str(s).strip()][:taskplus.MAX_ITEMS]
     ref = fields.pop("client_ref", None)
+    from . import taskmore
+    urls = []
+    for u in (fields.pop("links", None) or [])[:taskmore.MAX_LINKS]:
+        try:
+            urls.append(taskmore.clean_url(u))
+        except taskmore.PlusError as exc:
+            raise TaskError(str(exc)) from exc
     clean = _clean({"kind": None, "priority": "normal", "repeat": "none", **fields})
     if "title" not in clean:
         raise TaskError("give the task a title of 2 to 160 characters")
@@ -260,15 +275,21 @@ def create(p: Principal, fields: dict) -> dict:
             taskplus._insert_items(conn, p.organization_id, tid, steps)
         emit(conn, "my_task.created", org_id=p.organization_id,
              payload={"task_id": tid, "title": clean["title"], "kind": clean["kind"], "due_at": clean.get("due_at")})
+        for u in urls:
+            taskmore.add_link(p, tid, u, conn=conn)
     with db.get_engine().connect() as conn:
         return get(conn, p.organization_id, tid)
 
 
 def create_from_text(p: Principal, text: str, tz: str | None = "UTC", extra: dict | None = None) -> dict:
+    from . import taskmore
+    text, urls = taskmore.take_urls(text)  # V6.93: web addresses become the task's links
     parsed = capture.parse(text, tz)
     if len(parsed["title"]) < 2:
         raise TaskError("say what the task is")
     fields = {k: parsed[k] for k in ("title", "kind", "priority", "due_at", "repeat", "budget_usd", "list_name", "estimate_minutes")}
+    if urls:
+        fields["links"] = urls
     fields.update({k: v for k, v in (extra or {}).items() if v is not None})
     return create(p, fields)
 

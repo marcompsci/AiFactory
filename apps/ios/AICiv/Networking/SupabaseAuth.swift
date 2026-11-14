@@ -22,12 +22,15 @@ final class SupabaseAuth: NSObject, ASWebAuthenticationPresentationContextProvid
 
     enum AuthFailure: LocalizedError {
         case notConfigured, cancelled, badCallback(String), exchange(String)
+        /// Supabase refused the saved sign-in itself (revoked, signed out elsewhere, or too old): only signing in again helps.
+        case rejected(String)
         var errorDescription: String? {
             switch self {
             case .notConfigured: return "Sign-in isn't set up on this server yet (no Supabase address)."
             case .cancelled: return "Sign-in was cancelled."
             case .badCallback(let m): return "Sign-in didn't complete: \(m)"
             case .exchange(let m): return "Sign-in failed: \(m)"
+            case .rejected(let m): return "Your sign-in has ended (\(m)). Sign in again."
             }
         }
     }
@@ -110,9 +113,12 @@ final class SupabaseAuth: NSObject, ASWebAuthenticationPresentationContextProvid
         r.setValue(publishableKey, forHTTPHeaderField: "apikey")
         r.httpBody = try JSONEncoder().encode(body)
         let (data, resp) = try await URLSession.shared.data(for: r)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else {
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
             let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]).flatMap { ($0["error_description"] ?? $0["msg"] ?? $0["message"]) as? String }
-            throw AuthFailure.exchange(msg ?? "status \((resp as? HTTPURLResponse)?.statusCode ?? 0)")
+            // 400/401/403 from the token endpoint: the refresh token itself was refused. Anything else may pass.
+            if grant == "refresh_token" && [400, 401, 403].contains(status) { throw AuthFailure.rejected(msg ?? "refused") }
+            throw AuthFailure.exchange(msg ?? "status \(status)")
         }
         let j = try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
         guard let access = j["access_token"] as? String, let refresh = j["refresh_token"] as? String else { throw AuthFailure.exchange("no tokens") }
@@ -138,5 +144,19 @@ final class SupabaseAuth: NSObject, ASWebAuthenticationPresentationContextProvid
     static func load() -> Session? {
         guard let raw = Keychain.load(account: "supabase-session"), let data = raw.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(Session.self, from: data)
+    }
+
+    /// V6.88: an API client for work done outside the open app (Siri, reminder buttons, background refresh), with the
+    /// sign-in renewed first if it's about to run out. A refusal is left for the app to handle when it next opens.
+    static func backgroundClient() async -> APIClient? {
+        let d = UserDefaults.standard
+        guard let url = URL(string: d.string(forKey: "serverURL") ?? "http://localhost:8000") else { return nil }
+        if let s = load(), s.expiresAt.timeIntervalSinceNow < 300,
+           let base = URL(string: d.string(forKey: "supabaseURL") ?? ""), base.scheme == "https",
+           let key = d.string(forKey: "supabaseKey"), !key.isEmpty,
+           let fresh = try? await SupabaseAuth(supabaseURL: base, publishableKey: key).refresh(s) {
+            save(fresh)
+        }
+        return APIClient(baseURL: url, token: Keychain.load())
     }
 }

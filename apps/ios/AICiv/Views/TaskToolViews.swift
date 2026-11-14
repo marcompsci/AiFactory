@@ -1,14 +1,17 @@
 import Charts
 import SwiftUI
+import UserNotifications
 
 /// The task list's tools (V6.74–V6.84): plan my day, the weekly review, results, insights and templates.
 enum TaskTool: String, CaseIterable, Identifiable {
-    case plan, review, results, insights, templates
+    case plan, review, habits, digest, results, insights, templates
     var id: String { rawValue }
     var label: String {
         switch self {
         case .plan: return "Plan my day"
         case .review: return "Weekly review"
+        case .habits: return "Habits"
+        case .digest: return "Morning digest"
         case .results: return "Results"
         case .insights: return "Insights"
         case .templates: return "Templates"
@@ -18,6 +21,8 @@ enum TaskTool: String, CaseIterable, Identifiable {
         switch self {
         case .plan: return "calendar.day.timeline.left"
         case .review: return "checklist.checked"
+        case .habits: return "flame"
+        case .digest: return "sun.horizon"
         case .results: return "books.vertical"
         case .insights: return "chart.bar.xaxis"
         case .templates: return "square.on.square"
@@ -36,6 +41,8 @@ struct TaskToolSheet: View {
                 switch tool {
                 case .plan: PlanDayView(changed: changed)
                 case .review: ReviewView(changed: changed)
+                case .habits: HabitsView()
+                case .digest: DigestSettingsView()
                 case .results: ResultsLibraryView()
                 case .insights: InsightsView()
                 case .templates: TemplatesView(changed: changed)
@@ -494,5 +501,212 @@ struct TemplatesView: View {
     private func remove(_ t: TaskTemplate) async {
         guard let api = app.api else { return }
         do { try await api.deleteTemplate(t.id); await load() } catch { self.error = failure(error) }
+    }
+}
+
+// MARK: - task history (V6.92)
+
+struct TaskHistoryView: View {
+    @Environment(AppState.self) private var app
+    let taskId: String
+    let title: String
+    @State private var entries: [TaskHistoryEntry]?
+    @State private var error: String?
+
+    var body: some View {
+        List {
+            if let error { Text(error).foregroundStyle(Theme.bad).font(.caption) }
+            if let entries {
+                ForEach(entries) { e in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: Self.icon(e.kind)).foregroundStyle(Self.color(e.kind)).frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(e.text).font(.subheadline)
+                            if let d = e.date {
+                                Text(d.formatted(date: .abbreviated, time: .shortened)).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            } else if error == nil { ProgressView() }
+        }
+        .navigationTitle("History").navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard let api = app.api else { error = "Connect to your Mac to see the history."; return }
+            do { entries = try await api.taskHistory(taskId) } catch { self.error = failure(error) }
+        }
+    }
+
+    static func icon(_ kind: String) -> String {
+        switch kind {
+        case "created": return "plus.circle"
+        case "completed": return "checkmark.circle.fill"
+        case "started": return "sparkles"
+        case "rated": return "hand.thumbsup"
+        case "run_completed": return "flag.checkered"
+        case "run_failed", "run_rejected": return "exclamationmark.triangle"
+        case "run_cancelled": return "stop.circle"
+        default: return "pencil"
+        }
+    }
+
+    static func color(_ kind: String) -> Color {
+        switch kind {
+        case "completed", "run_completed": return Theme.ok
+        case "run_failed", "run_rejected": return Theme.bad
+        case "started": return Theme.violet
+        default: return .secondary
+        }
+    }
+}
+
+// MARK: - habits: streaks on repeating tasks (V6.95)
+
+struct HabitsView: View {
+    @Environment(AppState.self) private var app
+    @State private var habits: [Habit]?
+    @State private var error: String?
+
+    var body: some View {
+        List {
+            if let error { Text(error).foregroundStyle(Theme.bad).font(.caption) }
+            if let habits, habits.isEmpty {
+                Text("No repeating tasks yet. Add one like \"stretch every day\" or \"pay rent on the 1st of every month\".")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(habits ?? []) { h in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(h.title).font(.subheadline.bold()).lineLimit(1)
+                        Spacer()
+                        Label("\(h.current)", systemImage: "flame.fill").font(.caption.bold())
+                            .foregroundStyle(h.current > 0 ? Theme.gold : .secondary)
+                    }
+                    HStack(spacing: 3) {
+                        ForEach(Array(h.recent.enumerated()), id: \.offset) { _, o in
+                            RoundedRectangle(cornerRadius: 2).fill(Self.color(o.outcome)).frame(width: 14, height: 14)
+                                .overlay { if o.outcome == "open" { RoundedRectangle(cornerRadius: 2).stroke(Theme.cyan, lineWidth: 1) } }
+                        }
+                    }
+                    .accessibilityHidden(true)
+                    Text("\(h.repeatLabel.capitalizedFirst) · best \(h.best) in a row"
+                         + (h.onTimeRate.map { " · \(Int($0 * 100))% on time" } ?? ""))
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(h.title), \(h.repeatLabel). Streak \(h.current), best \(h.best).")
+            }
+            if habits?.isEmpty == false {
+                Section {} footer: {
+                    Text("Green: done by its day. Yellow: done late. Red: dropped. Outlined: the one coming up. Late or dropped starts the count again.")
+                }
+            }
+        }
+        .task {
+            guard let api = app.api else { error = "Connect to your Mac to see your habits."; return }
+            do { habits = try await api.habits(tz: phoneTZ) } catch { self.error = failure(error) }
+        }
+    }
+
+    static func color(_ outcome: String) -> Color {
+        switch outcome {
+        case "done": return Theme.ok
+        case "late": return Theme.gold
+        case "missed": return Theme.bad
+        default: return Color.white.opacity(0.08)
+        }
+    }
+}
+
+extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
+// MARK: - morning digest (V6.96)
+
+struct DigestSettingsView: View {
+    @Environment(AppState.self) private var app
+    @AppStorage(DigestScheduler.enabledKey) private var enabled = false
+    @AppStorage(DigestScheduler.minutesKey) private var minutes = 7 * 60 + 30
+    @State private var preview: DayDigest?
+    @State private var note: String?
+
+    private var time: Binding<Date> {
+        Binding(get: { Calendar.current.startOfDay(for: Date()).addingTimeInterval(TimeInterval(minutes * 60)) },
+                set: { d in let c = Calendar.current.dateComponents([.hour, .minute], from: d); minutes = (c.hour ?? 7) * 60 + (c.minute ?? 30) })
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Toggle("Morning digest", isOn: $enabled)
+                if enabled { DatePicker("Time", selection: time, displayedComponents: .hourAndMinute) }
+            } footer: {
+                Text("One notification a day with what's due, what's overdue and what's waiting for you. It's worked out from your list each time the app updates, so it can be a few hours old; nothing is sent anywhere else.")
+            }
+            if let p = preview {
+                Section("What it would say now") {
+                    Text(p.title).font(.subheadline.bold())
+                    Text(p.body).font(.caption)
+                }
+            }
+            if let note { Text(note).font(.caption).foregroundStyle(.secondary) }
+        }
+        .task(id: "\(enabled)-\(minutes)") {
+            guard let api = app.api else { note = "Connect to your Mac to set up the digest."; return }
+            preview = try? await api.dayDigest(tz: phoneTZ, day: DigestScheduler.nextDay(minutes: minutes))
+            note = await DigestScheduler.schedule(api)
+        }
+    }
+}
+
+/// Keeps one pending digest notification, for the next time you chose, with the latest counts.
+enum DigestScheduler {
+    static let enabledKey = "digestEnabled"
+    static let minutesKey = "digestMinutes"
+    static let id = "morning-digest"
+
+    static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+    static var minutes: Int { (UserDefaults.standard.object(forKey: minutesKey) as? Int) ?? 7 * 60 + 30 }
+
+    /// "today" if the chosen time is still ahead today, otherwise "tomorrow".
+    static func nextDay(minutes: Int, now: Date = Date()) -> String {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: now)
+        return (c.hour ?? 0) * 60 + (c.minute ?? 0) < minutes ? "today" : "tomorrow"
+    }
+
+    /// Refreshes the pending digest at most every 15 minutes (called as the list loads and from background refresh).
+    static func refreshIfDue(_ api: APIClient) async {
+        guard enabled else { return }
+        let last = UserDefaults.standard.double(forKey: "digestScheduledAt")
+        guard Date().timeIntervalSince1970 - last > 15 * 60 else { return }
+        await schedule(api)
+    }
+
+    /// Replaces the pending digest. Returns a short status line for the settings screen.
+    @discardableResult
+    static func schedule(_ api: APIClient) async -> String? {
+        let center = UNUserNotificationCenter.current()
+        guard enabled else { center.removePendingNotificationRequests(withIdentifiers: [id]); return nil }
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "digestScheduledAt")
+        let m = minutes
+        let day = nextDay(minutes: m)
+        guard let d = try? await api.dayDigest(tz: TimeZone.current.identifier, day: day) else { return "Couldn't reach your Mac; the last digest stays scheduled." }
+        let content = UNMutableNotificationContent()
+        content.title = d.title
+        content.body = d.body
+        content.sound = .default
+        content.threadIdentifier = "digest"
+        var parts = DateComponents()
+        parts.hour = m / 60
+        parts.minute = m % 60
+        let base = Calendar.current.date(byAdding: .day, value: day == "today" ? 0 : 1, to: Date()) ?? Date()
+        let ymd = Calendar.current.dateComponents([.year, .month, .day], from: base)
+        parts.year = ymd.year; parts.month = ymd.month; parts.day = ymd.day
+        center.removePendingNotificationRequests(withIdentifiers: [id])
+        try? await center.add(UNNotificationRequest(identifier: id, content: content,
+                                                    trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
+        return "Next digest: \(day) at \(String(format: "%d:%02d", m / 60, m % 60))."
     }
 }
