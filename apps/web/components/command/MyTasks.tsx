@@ -113,6 +113,14 @@ export function MyTasksPanel() {
             {preview.budget_usd ? <Pill color="#5BF2A5">${Number(preview.budget_usd).toFixed(2)}</Pill> : null}
             {preview.repeat !== "none" ? <Pill color="#A66BFF">{preview.repeat_label || preview.repeat}</Pill> : null}
             {preview.links?.length ? <Pill color="#32D8FF">{preview.links.length === 1 ? "1 link" : `${preview.links.length} links`}</Pill> : null}
+            {preview.bill_hint ? (
+              <button type="button" className="rounded-full bg-[#5BF2A5]/20 px-2 py-0.5 text-xs text-[#5BF2A5]"
+                onClick={() => act.mutate(() => myTasks.addBill({ name: preview.bill_hint.name, amount: preview.bill_hint.amount, due_day: preview.bill_hint.due_day ?? 1,
+                  cadence: preview.bill_hint.cadence === "yearly" ? "yearly" : "monthly", due_month: preview.bill_hint.cadence === "yearly" ? new Date().getMonth() + 1 : null }),
+                  { onSuccess: () => { setText(""); setPreview(null); qc.invalidateQueries({ queryKey: ["bills"] }); } })}>
+                Add as a bill{preview.bill_hint.amount != null ? ` (${money(preview.bill_hint.amount)}` + (preview.bill_hint.due_day ? `, day ${preview.bill_hint.due_day})` : ")") : ""}
+              </button>
+            ) : null}
             {preview.list_name ? <Pill color="#FFBD69">#{preview.list_name}</Pill> : null}
             {preview.estimate_minutes ? <Pill color="#8a93b8">{mins(preview.estimate_minutes)}</Pill> : null}
           </p>
@@ -120,7 +128,7 @@ export function MyTasksPanel() {
         <ErrorNote error={add.error ?? act.error} />
       </form>
       <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Task tools">
-        {[["plan", "Plan my day"], ["fit", "I have…"], ["eod", "End of day"], ["goals", "Goals"], ["bills", "Bills"], ["month", "Month"], ["dump", "Brain dump"], ["review", "Weekly review"], ["habits", "Habits"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"], ["archive", "Archive & export"]].map(([k, label]) => (
+        {[["plan", "Plan my day"], ["money", "Money"], ["fit", "I have…"], ["eod", "End of day"], ["goals", "Goals"], ["bills", "Bills"], ["month", "Month"], ["dump", "Brain dump"], ["review", "Weekly review"], ["habits", "Habits"], ["results", "Results"], ["insights", "Insights"], ["templates", "Templates"], ["archive", "Archive & export"]].map(([k, label]) => (
           <Button key={k} aria-pressed={tool === k} variant={tool === k ? "primary" : "quiet"} onClick={() => setTool(tool === k ? null : k)}>{label}</Button>
         ))}
       </div>
@@ -375,6 +383,7 @@ function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
   if (tool === "review") return <Review refresh={refresh} />;
   if (tool === "habits") return <Habits />;
   if (tool === "fit") return <Fit />;
+  if (tool === "money") return <Money />;
   if (tool === "eod") return <EndOfDay refresh={refresh} />;
   if (tool === "goals") return <Goals />;
   if (tool === "bills") return <Bills />;
@@ -710,6 +719,10 @@ function Bills() {
         <li key={b.id} className="flex flex-wrap items-center gap-2">
           <b className="min-w-0 flex-1 truncate">{b.name}{b.autopay ? " (autopay)" : ""}</b>
           <span>{money(b.amount)}</span>
+          <label className="flex items-center gap-1 text-xs text-ink-3"><input type="checkbox" checked={!!b.subscription}
+            onChange={(e) => act.mutate(() => myTasks.setSubscription(b.id, { subscription: e.target.checked }))} /> subscription</label>
+          <button type="button" className="text-xs underline" title="Adds a research task; it only starts if you press Do it"
+            onClick={() => act.mutate(() => myTasks.findSavings(b.id))}>find cheaper</button>
           <span className={`text-xs ${b.overdue ? "text-bad" : "text-ink-3"}`}>{b.overdue ? `was due ${b.next_due}` : `due ${b.next_due}`}</span>
           {b.link_url ? <a href={b.link_url} target="_blank" rel="noopener noreferrer nofollow" className="text-xs text-[#32D8FF] underline">pay page</a> : null}
           {b.paid_this_period && !b.overdue ? <span className="text-xs text-[#5BF2A5]">paid ✓ <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.billUnpaid(b.id, b.this_period))}>undo</button></span>
@@ -834,6 +847,102 @@ function Archive({ refresh }: { refresh: () => void }) {
           <span className="text-ink-3">{t.status === "DONE" ? "done" : "dropped"}</span>
           <button type="button" className="underline" onClick={() => restore.mutate(t.id)}>restore</button></li>
       ))}</ul>
+    </div>
+  );
+}
+
+/** V6.113–V6.127: budget, payday planner, income, savings, subscriptions and credit — from what you type in. */
+function Money() {
+  const qc = useQueryClient();
+  const b = useQuery({ queryKey: ["money", "budget"], queryFn: myTasks.budget });
+  const pl = useQuery({ queryKey: ["money", "planner"], queryFn: myTasks.planner });
+  const inc = useQuery({ queryKey: ["money", "income"], queryFn: myTasks.income });
+  const sav = useQuery({ queryKey: ["money", "savings"], queryFn: myTasks.savings });
+  const subs = useQuery({ queryKey: ["money", "subs"], queryFn: myTasks.subscriptions });
+  const cr = useQuery({ queryKey: ["money", "credit"], queryFn: myTasks.credit });
+  const pay = useQuery({ queryKey: ["money", "pay"], queryFn: myTasks.pay });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["money"] }) });
+  const [amt, setAmt] = useState(""); const [src, setSrc] = useState(""); const [hrs, setHrs] = useState("");
+  const [gName, setGName] = useState(""); const [gTarget, setGTarget] = useState(""); const [gMonthly, setGMonthly] = useState("");
+  const [cName, setCName] = useState(""); const [cLimit, setCLimit] = useState(""); const [cBal, setCBal] = useState("");
+  const [pCad, setPCad] = useState("biweekly"); const [pDay, setPDay] = useState(""); const [pAmt, setPAmt] = useState("");
+  const input = "rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink";
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  return (
+    <div className="space-y-3 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={act.error ?? b.error} />
+      {b.data ? (
+        <div>
+          <h5 className="text-xs font-semibold text-ink-2">This month</h5>
+          <p className="text-xs">Income {money(b.data.income)} − bills {money(b.data.bills)}{b.data.bills_vary ? ` (+${b.data.bills_vary} that vary)` : ""} − savings plan {money(b.data.savings_plan)} = <b className={b.data.left < 0 ? "text-bad" : "text-[#5BF2A5]"}>{money(b.data.left)} left</b></p>
+        </div>
+      ) : null}
+      <div>
+        <h5 className="text-xs font-semibold text-ink-2">Payday planner</h5>
+        {(pl.data?.periods ?? []).map((p: Json) => (
+          <p key={p.from} className="text-xs">{p.from} → {p.to}: {p.bills.length ? p.bills.map((x: Json) => `${x.name} ${money(x.amount)}`).join(", ") : "no bills"} · needs {money(p.needed)}{p.left != null ? ` · left ${money(p.left)}` : ""}</p>
+        ))}
+        <p className="text-xs text-ink-3">Paydays: {(pay.data?.schedules ?? []).map((s: Json) => `${s.name} (${s.cadence}) next ${s.next[0]}`).join("; ") || "none yet"}</p>
+        <form className="mt-1 flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (pDay) act.mutate(() => myTasks.addPay({ name: "Paycheck", cadence: pCad, anchor_day: pDay, amount: pAmt ? Number(pAmt) : null })); }}>
+          <select aria-label="How often you get paid" value={pCad} onChange={(e) => setPCad(e.target.value)} className={input}>
+            <option value="weekly">weekly</option><option value="biweekly">every 2 weeks</option><option value="semimonthly">15th + last day</option><option value="monthly">monthly</option>
+          </select>
+          <input aria-label="A recent payday" type="date" value={pDay} onChange={(e) => setPDay(e.target.value)} className={input} />
+          <input aria-label="Usual pay" value={pAmt} onChange={(e) => setPAmt(e.target.value)} placeholder="usual pay" inputMode="decimal" className={`w-24 ${input}`} />
+          <Button type="submit" disabled={!pDay}>Add payday</Button>
+        </form>
+      </div>
+      <div>
+        <h5 className="text-xs font-semibold text-ink-2">Income · this week {money(inc.data?.week_total)}{inc.data?.week_hourly ? ` (${money(inc.data.week_hourly)}/hr)` : ""} · this month {money(inc.data?.month_total)}</h5>
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (Number(amt) > 0 && src.trim()) { act.mutate(() => myTasks.logIncome(Number(amt), src.trim(), hrs ? Number(hrs) : undefined)); setAmt(""); setHrs(""); } }}>
+          <input aria-label="Amount earned" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="amount" inputMode="decimal" className={`w-20 ${input}`} />
+          <input aria-label="Where it came from" value={src} onChange={(e) => setSrc(e.target.value)} placeholder="from" className={`w-32 ${input}`} />
+          <input aria-label="Hours" value={hrs} onChange={(e) => setHrs(e.target.value)} placeholder="hours" inputMode="decimal" className={`w-16 ${input}`} />
+          <Button type="submit" disabled={!(Number(amt) > 0) || !src.trim()}>Log</Button>
+        </form>
+      </div>
+      <div>
+        <h5 className="text-xs font-semibold text-ink-2">Savings</h5>
+        {(sav.data?.goals ?? []).map((g: Json) => (
+          <div key={g.id} className="text-xs">
+            <div className="flex items-center gap-2"><b className="min-w-0 flex-1 truncate">{g.name}</b>{money(g.saved)} of {money(g.target)}
+              <button type="button" className="underline" onClick={() => { const v = window.prompt(`Deposit to ${g.name} (negative to take out)`); if (v && Number(v)) act.mutate(() => myTasks.deposit(g.id, Number(v))); }}>deposit</button></div>
+            <div className="h-1.5 rounded bg-white/10"><div className="h-full rounded bg-[#FFBD69]" style={{ width: pct(g.progress) }} /></div>
+            {g.per_week_needed ? <p className="text-ink-3">{money(g.per_week_needed)} a week reaches it by {g.deadline}</p> : null}
+          </div>
+        ))}
+        <form className="mt-1 flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (gName.trim() && Number(gTarget) > 0) { act.mutate(() => myTasks.addSavings({ name: gName.trim(), target: Number(gTarget), monthly_plan: gMonthly ? Number(gMonthly) : null })); setGName(""); setGTarget(""); setGMonthly(""); } }}>
+          <input aria-label="Goal name" value={gName} onChange={(e) => setGName(e.target.value)} placeholder="goal" className={`w-28 ${input}`} />
+          <input aria-label="Target" value={gTarget} onChange={(e) => setGTarget(e.target.value)} placeholder="target" inputMode="decimal" className={`w-20 ${input}`} />
+          <input aria-label="Monthly plan" value={gMonthly} onChange={(e) => setGMonthly(e.target.value)} placeholder="per month" inputMode="decimal" className={`w-20 ${input}`} />
+          <Button type="submit" disabled={!gName.trim() || !(Number(gTarget) > 0)}>Add goal</Button>
+        </form>
+      </div>
+      {subs.data?.subscriptions?.length ? (
+        <div>
+          <h5 className="text-xs font-semibold text-ink-2">Subscriptions · {money(subs.data.yearly_total)} a year</h5>
+          {subs.data.subscriptions.map((x: Json) => (
+            <p key={x.bill_id} className="text-xs">{x.name} {money(x.yearly)}/yr {x.review_due ? <span className="text-[#FFBD69]">· review due</span> : null}{" "}
+              <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.setSubscription(x.bill_id, { reviewed: true }))}>still worth it</button></p>
+          ))}
+        </div>
+      ) : null}
+      <div>
+        <h5 className="text-xs font-semibold text-ink-2">Credit{cr.data?.utilization != null ? ` · ${pct(cr.data.utilization)} used overall` : ""}{cr.data?.record?.on_time_rate != null ? ` · ${pct(cr.data.record.on_time_rate)} of bills paid on time` : ""}</h5>
+        {(cr.data?.cards ?? []).map((c: Json) => (
+          <p key={c.id} className="text-xs">{c.name}: {money(c.balance)} of {money(c.limit)} ({pct(c.utilization)}){" "}
+            <button type="button" className="underline" onClick={() => { const v = window.prompt(`New balance for ${c.name}`); if (v != null && v !== "" && Number(v) >= 0) act.mutate(() => myTasks.editCard(c.id, { balance: Number(v) })); }}>update</button>{" "}
+            <button type="button" className="text-ink-3" aria-label={`Delete ${c.name}`} onClick={() => act.mutate(() => myTasks.removeCard(c.id))}>×</button></p>
+        ))}
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (cName.trim() && Number(cLimit) > 0) { act.mutate(() => myTasks.addCard({ name: cName.trim(), limit: Number(cLimit), balance: Number(cBal || 0) })); setCName(""); setCLimit(""); setCBal(""); } }}>
+          <input aria-label="Card nickname" value={cName} onChange={(e) => setCName(e.target.value)} placeholder="nickname (no number)" className={`w-36 ${input}`} />
+          <input aria-label="Limit" value={cLimit} onChange={(e) => setCLimit(e.target.value)} placeholder="limit" inputMode="decimal" className={`w-20 ${input}`} />
+          <input aria-label="Balance" value={cBal} onChange={(e) => setCBal(e.target.value)} placeholder="balance" inputMode="decimal" className={`w-20 ${input}`} />
+          <Button type="submit" disabled={!cName.trim() || !(Number(cLimit) > 0)}>Add card</Button>
+        </form>
+        {cr.data ? <p className="text-xs text-ink-3">{cr.data.note}</p> : null}
+      </div>
+      <p className="text-xs text-ink-3">Everything here comes from what you enter. AI Civ isn't connected to a bank and never moves money.</p>
     </div>
   );
 }

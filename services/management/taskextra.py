@@ -352,6 +352,7 @@ def remove_bill(p: Principal, bid: str) -> None:
     with transaction() as conn:
         r = _bill(conn, p.organization_id, bid)
         conn.execute(delete(db.my_bill_payments).where(db.my_bill_payments.c.bill_id == bid))
+        conn.execute(delete(db.bill_meta).where(db.bill_meta.c.bill_id == bid))
         conn.execute(delete(db.my_bills).where(db.my_bills.c.id == bid))
         emit(conn, "bill.changed", org_id=p.organization_id, payload={"bill_id": bid, "name": r.name, "change": "removed"})
 
@@ -359,8 +360,20 @@ def remove_bill(p: Principal, bid: str) -> None:
 PERIOD_RX = re.compile(r"^\d{4}(-(0[1-9]|1[0-2]))?$")
 
 
-def mark_paid(p: Principal, bid: str, period: str | None = None, amount=None, tz: str | None = "UTC") -> dict:
-    """You paid it (somewhere else): record it for one period. The app moves no money."""
+def mark_paid(p: Principal, bid: str, period: str | None = None, amount=None, tz: str | None = "UTC",
+              paid_on: str | None = None) -> dict:
+    """You paid it (somewhere else): record it for one period, on the day you paid (default today; V6.121 uses it for
+    your on-time record). The app moves no money."""
+    when = _now()
+    if paid_on:
+        try:
+            d = date.fromisoformat(paid_on)
+        except ValueError as exc:
+            raise PlusError("the day you paid is YYYY-MM-DD") from exc
+        zone = _zone(tz)
+        if d > when.astimezone(zone).date() or d < when.astimezone(zone).date() - timedelta(days=400):
+            raise PlusError("the day you paid can't be in the future or over a year ago")
+        when = datetime.combine(d, time(12, 0), tzinfo=zone)
     with transaction() as conn:
         r = _bill(conn, p.organization_id, bid)
         b = next(x for x in bills(conn, p.organization_id, tz, include_inactive=True) if x["id"] == bid)
@@ -372,7 +385,7 @@ def mark_paid(p: Principal, bid: str, period: str | None = None, amount=None, tz
         if conn.execute(select(P.c.id).where(P.c.bill_id == bid, P.c.period == per)).first():
             raise PlusError("that period is already marked paid", 409)
         conn.execute(insert(P).values(id=db.new_id(), bill_id=bid, organization_id=p.organization_id, period=per,
-                                      amount_cents=cents, paid_at=_now().isoformat(), created_by=p.user_id))
+                                      amount_cents=cents, paid_at=when.astimezone(timezone.utc).isoformat(), created_by=p.user_id))
         emit(conn, "bill.paid", org_id=p.organization_id, payload={"bill_id": bid, "name": r.name, "period": per})
     return _one_bill(p.organization_id, bid, tz)
 

@@ -1469,6 +1469,71 @@ day_notes = Table(  # V6.105 the note you leave yourself at the end of a day
     Column("created_at", String, nullable=False, default=utcnow),
 )
 
+income_entries = Table(  # V6.113 money you earned (you enter it; nothing is connected)
+    "income_entries", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("amount_cents", Integer, nullable=False),
+    Column("source", String, nullable=False),
+    Column("day", String, nullable=False),            # YYYY-MM-DD
+    Column("hours", Float),
+    Column("note", String, nullable=False, default=""),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+pay_schedules = Table(  # V6.114 when you get paid
+    "pay_schedules", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("cadence", String, nullable=False),        # weekly | biweekly | semimonthly | monthly
+    Column("anchor_day", String, nullable=False),     # a payday you know, YYYY-MM-DD
+    Column("amount_cents", Integer),                  # what you usually get (None: it varies)
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+savings_goals = Table(  # V6.116
+    "savings_goals", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("target_cents", Integer, nullable=False),
+    Column("deadline", String),                       # YYYY-MM-DD or None
+    Column("monthly_plan_cents", Integer),            # what you plan to put in each month (used by the budget)
+    Column("done", Integer, nullable=False, default=0),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+savings_entries = Table(  # V6.116 deposits (or withdrawals) you record against a goal
+    "savings_entries", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("goal_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("amount_cents", Integer, nullable=False),
+    Column("day", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+bill_meta = Table(  # V6.118 a bill that's a subscription, and when you last looked at whether it's worth it
+    "bill_meta", metadata,
+    Column("bill_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("subscription", Integer, nullable=False, default=0),
+    Column("reviewed_at", String),
+)
+
+credit_cards = Table(  # V6.120 balances and limits you type in (no bank connection)
+    "credit_cards", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("limit_cents", Integer, nullable=False),
+    Column("balance_cents", Integer, nullable=False, default=0),
+    Column("statement_day", Integer),
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
 list_styles = Table(  # V6.110 a color and an icon for a #list
     "list_styles", metadata,
     Column("organization_id", String(36), primary_key=True),

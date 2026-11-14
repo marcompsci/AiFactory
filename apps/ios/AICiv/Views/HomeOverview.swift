@@ -13,6 +13,7 @@ struct HomeOverviewTab: View {
                 if why.contains("Sign in") { SignInCard() } else { RetryCard(message: why) }
             }
             if let low = app.lowStorage { LowStorageCard(report: low) }
+            if app.connection == .live { MoneyCard() }
             if app.connection == .live { BriefCard().pixelPanel() }
             more
             activity

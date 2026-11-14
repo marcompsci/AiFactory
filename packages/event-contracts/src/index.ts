@@ -60,6 +60,7 @@ export const EVENT_TYPES = [
   "bill.paid",
   "goal.changed",
   "day.closed",
+  "money.changed",
   "mission.priority_changed",
   "permission.revoked",
   "permission.restored",

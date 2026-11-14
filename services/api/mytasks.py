@@ -95,6 +95,8 @@ def parse(text: str = Query(min_length=1, max_length=400), tz: str = Query(defau
     out = capture.parse(rest, tz)
     out["links"] = urls
     out["repeat_label"] = capture.repeat_label(out["repeat"])
+    from services.management import money
+    out["bill_hint"] = money.bill_hint(text)  # V6.122: this looks like a bill; offer to add it as one
     return out
 
 
@@ -534,7 +536,10 @@ class BillIn(BaseModel):
 @router.get("/bills")
 def list_bills(tz: str = Query(default="UTC", max_length=64), all: bool = False, p: Principal = Depends(member)) -> dict:
     with db.get_engine().connect() as conn:
-        return {"bills": taskextra.bills(conn, p.organization_id, tz, include_inactive=all)}
+        from services.management import money
+        subs = money.flags(conn, p.organization_id)
+        return {"bills": [{**b, "subscription": subs.get(b["id"], False)}
+                          for b in taskextra.bills(conn, p.organization_id, tz, include_inactive=all)]}
 
 
 @router.get("/bills/summary")
@@ -570,6 +575,7 @@ def remove_bill(bid: str, p: Principal = Depends(operator)) -> dict:
 
 class PaidIn(BaseModel):
     period: str | None = Field(default=None, max_length=7)
+    paid_on: str | None = Field(default=None, max_length=10)
     amount: float | None = Field(default=None, ge=0, le=1_000_000)
     tz: str | None = Field(default="UTC", max_length=64)
 
@@ -578,7 +584,7 @@ class PaidIn(BaseModel):
 def bill_paid(bid: str, body: PaidIn, p: Principal = Depends(operator)) -> dict:
     """You paid it somewhere else; this only records that."""
     try:
-        return taskextra.mark_paid(p, bid, body.period, body.amount, body.tz)
+        return taskextra.mark_paid(p, bid, body.period, body.amount, body.tz, body.paid_on)
     except Errors as exc:
         raise _err(exc) from exc
 

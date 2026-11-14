@@ -4,11 +4,12 @@ import UserNotifications
 
 /// The task list's tools (V6.74–V6.84): plan my day, the weekly review, results, insights and templates.
 enum TaskTool: String, CaseIterable, Identifiable {
-    case plan, fit, endOfDay, goals, bills, month, dump, review, habits, digest, results, insights, templates, archive
+    case plan, money, fit, endOfDay, goals, bills, month, dump, review, habits, digest, results, insights, templates, archive
     var id: String { rawValue }
     var label: String {
         switch self {
         case .plan: return "Plan my day"
+        case .money: return "Money"
         case .fit: return "I have…"
         case .endOfDay: return "End of day"
         case .goals: return "Goals"
@@ -27,6 +28,7 @@ enum TaskTool: String, CaseIterable, Identifiable {
     var icon: String {
         switch self {
         case .plan: return "calendar.day.timeline.left"
+        case .money: return "banknote"
         case .fit: return "hourglass"
         case .endOfDay: return "moon.stars"
         case .goals: return "target"
@@ -54,6 +56,7 @@ struct TaskToolSheet: View {
             Group {
                 switch tool {
                 case .plan: PlanDayView(changed: changed)
+                case .money: MoneyView()
                 case .fit: FitView()
                 case .endOfDay: EndOfDayView(changed: changed)
                 case .goals: GoalsView()
@@ -680,6 +683,7 @@ struct DigestSettingsView: View {
             } footer: {
                 Text("One notification a day with what's due, what's overdue and what's waiting for you. It's worked out from your list each time the app updates, so it can be a few hours old; nothing is sent anywhere else.")
             }
+            QuietHoursSettings()
             if let p = preview {
                 Section("What it would say now") {
                     Text(p.title).font(.subheadline.bold())
@@ -743,12 +747,9 @@ enum DigestScheduler {
             content.body = d.body + (n == 0 ? "" : " (From your list as of \(stamp); open AI Civ for the latest.)")
             content.sound = .default
             content.threadIdentifier = "digest"
-            var parts = DateComponents()
-            parts.hour = m / 60
-            parts.minute = m % 60
             let base = Calendar.current.date(byAdding: .day, value: ahead, to: Date()) ?? Date()
-            let ymd = Calendar.current.dateComponents([.year, .month, .day], from: base)
-            parts.year = ymd.year; parts.month = ymd.month; parts.day = ymd.day
+            let at = QuietHours.adjust(Calendar.current.startOfDay(for: base).addingTimeInterval(TimeInterval(m * 60)))
+            let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: at)
             try? await center.add(UNNotificationRequest(identifier: "\(id)-\(n)", content: content,
                                                         trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
         }

@@ -44,6 +44,7 @@ struct Bill: Decodable, Hashable, Identifiable {
     let period: String
     let paidThisPeriod: Bool
     var thisPeriod: String? = nil
+    var subscription: Bool? = nil
     let payments: [Payment]
 
     var due: Date? {

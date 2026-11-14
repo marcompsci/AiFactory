@@ -113,9 +113,10 @@ struct TaskPreview: Decodable, Hashable {
     var estimateMinutes: Int? = nil
     var links: [String]? = nil
     var repeatLabel: String? = nil
+    var billHint: BillHint? = nil
 
     enum CodingKeys: String, CodingKey {
-        case title, dueAt, dueLabel, priority, budgetUsd, kind, repeats = "repeat", listName, estimateMinutes, links, repeatLabel
+        case title, dueAt, dueLabel, priority, budgetUsd, kind, repeats = "repeat", listName, estimateMinutes, links, repeatLabel, billHint
     }
 }
 

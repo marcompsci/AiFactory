@@ -132,6 +132,77 @@ struct PlanMyDayIntent: AppIntent {
     }
 }
 
+// MARK: - V6.124: money by voice
+
+struct BillsDueIntent: AppIntent {
+    static var title: LocalizedStringResource = "What bills are due"
+    static var description = IntentDescription("Tells you which of your AI Civ bills are due in the next week, and any past due.")
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let api = await IntentAPI.client() else { return .result(dialog: "AI Civ isn't set up with a server yet.") }
+        do {
+            let o = try await api.moneyOverview()
+            if o.billsDueSoon.isEmpty { return .result(dialog: "No bills due in the next week.") }
+            let parts = o.billsDueSoon.map { b in
+                "\(b.name)\(b.amount.map { ", \($0.formatted(.currency(code: "USD")))" } ?? "")\(b.overdue ? ", past due" : "")"
+            }
+            return .result(dialog: "\(parts.count == 1 ? "One bill" : "\(parts.count) bills"): \(parts.joined(separator: "; ")).")
+        } catch {
+            return .result(dialog: "\(IntentAPI.problem(error))")
+        }
+    }
+}
+
+struct MarkBillPaidIntent: AppIntent {
+    static var title: LocalizedStringResource = "Mark a bill paid"
+    static var description = IntentDescription("Records that you paid one of your bills (you pay it where you usually do). Asks you to confirm; your iPhone has to be unlocked.")
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+
+    @Parameter(title: "Bill", requestValueDialog: "Which bill?")
+    var name: String
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let api = await IntentAPI.client() else { return .result(dialog: "AI Civ isn't set up with a server yet.") }
+        do {
+            let said = name.lowercased()
+            let all = try await api.bills()
+            guard let b = all.first(where: { $0.name.lowercased() == said })
+                    ?? all.first(where: { said.contains($0.name.lowercased()) || $0.name.lowercased().contains(said) }) else {
+                return .result(dialog: "I couldn't find a bill called \(name).")
+            }
+            if b.paidThisPeriod && !b.overdue { return .result(dialog: "\(b.name) is already marked paid for now.") }
+            try await requestConfirmation(result: .result(dialog: "Mark \(b.name) paid for \(b.period)?"))
+            let after = try await api.markBillPaid(b.id, paidOn: nil)
+            return .result(dialog: "Marked \(b.name) paid. Next due \(after.nextDue).")
+        } catch let e as APIError {
+            return .result(dialog: "\(IntentAPI.problem(e))")
+        } catch let e as URLError {
+            return .result(dialog: "\(IntentAPI.problem(e))")
+        }
+    }
+}
+
+struct LogIncomeIntent: AppIntent {
+    static var title: LocalizedStringResource = "Log income"
+    static var description = IntentDescription("Records money you earned today in AI Civ.")
+
+    @Parameter(title: "Amount", requestValueDialog: "How much?")
+    var amount: Double
+    @Parameter(title: "From", requestValueDialog: "Where from?")
+    var source: String
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let api = await IntentAPI.client() else { return .result(dialog: "AI Civ isn't set up with a server yet.") }
+        do {
+            try await api.logIncome(amount: amount, source: source)
+            let week = (try? await api.income().weekTotal).map { " That's \($0.formatted(.currency(code: "USD"))) this week." } ?? ""
+            return .result(dialog: "Logged \(amount.formatted(.currency(code: "USD"))) from \(source).\(week)")
+        } catch {
+            return .result(dialog: "\(IntentAPI.problem(error))")
+        }
+    }
+}
+
 struct AICivShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AddTaskIntent(), phrases: ["Add a task in \(.applicationName)", "Add to my \(.applicationName) list"],
@@ -144,5 +215,11 @@ struct AICivShortcuts: AppShortcutsProvider {
                     shortTitle: "Snooze a task", systemImageName: "moon.zzz")
         AppShortcut(intent: PlanMyDayIntent(), phrases: ["Plan my day in \(.applicationName)", "What's my day in \(.applicationName)"],
                     shortTitle: "Plan my day", systemImageName: "sun.horizon")
+        AppShortcut(intent: BillsDueIntent(), phrases: ["What bills are due in \(.applicationName)", "My bills in \(.applicationName)"],
+                    shortTitle: "Bills due", systemImageName: "dollarsign.circle")
+        AppShortcut(intent: MarkBillPaidIntent(), phrases: ["Mark a bill paid in \(.applicationName)"],
+                    shortTitle: "Mark a bill paid", systemImageName: "checkmark.seal")
+        AppShortcut(intent: LogIncomeIntent(), phrases: ["Log income in \(.applicationName)"],
+                    shortTitle: "Log income", systemImageName: "banknote")
     }
 }

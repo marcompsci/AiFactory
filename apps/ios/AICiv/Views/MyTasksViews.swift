@@ -24,6 +24,7 @@ struct MyTasksTab: View {
     @State private var styles: [String: ListStyle] = [:]
     @State private var icons: [String] = []
     @State private var styling: StyleTarget?
+    @State private var billDraft: BillDraft?
     @FocusState private var typing: Bool
 
     private var tz: String { TimeZone.current.identifier }
@@ -70,6 +71,9 @@ struct MyTasksTab: View {
         }
         .task(id: "\(app.openTaskId ?? "")|\(app.connection == .live)") { await openRequested() }
         .overlay(alignment: .bottom) { if let undo { undoBar(undo) } }
+        .sheet(item: $billDraft) { d in
+            BillEditor(draft: d) { text = ""; preview = nil }.presentationDetents([.large])
+        }
         .sheet(item: $styling) { s in
             ListStyleSheet(name: s.name, current: styles[s.name], icons: icons) { styles = $0 }.presentationDetents([.medium, .large])
         }
@@ -173,6 +177,10 @@ struct MyTasksTab: View {
                     if let b = p.budgetUsd { Chip(text: String(format: "$%.2f", b), color: Theme.ok) }
                     if p.repeats != "none" { Chip(text: p.repeatLabel ?? p.repeats, color: Theme.violet) }
                     if let n = p.links?.count, n > 0 { Chip(text: n == 1 ? "1 link" : "\(n) links", color: Theme.cyan) }
+                    if let h = p.billHint {
+                        Button { billDraft = BillDraft(hint: h) } label: { Label("Add as a bill", systemImage: "dollarsign.circle") }
+                            .font(.caption.bold()).buttonStyle(.bordered).tint(Theme.ok)
+                    }
                     if let l = p.listName { Chip(text: "#\(l)", color: Theme.gold) }
                     if let m = p.estimateMinutes { Chip(text: TaskTime.minutes(m), color: .secondary) }
                 }
@@ -956,7 +964,7 @@ enum TaskReminders {
                 c.sound = .default
                 c.categoryIdentifier = AppDelegate.taskCategory  // Done (after unlocking), Snooze 1 hour, Open
                 c.userInfo = ["task_id": t.id]
-                let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: d)
+                let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: QuietHours.adjust(d))
                 center.add(UNNotificationRequest(identifier: id, content: c, trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
             }
         }

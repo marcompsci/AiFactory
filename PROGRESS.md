@@ -688,3 +688,33 @@ usually do and mark it paid here. Your calendar is read on the phone and only ev
 
 Server: `services/management/taskextra.py`, migration `0021_bills_goals_waiting.sql`, tests in
 `tests/integration/test_v698_v712.py`. New events: `bill.changed`, `bill.paid`, `goal.changed`, `day.closed`.
+
+## V6.113–V6.127: Money (iPhone, web, server)
+
+Everything is worked out from numbers you type in. Nothing is connected to a bank, nothing moves money, and nothing is
+financial advice: utilization is a plain ratio with the general rule of thumb lenders publish, not a score.
+
+- **V6.113 Income log.** Amount, source, day and optional hours; week and month totals, by source, 8-week chart, and an
+  hourly figure from the hours you logged (before costs).
+- **V6.114 Paydays.** Weekly, every 2 weeks, the 15th and last day, or monthly, from a payday you know.
+- **V6.115 Payday planner.** Pay period by pay period: bills due before the next payday, the cash they need, and what's
+  left of the paycheck (when you've said what it usually is).
+- **V6.116 Savings goals.** Target, optional deadline and monthly plan, deposits (or withdrawals) you record, progress
+  and what a week reaches it by the deadline.
+- **V6.117 Monthly budget.** Income (logged plus what pay schedules still expect this month) − bills − planned savings.
+- **V6.118 Subscriptions.** Mark bills as subscriptions; yearly cost, highest first; "still worth it" every 3 months.
+- **V6.119 Find savings.** From a bill, add a research task for the agents to find a cheaper option. It isn't started;
+  its instructions say research only, never sign up, cancel or buy.
+- **V6.120 Credit utilization.** Card nicknames (card numbers refused), limits and balances you enter; per card and
+  overall; a reminder two days before each statement closes.
+- **V6.121 On-time record.** Twelve months of bills: paid on or before the due day, late, or missed. Mark a bill paid on
+  the day you actually paid it.
+- **V6.122 Bills in quick capture.** "phone bill $54.99 on the 15th every month" offers "Add as a bill".
+- **V6.123 Money card on Home.** Earned this week, bills in the next 7 days, savings progress, next payday.
+- **V6.124 Siri.** "What bills are due", "Mark a bill paid" (confirms, needs the phone unlocked), "Log income".
+- **V6.125 Quiet hours.** Task, bill, card, follow-up and digest reminders move to the end of quiet hours.
+- **V6.126 Website.** A Money panel with the same pieces, plus "Add as a bill" in quick capture.
+- **V6.127 Polish and checks.** Independent review, fixes, then the phone install.
+
+Server: `services/management/money.py`, `services/api/money.py`, migration `0022_money.sql`, tests in
+`tests/integration/test_v713_v727.py`. New event: `money.changed`.

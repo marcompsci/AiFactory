@@ -98,6 +98,9 @@ struct BillsView: View {
     @State private var editing: BillDraft?
     @State private var error: String?
     @State private var loaded = false
+    @State private var paidOnFor: Bill?
+    @State private var paidOn = Date()
+    @State private var note: String?
 
     var body: some View {
         List {
@@ -113,6 +116,7 @@ struct BillsView: View {
                 } footer: { Text("AI Civ doesn't pay bills or move money. Pay wherever you normally do, then mark it paid here.") }
             }
             if let error { Text(error).foregroundStyle(Theme.bad).font(.caption) }
+            if let note { Text(note).foregroundStyle(Theme.ok).font(.caption) }
             if loaded && bills.isEmpty { Text("No bills yet. Add the ones you pay each month or year.").foregroundStyle(.secondary) }
             ForEach(bills) { b in
                 VStack(alignment: .leading, spacing: 4) {
@@ -135,6 +139,10 @@ struct BillsView: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { editing = BillDraft(b) }
+                .contextMenu {
+                    Button { paidOn = Date(); paidOnFor = b } label: { Label("Paid on a different day…", systemImage: "calendar") }
+                    Button { Task { await findCheaper(b) } } label: { Label("Find a cheaper option", systemImage: "magnifyingglass") }
+                }
                 .swipeActions {
                     Button(role: .destructive) { Task { await remove(b) } } label: { Label("Delete", systemImage: "trash") }
                     if b.paidThisPeriod, let per = b.thisPeriod {
@@ -146,6 +154,22 @@ struct BillsView: View {
         }
         .toolbar { ToolbarItem(placement: .topBarLeading) { Button { editing = BillDraft() } label: { Label("Add a bill", systemImage: "plus") } } }
         .sheet(item: $editing) { d in BillEditor(draft: d) { await load() }.presentationDetents([.large]) }
+        .sheet(item: $paidOnFor) { b in
+            NavigationStack {
+                Form {
+                    DatePicker("I paid \(b.name) on", selection: $paidOn, in: (Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date())...Date(),
+                               displayedComponents: .date)
+                    Text("This records it for \(b.period). The day counts toward your on-time record.").font(.caption).foregroundStyle(.secondary)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { paidOnFor = nil } }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") { let bill = b; paidOnFor = nil; Task { await paid(bill, on: paidOn) } }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
         .task { await load() }
     }
 
@@ -169,9 +193,15 @@ struct BillsView: View {
         } catch { self.error = problem(error) }
     }
 
-    private func paid(_ b: Bill) async {
+    private func paid(_ b: Bill, on day: Date? = nil) async {
         guard let api = app.api else { return }
-        do { _ = try await api.markBillPaid(b.id); Haptics.success(); await load() } catch { self.error = problem(error) }
+        do { _ = try await api.markBillPaid(b.id, paidOn: day); Haptics.success(); await load() } catch { self.error = problem(error) }
+    }
+
+    private func findCheaper(_ b: Bill) async {
+        guard let api = app.api else { return }
+        do { let t = try await api.findSavings(b.id); note = "Added \"\(t.title)\" to your list. It only starts if you press Do it." }
+        catch { self.error = problem(error) }
     }
 
     private func unpaid(_ b: Bill, _ period: String) async {
@@ -198,6 +228,11 @@ struct BillDraft: Identifiable {
     var remindDays = 3
 
     init() {}
+    /// V6.122: from quick capture ("phone bill $54.99 on the 15th every month").
+    init(hint h: BillHint) {
+        name = h.name; amount = h.amount.map { String(format: "%.2f", $0) } ?? ""
+        yearly = h.cadence == "yearly"; dueDay = h.dueDay ?? 1
+    }
     init(_ b: Bill) {
         billId = b.id; name = b.name; amount = b.amount.map { String(format: "%.2f", $0) } ?? ""
         yearly = b.cadence == "yearly"; dueDay = b.dueDay; dueMonth = b.dueMonth ?? 1; autopay = b.autopay
@@ -272,7 +307,9 @@ enum BillReminders {
         for b in bills where b.active && !(b.paidThisPeriod && !b.overdue) {
             guard let due = b.due else { continue }
             let day = cal.date(byAdding: .day, value: b.autopay ? 0 : -b.remindDays, to: due) ?? due
-            guard let at = cal.date(bySettingHour: 9, minute: 0, second: 0, of: day), at > now else { continue }
+            guard let nine = cal.date(bySettingHour: 9, minute: 0, second: 0, of: day) else { continue }
+            let at = QuietHours.adjust(nine)
+            guard at > now else { continue }
             wanted.append(("\(prefix)\(b.id)-\(b.period)-\(b.autopay ? "a" : "\(b.remindDays)")", b, at))
         }
         let center = UNUserNotificationCenter.current()
