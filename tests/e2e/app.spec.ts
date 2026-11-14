@@ -32,7 +32,7 @@ test("agent inspector opens from the roster", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("tab", { name: /Agents/ }).click();
   await page.getByRole("button", { name: /Sentry QA Tester/ }).click();
-  await expect(page.getByText("Permissions")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Permissions" })).toBeVisible();
   await expect(page.getByText("run_tests", { exact: true }).first()).toBeVisible();
 });
 
