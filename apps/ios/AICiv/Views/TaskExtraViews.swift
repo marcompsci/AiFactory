@@ -231,7 +231,7 @@ struct BillDraft: Identifiable {
     /// V6.122: from quick capture ("phone bill $54.99 on the 15th every month").
     init(hint h: BillHint) {
         name = h.name; amount = h.amount.map { String(format: "%.2f", $0) } ?? ""
-        yearly = h.cadence == "yearly"; dueDay = h.dueDay ?? 1
+        yearly = h.cadence == "yearly"; dueDay = h.dueDay ?? 1; dueMonth = h.dueMonth ?? Calendar.current.component(.month, from: Date())
     }
     init(_ b: Bill) {
         billId = b.id; name = b.name; amount = b.amount.map { String(format: "%.2f", $0) } ?? ""

@@ -28,6 +28,7 @@ struct PaySchedule: Decodable, Hashable, Identifiable {
 struct PayPlanner: Decodable, Hashable {
     struct DueBill: Decodable, Hashable, Identifiable {
         let billId: String; let name: String; let due: String; let amount: Double?; let autopay: Bool; let overdue: Bool
+        var paid: Bool? = nil
         var id: String { billId + due }
     }
     struct Period: Decodable, Hashable, Identifiable {
@@ -116,7 +117,7 @@ struct MoneyOverview: Decodable, Hashable {
     let savings: [Goal]
 }
 
-struct BillHint: Decodable, Hashable { let name: String; let amount: Double?; let dueDay: Int?; let cadence: String }
+struct BillHint: Decodable, Hashable { let name: String; let amount: Double?; let dueDay: Int?; let cadence: String; var dueMonth: Int? = nil }
 
 private struct SchedulesBox: Decodable { let schedules: [PaySchedule] }
 private struct GoalsBox: Decodable { let goals: [SavingsGoal] }

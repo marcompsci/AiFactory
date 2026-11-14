@@ -131,7 +131,9 @@ def test_on_time_record(client):
 
 def test_bill_hint_and_overview(client):
     h = money.bill_hint("phone bill $54.99 on the 15th every month")
-    assert h == {"name": "Phone bill", "amount": 54.99, "due_day": 15, "cadence": "monthly"}
+    assert h == {"name": "Phone bill", "amount": 54.99, "due_day": 15, "cadence": "monthly", "due_month": None}
+    y = money.bill_hint("car insurance $600 a year due March 1st")
+    assert y == {"name": "Car insurance", "amount": 600.0, "due_day": 1, "cadence": "yearly", "due_month": 3}
     assert money.bill_hint("buy milk tomorrow") is None
     assert money.bill_hint("car insurance $1,200 every year")["amount"] == 1200 and money.bill_hint("car insurance $1,200 every year")["cadence"] == "yearly"
     prev = client.get("/api/my-tasks/parse", params={"text": "pay rent $1800 on the 1st every month", "tz": LA}).json()
@@ -140,3 +142,19 @@ def test_bill_hint_and_overview(client):
     client.post("/api/money/income", json={"amount": 80, "source": "Rideshare", "tz": LA})
     o = client.get("/api/money/overview", params={"tz": LA}).json()
     assert o["income_this_week"] == 80 and "bills_due_soon" in o and "savings" in o
+
+
+def test_review_fixes_money(client):
+    from datetime import date
+    # a first payday in the future isn't preceded by made-up ones
+    assert money.paydays({"cadence": "biweekly", "anchor_day": "2026-12-01"}, date(2026, 11, 13), 2) == [date(2026, 12, 1), date(2026, 12, 15)]
+    _clear()
+    t = _today()
+    anchor = (t - timedelta(days=2)).isoformat()
+    client.post("/api/money/pay", json={"name": "Job", "cadence": "weekly", "anchor_day": anchor, "amount": 800})
+    client.post("/api/money/pay", json={"name": "Gig", "cadence": "weekly", "anchor_day": anchor})  # same days, amount varies
+    pl = client.get("/api/money/planner", params={"tz": LA}).json()  # used to crash sorting None against 800
+    assert pl["periods"][0]["pay"] == 800 and "Job + Gig" in pl["periods"][0]["payday"]
+    g = client.post("/api/money/savings", json={"name": "Trip", "target": 500, "tz": LA}).json()
+    client.post(f"/api/money/savings/{g['id']}/deposits", json={"amount": 50, "tz": LA})
+    assert client.post(f"/api/money/savings/{g['id']}/deposits", json={"amount": -80, "tz": LA}).status_code == 422

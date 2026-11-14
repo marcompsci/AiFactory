@@ -113,10 +113,12 @@ export function MyTasksPanel() {
             {preview.budget_usd ? <Pill color="#5BF2A5">${Number(preview.budget_usd).toFixed(2)}</Pill> : null}
             {preview.repeat !== "none" ? <Pill color="#A66BFF">{preview.repeat_label || preview.repeat}</Pill> : null}
             {preview.links?.length ? <Pill color="#32D8FF">{preview.links.length === 1 ? "1 link" : `${preview.links.length} links`}</Pill> : null}
-            {preview.bill_hint ? (
+            {preview.bill_hint && (!preview.bill_hint.due_day || (preview.bill_hint.cadence === "yearly" && !preview.bill_hint.due_month)) ? (
+              <span className="text-xs text-ink-3">Looks like a bill: add it under Bills with its due {preview.bill_hint.due_day ? "month" : "day"}.</span>
+            ) : preview.bill_hint ? (
               <button type="button" className="rounded-full bg-[#5BF2A5]/20 px-2 py-0.5 text-xs text-[#5BF2A5]"
-                onClick={() => act.mutate(() => myTasks.addBill({ name: preview.bill_hint.name, amount: preview.bill_hint.amount, due_day: preview.bill_hint.due_day ?? 1,
-                  cadence: preview.bill_hint.cadence === "yearly" ? "yearly" : "monthly", due_month: preview.bill_hint.cadence === "yearly" ? new Date().getMonth() + 1 : null }),
+                onClick={() => act.mutate(() => myTasks.addBill({ name: preview.bill_hint.name, amount: preview.bill_hint.amount, due_day: preview.bill_hint.due_day,
+                  cadence: preview.bill_hint.cadence === "yearly" ? "yearly" : "monthly", due_month: preview.bill_hint.cadence === "yearly" ? preview.bill_hint.due_month : null }),
                   { onSuccess: () => { setText(""); setPreview(null); qc.invalidateQueries({ queryKey: ["bills"] }); } })}>
                 Add as a bill{preview.bill_hint.amount != null ? ` (${money(preview.bill_hint.amount)}` + (preview.bill_hint.due_day ? `, day ${preview.bill_hint.due_day})` : ")") : ""}
               </button>
@@ -706,7 +708,9 @@ function Bills() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["bills"], queryFn: myTasks.bills });
   const s = useQuery({ queryKey: ["bills", "summary"], queryFn: myTasks.billSummary });
-  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["bills"] }) });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => {
+    for (const k of ["bills", "money", "my-tasks", "month"]) qc.invalidateQueries({ queryKey: [k] });
+  } });
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [day, setDay] = useState("1");
@@ -861,7 +865,9 @@ function Money() {
   const subs = useQuery({ queryKey: ["money", "subs"], queryFn: myTasks.subscriptions });
   const cr = useQuery({ queryKey: ["money", "credit"], queryFn: myTasks.credit });
   const pay = useQuery({ queryKey: ["money", "pay"], queryFn: myTasks.pay });
-  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["money"] }) });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => {
+    for (const k of ["money", "bills", "my-tasks"]) qc.invalidateQueries({ queryKey: [k] });
+  } });
   const [amt, setAmt] = useState(""); const [src, setSrc] = useState(""); const [hrs, setHrs] = useState("");
   const [gName, setGName] = useState(""); const [gTarget, setGTarget] = useState(""); const [gMonthly, setGMonthly] = useState("");
   const [cName, setCName] = useState(""); const [cLimit, setCLimit] = useState(""); const [cBal, setCBal] = useState("");

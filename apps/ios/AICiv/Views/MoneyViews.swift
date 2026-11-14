@@ -79,7 +79,8 @@ struct PlanMoneyView: View {
                             if per.bills.isEmpty { Text("No bills due").font(.caption).foregroundStyle(.secondary) }
                             ForEach(per.bills) { b in
                                 HStack {
-                                    Text(b.name + (b.autopay ? " (autopay)" : "")).font(.caption).foregroundStyle(b.overdue ? Theme.bad : Theme.ink)
+                                    Text(b.name + (b.autopay ? " (autopay)" : "") + (b.paid == true ? " · paid" : "")).font(.caption)
+                                        .foregroundStyle(b.overdue ? Theme.bad : b.paid == true ? .secondary : Theme.ink)
                                     Spacer()
                                     Text("\(shortDay(b.due)) · \(usd(b.amount))").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                                 }

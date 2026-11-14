@@ -134,8 +134,10 @@ def income(conn: Connection, org: str, tz: str | None = "UTC", days: int = 90) -
 # ---------------------------------------------------------------- V6.114 paydays
 
 def paydays(s, start: date, count: int = 6) -> list[date]:
-    """The next `count` paydays on or after `start` for a schedule."""
+    """The next `count` paydays on or after `start` for a schedule, never before its first payday (the anchor)."""
     anchor = s["anchor_day"] if isinstance(s["anchor_day"], date) else date.fromisoformat(_day(s["anchor_day"]))
+    if s["cadence"] != "semimonthly":
+        start = max(start, anchor)
     out: list[date] = []
     if s["cadence"] in ("weekly", "biweekly"):
         step = 7 if s["cadence"] == "weekly" else 14
@@ -217,6 +219,20 @@ def bill_dates(b: dict, start: date, end: date, include_overdue: bool = False) -
     return sorted(out)
 
 
+def paid_dates(b: dict, start: date, end: date) -> list[date]:
+    """A bill's due dates from `start` to before `end` that are marked paid."""
+    paid = {x["period"] for x in b["payments"]}
+    if b["cadence"] == "monthly":
+        y, m = start.year, start.month
+        cands = []
+        for _ in range(3):
+            cands.append(due_date(b, y, m))
+            y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    else:
+        cands = [due_date(b, start.year), due_date(b, start.year + 1)]
+    return sorted({d for d in cands if start <= d < end and period_of(b, d) in paid})
+
+
 def planner(conn: Connection, org: str, tz: str | None = "UTC", periods: int = 4) -> dict:
     """Pay period by pay period: the bills due before the next payday, the cash they need, and what's left of that pay
     (when you've said what a paycheck usually is). With no pay schedule, it groups by the next four weeks."""
@@ -226,7 +242,11 @@ def planner(conn: Connection, org: str, tz: str | None = "UTC", periods: int = 4
     for s in scheds:
         for d in paydays(s, today - timedelta(days=31), 12):
             days.append((d, s["amount_cents"], s["name"]))
-    days.sort()
+    merged: dict[date, tuple[int | None, list[str]]] = {}  # two schedules paying the same day are one payday
+    for d, amt, name in days:
+        have, names = merged.get(d, (None, []))
+        merged[d] = (amt if have is None else have + amt if amt is not None else have, names + [name])
+    days = [(d, amt, " + ".join(dict.fromkeys(n))) for d, (amt, n) in sorted(merged.items())]
     past = [d for d in days if d[0] <= today]
     ahead = [d for d in days if d[0] > today]
     starts = ([past[-1]] if past else [(today, None, "Today")]) + ahead
@@ -240,7 +260,11 @@ def planner(conn: Connection, org: str, tz: str | None = "UTC", periods: int = 4
         for b in items:
             for d in bill_dates(b, today if i == 0 else s[0], e[0], include_overdue=i == 0):
                 due.append({"bill_id": b["id"], "name": b["name"], "due": d.isoformat(), "amount": b["amount"],
-                            "autopay": b["autopay"], "overdue": d < today})
+                            "autopay": b["autopay"], "overdue": d < today, "paid": False})
+            if i == 0 and scheds:  # bills since this paycheck that you've already paid came out of it too
+                for d in paid_dates(b, s[0], today):
+                    due.append({"bill_id": b["id"], "name": b["name"], "due": d.isoformat(), "amount": b["amount"],
+                                "autopay": b["autopay"], "overdue": False, "paid": True})
         due.sort(key=lambda x: x["due"])
         need = sum(round(x["amount"] * 100) for x in due if x["amount"] is not None)
         pay = s[1]
@@ -270,7 +294,7 @@ def goals(conn: Connection, org: str, tz: str | None = "UTC") -> list[dict]:
         dl = date.fromisoformat(_day(r.deadline)) if r.deadline else None
         weeks = max(1, -(-(dl - today).days // 7)) if dl and dl > today else None
         out.append({"id": r.id, "name": r.name, "target": r.target_cents / 100, "saved": have / 100, "left": left / 100,
-                    "progress": round(min(1.0, have / r.target_cents), 3), "deadline": _day(r.deadline) if r.deadline else None,
+                    "progress": round(max(0.0, min(1.0, have / r.target_cents)), 3), "deadline": _day(r.deadline) if r.deadline else None,
                     "monthly_plan": r.monthly_plan_cents / 100 if r.monthly_plan_cents is not None else None,
                     "per_week_needed": round(left / weeks / 100, 2) if weeks and left else (0.0 if not left else None),
                     "past_deadline": bool(dl and dl < today and left), "done": bool(r.done) or left == 0,
@@ -308,6 +332,10 @@ def save_to(p: Principal, gid: str, amount, day: str | None = None, tz: str | No
         raise PlusError("the day can't be in the future")
     with transaction() as conn:
         _row(conn, db.savings_goals, p.organization_id, gid, "goal")
+        E = db.savings_entries
+        have = sum(r.amount_cents for r in conn.execute(select(E.c.amount_cents).where(E.c.goal_id == gid)))
+        if have + c < 0:
+            raise PlusError(f"that's more than the ${have / 100:.2f} recorded for this goal")
         conn.execute(insert(db.savings_entries).values(id=db.new_id(), goal_id=gid, organization_id=p.organization_id,
                                                        amount_cents=c, day=d.isoformat(), created_at=_now().isoformat()))
         _changed(conn, p.organization_id, "savings")
@@ -331,9 +359,19 @@ def budget(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     last = today.replace(day=_month_len(today.year, today.month))
     logged = income(conn, org, tz, 40)["month_total"]
     expected = 0
+    I = db.income_entries
+    logged_rows = [(date.fromisoformat(_day(r.day)), r.amount_cents) for r in conn.execute(
+        select(I.c.day, I.c.amount_cents).where(I.c.organization_id == org, I.c.day >= (first - timedelta(days=3)).isoformat()))]
     for s in schedules(conn, org, tz):
-        if s["amount_cents"] is not None:
-            expected += s["amount_cents"] * sum(1 for d in paydays(s, today + timedelta(days=1), 10) if d <= last)
+        if s["amount_cents"] is None:
+            continue
+        for d in paydays(s, today + timedelta(days=1), 10):
+            if d > last:
+                break
+            # a paycheck that arrived early (you logged it a few days before) isn't expected again
+            if any(d - timedelta(days=4) <= ld <= today and amt >= s["amount_cents"] // 2 for ld, amt in logged_rows):
+                continue
+            expected += s["amount_cents"]
     bill_total = 0
     varies = 0
     for b in bills(conn, org, tz):
@@ -522,6 +560,8 @@ def on_time(conn: Connection, org: str, tz: str | None = "UTC", months: int = 12
             if d < created:
                 continue
             paid_at = pays.get((b["id"], period_of(b, d)))
+            if not b["active"] and not paid_at:
+                continue  # a bill you've switched off isn't owed (only what you recorded paying counts)
             if paid_at:
                 when = datetime.fromisoformat(str(paid_at).replace("Z", "+00:00")).astimezone(zone).date()
                 key = "on_time" if when <= d else "late"
@@ -540,22 +580,31 @@ def on_time(conn: Connection, org: str, tz: str | None = "UTC", months: int = 12
 # ---------------------------------------------------------------- V6.122 a bill in quick capture
 
 def bill_hint(text: str) -> dict | None:
-    """"phone bill $54.99 on the 15th every month" looks like a bill: offer to add it as one (nothing is saved)."""
+    """"phone bill $54.99 on the 15th every month" or "car insurance $600 a year due March 1st" looks like a bill:
+    offer to add it as one (nothing is saved). Unknown parts are left empty for you to fill in."""
     import re
+    months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+    mon_rx = r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b"
     low = f" {text.lower()} "
     if not re.search(r"\b(bill|rent|mortgage|insurance|subscription|loan|payment|utilities|internet|phone plan)\b", low):
         return None
     amt = re.search(r"\$\s?(\d{1,6}(?:,\d{3})*(?:\.\d{1,2})?)", low)
     day = re.search(r"\b(?:on the |due (?:on )?(?:the )?)?(3[01]|[12]\d|0?[1-9])(?:st|nd|rd|th)\b", low)
-    monthly = re.search(r"\b(every month|monthly|each month|a month|per month|/mo)\b", low)
+    monthly = re.search(r"\b(every month|monthly|each month|a month|per month)\b|/mo\b", low)
     yearly = re.search(r"\b(every year|yearly|annually|per year|a year)\b", low)
+    mon = re.search(mon_rx, low)
     if not (amt or day) or not (monthly or yearly or day):
         return None
-    name = re.sub(r"\$\s?\d[\d,]*(?:\.\d{1,2})?|\b(on the |due (on )?(the )?)?(3[01]|[12]\d|0?[1-9])(st|nd|rd|th)\b|\b(every month|monthly|each month|a month|per month|every year|yearly|annually|per year|a year|pay( the)?|my)\b|/mo",
+    cadence = "yearly" if yearly and not monthly else "monthly"
+    due_month = next((i + 1 for i, m in enumerate(months) if m.startswith(mon.group(1)[:3])), None) if mon and cadence == "yearly" else None
+    name = re.sub(r"\$\s?\d[\d,]*(?:\.\d{1,2})?|\b(on the |due (on )?(the )?)?(3[01]|[12]\d|0?[1-9])(st|nd|rd|th)\b"
+                  r"|\b(every month|monthly|each month|a month|per month|every year|yearly|annually|per year|a year|pay( the)?|my|due|on)\b|/mo\b",
                   " ", text, flags=re.I)
+    if cadence == "yearly":
+        name = re.sub(mon_rx, " ", name, flags=re.I)
     name = " ".join(name.split()).strip(" ,.-")[:80] or "Bill"
     return {"name": name[:1].upper() + name[1:], "amount": float(amt.group(1).replace(",", "")) if amt else None,
-            "due_day": int(day.group(1)) if day else None, "cadence": "yearly" if yearly and not monthly else "monthly"}
+            "due_day": int(day.group(1)) if day else None, "cadence": cadence, "due_month": due_month}
 
 
 # ---------------------------------------------------------------- V6.123 the money overview
