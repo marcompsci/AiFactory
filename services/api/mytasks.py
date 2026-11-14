@@ -227,17 +227,17 @@ def habit_list(tz: str = Query(default="UTC", max_length=64), p: Principal = Dep
 
 
 @router.get("/my-tasks/digest")
-def day_digest(tz: str = Query(default="UTC", max_length=64), day: str = Query(default="today", pattern="^(today|tomorrow)$"),
+def day_digest(tz: str = Query(default="UTC", max_length=64), day: str = Query(default="today", pattern="^(today|tomorrow|[2-6])$"),
                p: Principal = Depends(member)) -> dict:
     with db.get_engine().connect() as conn:
         return taskmore.digest(conn, p.organization_id, tz, day)
 
 
 @router.get("/my-tasks/{tid}")
-def detail(tid: str, p: Principal = Depends(member)) -> dict:
+def detail(tid: str, tz: str = Query(default="UTC", max_length=64), p: Principal = Depends(member)) -> dict:
     with db.get_engine().connect() as conn:
         try:
-            return mytasks.get(conn, p.organization_id, tid)
+            return mytasks.get(conn, p.organization_id, tid, tz)
         except Errors as exc:
             raise _err(exc) from exc
 

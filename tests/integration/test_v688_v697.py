@@ -150,3 +150,53 @@ def test_digest(client):
         assert empty["title"] == "Tomorrow: nothing due" and empty["body"] == "A clear day on your list."
         assert taskmore.digest(conn, org, LA, "today")["due"] >= 0
     assert client.get("/api/my-tasks/digest", params={"day": "yesterday"}).status_code == 422
+
+
+def test_review_fixes_repeats():
+    from services.management.capture import valid_repeat
+    assert not valid_repeat("daily\n") and not valid_repeat("days:1٣") and valid_repeat("days:365") and not valid_repeat("days:366")
+    zone = __import__("zoneinfo").ZoneInfo(LA)
+    # plain monthly from the 31st comes back to the 31st; yearly from Feb 29 returns in leap years
+    first = "2026-02-01T01:00:00+00:00"  # Jan 31, 5pm in Los Angeles
+    a, days = first, []
+    for _ in range(3):
+        a = next_due(a, "monthly", LA, after=datetime.fromisoformat(a), anchor=first)
+        days.append(datetime.fromisoformat(a).astimezone(zone).strftime("%b %d"))
+    assert days == ["Feb 28", "Mar 31", "Apr 30"]
+    leap = "2028-03-01T01:00:00+00:00"  # Feb 29, 2028
+    a, years = leap, []
+    for _ in range(4):
+        a = next_due(a, "yearly", LA, after=datetime.fromisoformat(a), anchor=leap)
+        years.append(datetime.fromisoformat(a).astimezone(zone).strftime("%Y-%m-%d"))
+    assert years == ["2029-02-28", "2030-02-28", "2031-02-28", "2032-02-29"]
+
+
+def test_review_fixes_links_and_search(client):
+    t = _add(client, "pay the card bill every month")
+    for bad in ("http://[abc/x", "http://ab", "https://exa\x00mple.com/x"):
+        assert client.post(f"/api/my-tasks/{t['id']}/links", json={"url": bad}).status_code == 422, bad
+    links = client.post(f"/api/my-tasks/{t['id']}/links", json={"url": "HTTPS://bank.example.com/pay"}).json()["links"]
+    assert links[0]["url"] == "https://bank.example.com/pay"
+    nxt = client.post(f"/api/my-tasks/{t['id']}/done", json={"tz": LA}).json()["next"]
+    assert [l["url"] for l in client.get(f"/api/my-tasks/{nxt['id']}").json()["links"]] == ["https://bank.example.com/pay"]
+    _add(client, "купить молоко")
+    assert [x["title"] for x in client.get("/api/my-tasks", params={"q": "молоко"}).json()["tasks"]] == ["Купить молоко"]
+    assert client.get("/api/my-tasks", params={"q": "!!"}).json()["tasks"] == []
+    assert client.post("/api/my-tasks", json={"text": "see http://[abc/x now"}).status_code == 201
+
+
+def test_undo_keeps_a_repeat_you_worked_on(client):
+    t = _add(client, "water the plants every 3 days", items=["Ferns"])
+    nxt = client.post(f"/api/my-tasks/{t['id']}/done", json={"tz": LA}).json()["next"]
+    item = client.get(f"/api/my-tasks/{nxt['id']}").json()["items"][0]["id"]
+    client.patch(f"/api/my-tasks/{nxt['id']}/items/{item}", json={"done": True})  # ticked a step on the next one
+    assert client.post(f"/api/my-tasks/{t['id']}/undo-done").json()["removed_next"] is None
+    assert client.get(f"/api/my-tasks/{nxt['id']}").status_code == 200
+
+
+def test_digest_counts_each_task_once(client):
+    _add(client, "old one", due_at="2020-01-01T00:00:00Z")
+    with db.get_engine().connect() as conn:
+        org = conn.execute(select(db.my_tasks.c.organization_id)).scalar()
+        d = taskmore.digest(conn, org, "UTC", "3")
+    assert d["overdue"] == 1 and d["body"].count("Old one") == 1 and not d["title"].startswith(("Today", "Tomorrow"))

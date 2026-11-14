@@ -151,6 +151,27 @@ final class AppState {
     /// keeps it, so you aren't signed out by bad timing.
     @discardableResult
     func forceRefresh() async -> Bool {
+        if let running = refreshing { return await running.value }  // one refresh at a time: refresh tokens are single-use
+        let t = Task { await self.refreshOnce() }
+        refreshing = t
+        defer { refreshing = nil }
+        return await t.value
+    }
+
+    @ObservationIgnored private var refreshing: Task<Bool, Never>?
+
+    /// Siri, a reminder button or background refresh may have renewed the sign-in already (and used up the token
+    /// this copy holds): take theirs from the Keychain when it's newer.
+    private func adoptStoredSession() -> Bool {
+        guard let stored = SupabaseAuth.load(), let mine = session, stored.refreshToken != mine.refreshToken,
+              stored.expiresAt > mine.expiresAt else { return false }
+        session = stored
+        signInReason = nil
+        return stored.expiresAt.timeIntervalSinceNow > 60
+    }
+
+    private func refreshOnce() async -> Bool {
+        if adoptStoredSession() { return true }
         guard let s = session else { return false }
         if auth == nil { await loadPublicConfig() }
         guard let auth else { return false }
@@ -161,6 +182,7 @@ final class AppState {
             signInReason = nil
             return true
         } catch SupabaseAuth.AuthFailure.rejected(_) {
+            if adoptStoredSession() { return true }  // refused because another part of the app had just renewed it
             endSession("Your sign-in ended, so sign in again. Nothing on your Mac changed.")
             return false
         } catch {

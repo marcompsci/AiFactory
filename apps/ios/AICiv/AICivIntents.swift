@@ -52,6 +52,7 @@ struct ListTasksIntent: AppIntent {
 private func spokenTask(_ api: APIClient, _ name: String) async throws -> MyTask? {
     let filler: Set<String> = ["the", "a", "an", "my", "task", "to", "for", "of", "on", "and", "that", "one", "thing"]
     let words = name.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init).filter { !filler.contains($0) }
+    guard !words.isEmpty else { return nil }  // "the task" names nothing
     if let t = try await api.searchTasks(words.joined(separator: " ")).first(where: { $0.isOpen }) { return t }
     // no task has every word: take the open task that shares the most words with what was said
     let open = try await api.myTasks().filter { $0.isOpen }

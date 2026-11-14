@@ -249,6 +249,10 @@ def copy_details(conn: Connection, org: str, src: str, dst: str) -> None:
     steps = [i["text"] for i in items_for(conn, org, [src]).get(src, [])]
     if steps:
         _insert_items(conn, org, dst, steps)
+    L = db.task_links  # and its links (a bill's payment page comes back every month)
+    for ln in conn.execute(select(L).where(L.c.task_id == src, L.c.organization_id == org).order_by(L.c.created_at)):
+        conn.execute(insert(L).values(id=db.new_id(), task_id=dst, organization_id=org, url=ln.url, title=ln.title,
+                                      created_by=ln.created_by, created_at=_now().isoformat()))
 
 
 def forget(conn: Connection, tid: str) -> None:

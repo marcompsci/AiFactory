@@ -217,18 +217,16 @@ enum DayPlanCalendar {
 
 /// Home Screen quick actions (V6.97): handed to the app as it opens, or while it's running. SwiftUI still builds the
 /// window; this only passes the action along.
+@MainActor
 final class QuickActionSceneDelegate: NSObject, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        if let item = connectionOptions.shortcutItem { Task { @MainActor in TaskActions.pendingQuick = item.type } }
+        if let item = connectionOptions.shortcutItem { TaskActions.pendingQuick = item.type }  // before the first view appears
     }
 
     func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
                      completionHandler: @escaping (Bool) -> Void) {
-        let type = shortcutItem.type
-        Task { @MainActor in
-            TaskActions.pendingQuick = type
-            NotificationCenter.default.post(name: TaskActions.quickNote, object: type)
-            completionHandler(true)
-        }
+        TaskActions.pendingQuick = shortcutItem.type
+        NotificationCenter.default.post(name: TaskActions.quickNote, object: shortcutItem.type)
+        completionHandler(true)
     }
 }

@@ -205,7 +205,7 @@ def sort_key(t: dict):
     return (order.get(t["stage"], 9), t["due_at"] is None, t["due_at"] or "", PRIORITY_RANK.get(t["priority"], 1), t["created_at"])
 
 
-def get(conn: Connection, org: str, tid: str) -> dict:
+def get(conn: Connection, org: str, tid: str, tz: str | None = "UTC") -> dict:
     from . import taskplus
     r = _row(conn, org, tid)
     ms = _missions(conn, [r.mission_id] if r.mission_id else [])
@@ -217,7 +217,7 @@ def get(conn: Connection, org: str, tid: str) -> dict:
     d["focus_minutes"] = taskplus.focus_total(conn, tid)
     from . import taskmore
     d["links"] = taskmore.links_for(conn, org, [tid]).get(tid, [])
-    d["streak"] = taskmore.streak_for(conn, org, r)
+    d["streak"] = taskmore.streak_for(conn, org, r, tz)
     if d["blocked_by"]:
         d["blocked_by_title"] = conn.execute(select(db.my_tasks.c.title).where(db.my_tasks.c.id == d["blocked_by"])).scalar()
     m = d["mission"] or {}
@@ -343,7 +343,8 @@ def complete(p: Principal, tid: str, tz: str | None = "UTC") -> dict:
         if r.repeat != "none" and already is None:
             nxt_id = db.new_id()
             conn.execute(insert(T).values(id=nxt_id, organization_id=r.organization_id, title=r.title, notes=r.notes, kind=r.kind,
-                                          priority=r.priority, status="OPEN", due_at=capture.next_due(r.due_at, r.repeat, tz),
+                                          priority=r.priority, status="OPEN",
+                                          due_at=capture.next_due(r.due_at, r.repeat, tz, anchor=_first_due(conn, r)),
                                           repeat=r.repeat, budget_usd=r.budget_usd, repository_id=r.repository_id, runs=0,
                                           repeat_of=tid, created_by=p.user_id, created_at=now, updated_at=now))
             from . import taskplus
@@ -352,6 +353,14 @@ def complete(p: Principal, tid: str, tz: str | None = "UTC") -> dict:
              payload={"task_id": tid, "title": r.title, "next_task_id": nxt_id, "had_run": bool(r.mission_id)})
     with db.get_engine().connect() as conn:
         return {"task": get(conn, p.organization_id, tid), "next": get(conn, p.organization_id, nxt_id) if nxt_id else None}
+
+
+def _first_due(conn: Connection, r) -> str | None:
+    """The first due date of a repeating series (follows repeat_of back; at most 400 steps)."""
+    from . import taskmore
+    chain = taskmore.chain_rows(conn, r.organization_id, r.id)
+    dated = [x for x in chain if x["due_at"]]
+    return dated[-1]["due_at"] if dated else r.due_at
 
 
 def _stop_run(p: Principal, r) -> None:

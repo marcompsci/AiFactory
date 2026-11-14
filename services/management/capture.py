@@ -20,13 +20,13 @@ MONTH_RX = (r"jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|a
 DEFAULT_HOUR = 17  # a date without a time means "by the end of the working day"
 # V6.94: how a task can repeat. "days:N" is every N days (2 to 365).
 # "monthly:29" and "monthly:30" keep that day through short months (plain "monthly" keeps the due date's day).
-REPEAT_RX = re.compile(r"^(none|daily|weekdays|weekly|biweekly|monthly|monthly:(29|30)|monthly_last|yearly"
-                       r"|days:([2-9]|[1-9]\d|[12]\d\d|3[0-5]\d|36[0-5]))$")
+REPEAT_RX = re.compile(r"(none|daily|weekdays|weekly|biweekly|monthly|monthly:(29|30)|monthly_last|yearly"
+                       r"|days:([2-9]|[1-9][0-9]|[12][0-9][0-9]|3[0-5][0-9]|36[0-5]))", re.ASCII)
 _DOM = r"(3[01]|[12]\d|0?[1-9])"
 
 
 def valid_repeat(value: str | None) -> bool:
-    return bool(value) and bool(REPEAT_RX.match(value))
+    return isinstance(value, str) and REPEAT_RX.fullmatch(value) is not None
 
 
 def repeat_label(value: str) -> str:
@@ -275,10 +275,12 @@ def label(when: datetime, now: datetime) -> str:
     return f"{when.strftime('%b')} {when.day} {clock}"
 
 
-def next_due(due_at: str | None, repeat: str, tz: str | None = "UTC", after: datetime | None = None) -> str | None:
+def next_due(due_at: str | None, repeat: str, tz: str | None = "UTC", after: datetime | None = None,
+             anchor: str | None = None) -> str | None:
     """When a repeating task comes round again: the next slot after `after` (default now) and after the last due date,
     keeping the same time of day in the person's time zone. Months keep their day (or their last day); a missed stretch
-    is skipped rather than piled up."""
+    is skipped rather than piled up. `anchor` is the first due date of the series: monthly and yearly repeats keep its
+    day (the 31st comes back after a short month, Feb 29 after a non-leap year)."""
     if repeat == "none" or not valid_repeat(repeat):
         return None
     zone = _zone(tz)
@@ -286,13 +288,21 @@ def next_due(due_at: str | None, repeat: str, tz: str | None = "UTC", after: dat
     base = datetime.fromisoformat(due_at).astimezone(zone) if due_at else after.replace(hour=DEFAULT_HOUR, minute=0, second=0, microsecond=0)
     if repeat.startswith("monthly") or repeat == "yearly":
         months = 12 if repeat == "yearly" else 1
-        anchor = int(repeat[8:]) if repeat.startswith("monthly:") else None
+        first = datetime.fromisoformat(anchor).astimezone(zone) if anchor else None
+        anchor_day = int(repeat[8:]) if repeat.startswith("monthly:") else (first.day if first else None)
         last = repeat == "monthly_last"
+        if repeat == "yearly" and first:  # count the years from the first date, so Feb 29 returns in leap years
+            n = max(1, (after.year - first.year))
+            nxt = _add_months(first, 12 * n, day=first.day)
+            while nxt <= after or nxt <= base:
+                n += 1
+                nxt = _add_months(first, 12 * n, day=first.day)
+            return nxt.astimezone(timezone.utc).isoformat()
         n = 1
-        nxt = _add_months(base, months, day=anchor, last=last)
+        nxt = _add_months(base, months, day=anchor_day, last=last)
         while nxt <= after:
             n += 1
-            nxt = _add_months(base, months * n, day=anchor, last=last)
+            nxt = _add_months(base, months * n, day=anchor_day, last=last)
         return nxt.astimezone(timezone.utc).isoformat()
     days = {"weekly": 7, "biweekly": 14}.get(repeat) or (int(repeat[5:]) if repeat.startswith("days:") else 1)
     step = timedelta(days=days)

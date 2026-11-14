@@ -25,8 +25,10 @@ URL_RX = re.compile(r"https?://[^\s<>\"']{3,2040}", re.I)
 # ---------------------------------------------------------------- V6.90 search
 
 def search_ids(conn: Connection, org: str, q: str) -> set[str]:
-    """Tasks whose title, notes, list or checklist mention every word of `q` (letters and digits, up to 8 words)."""
-    words = re.findall(r"[a-z0-9]{2,}", (q or "").lower())[:8]
+    """Tasks whose title, notes, list, checklist or links mention every word of `q` (any script, up to 8 words).
+    A search with no words in it finds nothing."""
+    words = [w.replace("_", "") for w in re.findall(r"\w+", (q or "").lower())]
+    words = [w for w in words if w][:8]
     T, M, I, L = db.my_tasks, db.task_meta, db.task_items, db.task_links
     if not words:
         return set()
@@ -58,7 +60,8 @@ def undo_done(p: Principal, tid: str) -> dict:
         if r.status != "DONE":
             raise PlusError("only a finished task can be taken back", 409)
         nxt = conn.execute(select(T).where(T.c.repeat_of == tid, T.c.organization_id == p.organization_id)).first()
-        if nxt is not None and nxt.status == "OPEN" and not nxt.mission_id and nxt.updated_at == nxt.created_at:
+        if nxt is not None and nxt.status == "OPEN" and not nxt.mission_id and nxt.updated_at == nxt.created_at \
+                and _untouched(conn, p.organization_id, nxt.id):
             taskplus.forget(conn, nxt.id)
             conn.execute(delete(T).where(T.c.id == nxt.id))
             removed = nxt.id
@@ -67,6 +70,15 @@ def undo_done(p: Principal, tid: str) -> dict:
              payload={"task_id": tid, "title": r.title, "status": "OPEN", "undo": "done", "removed_next": removed})
     with db.get_engine().connect() as conn:
         return {"task": mytasks.get(conn, p.organization_id, tid), "removed_next": removed}
+
+
+def _untouched(conn: Connection, org: str, tid: str) -> bool:
+    """Nothing has been done to a queued repeat: no change of any kind (each one leaves an event), no focus time."""
+    E = db.events
+    changed = conn.execute(select(E.c.id).where(E.c.organization_id == org, E.c.event_type.like("my_task.%"),
+                                                E.c.payload["task_id"].as_string() == tid).limit(1)).first()
+    focused = conn.execute(select(db.focus_sessions.c.id).where(db.focus_sessions.c.task_id == tid).limit(1)).first()
+    return changed is None and focused is None
 
 
 # ---------------------------------------------------------------- V6.92 history
@@ -131,12 +143,19 @@ def history(conn: Connection, org: str, tid: str, limit: int = 100) -> list[dict
 
 def clean_url(url: str) -> str:
     u = (url or "").strip()
-    parts = urlsplit(u)
-    if parts.scheme not in ("http", "https") or not parts.netloc or len(u) > 2048 or any(c.isspace() for c in u):
-        raise PlusError("a link starts with http:// or https:// and has a web address")
+    bad = PlusError("a link starts with http:// or https:// and has a web address")
+    if not 10 <= len(u) <= 2048 or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in u):
+        raise bad
+    try:
+        parts = urlsplit(u)
+        host = parts.hostname
+    except ValueError as exc:
+        raise bad from exc
+    if parts.scheme.lower() not in ("http", "https") or not host:
+        raise bad
     if "@" in parts.netloc:
         raise PlusError("a link can't carry a user name or password")
-    return u
+    return parts.scheme.lower() + u[len(parts.scheme):]  # "HTTPS://…" is stored as "https://…"
 
 
 def links_for(conn: Connection, org: str, ids: list[str]) -> dict[str, list[dict]]:
@@ -191,34 +210,48 @@ def remove_link(p: Principal, tid: str, lid: str) -> list[dict]:
 
 def take_urls(text: str) -> tuple[str, list[str]]:
     """Quick capture: web addresses typed into a task become its links and leave the title."""
-    urls = [m.group(0).rstrip(".,;:)!?") for m in URL_RX.finditer(text or "")][:MAX_LINKS]
+    urls = []
+    for m in URL_RX.finditer(text or ""):
+        try:
+            urls.append(clean_url(m.group(0).rstrip(".,;:)!?")))
+        except PlusError:
+            continue  # not a usable address: it's dropped from the title and not kept as a link
     rest = URL_RX.sub(" ", text or "")
-    return " ".join(rest.split()), urls
+    return " ".join(rest.split()), urls[:MAX_LINKS]
 
 
 # ---------------------------------------------------------------- V6.95 habits (streaks on repeating tasks)
 
-def _chain(conn: Connection, org: str, head) -> list:
-    """The occurrences of a repeating task, newest first, by following repeat_of back (at most 400)."""
+def _series_rows(conn: Connection, org: str) -> dict[str, dict]:
+    """Every task in a repeating series, read once: id → its few fields."""
     T = db.my_tasks
-    out = [head]
-    cur = head
-    while cur.repeat_of and len(out) < 400:
-        cur = conn.execute(select(T).where(T.c.id == cur.repeat_of, T.c.organization_id == org)).first()
-        if cur is None:
-            break
+    rows = conn.execute(select(T.c.id, T.c.repeat_of, T.c.status, T.c.due_at, T.c.done_at)
+                        .where(T.c.organization_id == org, or_(T.c.repeat != "none", T.c.repeat_of.is_not(None))))
+    return {r.id: dict(r._mapping) for r in rows}
+
+
+def _walk(rows: dict[str, dict], tid: str) -> list[dict]:
+    out, seen, cur = [], set(), rows.get(tid)
+    while cur and cur["id"] not in seen and len(out) < 400:
         out.append(cur)
+        seen.add(cur["id"])
+        cur = rows.get(cur["repeat_of"]) if cur["repeat_of"] else None
     return out
 
 
-def _outcome(r, zone) -> str:
+def chain_rows(conn: Connection, org: str, tid: str) -> list[dict]:
+    """The occurrences of a repeating task, newest first, following repeat_of back (one query, at most 400)."""
+    return _walk(_series_rows(conn, org), tid)
+
+
+def _outcome(r: dict, zone) -> str:
     """done (on or before its due day), late (done after its due day), missed (dropped), open."""
-    if r.status == "DONE":
-        if r.due_at and r.done_at and datetime.fromisoformat(r.done_at).astimezone(zone).date() > \
-                datetime.fromisoformat(r.due_at).astimezone(zone).date():
+    if r["status"] == "DONE":
+        if r["due_at"] and r["done_at"] and datetime.fromisoformat(r["done_at"]).astimezone(zone).date() > \
+                datetime.fromisoformat(r["due_at"]).astimezone(zone).date():
             return "late"
         return "done"
-    if r.status == "DROPPED":
+    if r["status"] == "DROPPED":
         return "missed"
     return "open"
 
@@ -241,16 +274,17 @@ def habits(conn: Connection, org: str, tz: str | None = "UTC") -> list[dict]:
     zone = _zone(tz)
     heads = conn.execute(select(T).where(T.c.organization_id == org, T.c.status == "OPEN", T.c.repeat != "none")
                          .order_by(T.c.due_at)).fetchall()
+    rows = _series_rows(conn, org)
     out = []
     for h in heads[:100]:
-        chain = list(reversed(_chain(conn, org, h)))  # oldest first
+        chain = list(reversed(_walk(rows, h.id)))  # oldest first
         outcomes = [_outcome(r, zone) for r in chain]
         cur, best = streak_of(outcomes)
         closed = [o for o in outcomes if o != "open"]
         out.append({"task_id": h.id, "title": h.title, "repeat": h.repeat, "repeat_label": repeat_label(h.repeat),
                     "due_at": h.due_at, "current": cur, "best": best, "times": len(closed),
                     "on_time_rate": round(closed.count("done") / len(closed), 2) if closed else None,
-                    "recent": [{"due_at": r.due_at, "outcome": o} for r, o in list(zip(chain, outcomes))[-14:]]})
+                    "recent": [{"due_at": r["due_at"], "outcome": o} for r, o in list(zip(chain, outcomes))[-14:]]})
     out.sort(key=lambda x: (-x["current"], x["title"].lower()))
     return out
 
@@ -259,7 +293,7 @@ def streak_for(conn: Connection, org: str, r, tz: str | None = "UTC") -> dict | 
     if r.repeat == "none" and not r.repeat_of:
         return None
     zone = _zone(tz)
-    outcomes = [_outcome(x, zone) for x in reversed(_chain(conn, org, r))]
+    outcomes = [_outcome(x, zone) for x in reversed(chain_rows(conn, org, r.id))]
     cur, best = streak_of(outcomes)
     return {"current": cur, "best": best, "times": sum(1 for o in outcomes if o != "open")}
 
@@ -267,18 +301,21 @@ def streak_for(conn: Connection, org: str, r, tz: str | None = "UTC") -> dict | 
 # ---------------------------------------------------------------- V6.96 the morning digest
 
 def digest(conn: Connection, org: str, tz: str | None = "UTC", day: str = "today", now: datetime | None = None) -> dict:
-    """A short summary of a day ("today" or "tomorrow") for a morning notification: what's due that day, what's
-    overdue, what needs you, and how much of the day the plan fills. Counts only; it changes nothing."""
+    """A short summary of a day ("today", "tomorrow", or "2"–"6" days ahead) for a morning notification: what's due by
+    the end of that day and still ahead of now, what's already overdue, what needs you, and how much work is planned.
+    Counts only; it changes nothing."""
     from . import mytasks, taskplus
     zone = _zone(tz)
     now = now or _now()
     local = now.astimezone(zone)
-    date = local.date() + timedelta(days=1 if day == "tomorrow" else 0)
+    ahead = {"today": 0, "tomorrow": 1}.get(day, int(day) if str(day).isdigit() else 0)
+    date = local.date() + timedelta(days=ahead)
     start = datetime.combine(date, time(0, 0), tzinfo=zone).astimezone(timezone.utc).isoformat()
     end = datetime.combine(date + timedelta(days=1), time(0, 0), tzinfo=zone).astimezone(timezone.utc).isoformat()
     tasks = [t for t in mytasks.listing(conn, org, include_done=False)]
-    due = [t for t in tasks if t["due_at"] and start <= t["due_at"] < end and t["stage"] not in ("snoozed",)]
-    overdue = [t for t in tasks if t["due_at"] and t["due_at"] < start and t["stage"] not in ("snoozed", "blocked")]
+    from_ = max(start, now.isoformat())
+    due = [t for t in tasks if t["due_at"] and from_ <= t["due_at"] < end and t["stage"] not in ("snoozed",)]
+    overdue = [t for t in tasks if t["due_at"] and t["due_at"] < now.isoformat() and t["stage"] not in ("snoozed", "blocked")]
     needs = [t for t in tasks if t["stage"] in ("needs_you", "review")]
     planned = sum(taskplus.minutes_of(t) for t in due)
     bits = []
@@ -288,9 +325,9 @@ def digest(conn: Connection, org: str, tz: str | None = "UTC", day: str = "today
         bits.append(f"{len(overdue)} overdue")
     if needs:
         bits.append(f"{len(needs)} waiting for you")
-    when = "Today" if day == "today" else "Tomorrow"
+    when = "Today" if ahead == 0 else "Tomorrow" if ahead == 1 else date.strftime("%A")
     title = f"{when}: " + (", ".join(bits) if bits else "nothing due")
-    top = [t["title"] for t in (needs + overdue + due)][:3]
+    top = list(dict.fromkeys(t["title"] for t in (needs + overdue + due)))[:3]
     body = ("First up: " + "; ".join(top) + "." if top else "A clear day on your list.") + \
         (f" About {planned // 60}h {planned % 60:02d}m of planned work." if planned >= 60 else
          f" About {planned} minutes of planned work." if planned else "")

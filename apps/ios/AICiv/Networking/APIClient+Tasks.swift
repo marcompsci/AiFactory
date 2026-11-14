@@ -118,7 +118,10 @@ extension APIClient {
     }
 
     func myTasks() async throws -> [MyTask] { try await send(request("/api/my-tasks"), as: TaskList.self).tasks }
-    func myTask(_ id: String) async throws -> MyTask { try await send(request("/api/my-tasks/\(id)"), as: MyTask.self) }
+    func myTask(_ id: String) async throws -> MyTask {
+        let tz = TimeZone.current.identifier.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_."))) ?? "UTC"
+        return try await send(request("/api/my-tasks/\(id)?tz=\(tz)"), as: MyTask.self)  // the streak counts days in your time zone
+    }
 
     func previewTask(_ text: String, tz: String) async throws -> TaskPreview {
         var c = URLComponents()

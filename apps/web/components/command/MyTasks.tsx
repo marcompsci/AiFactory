@@ -49,7 +49,7 @@ export function MyTasksPanel() {
   const [undo, setUndo] = useState<{ label: string; run: () => Promise<Json> } | null>(null);
   useEffect(() => { const h = window.setTimeout(() => setQ(search.trim()), 250); return () => clearTimeout(h); }, [search]);
   useEffect(() => { if (!undo) return; const h = window.setTimeout(() => setUndo(null), 6_000); return () => clearTimeout(h); }, [undo]);
-  const found = useQuery({ queryKey: ["my-tasks-search", q], queryFn: () => myTasks.search(q), enabled: status === "live" && q.length > 0 });
+  const found = useQuery({ queryKey: ["my-tasks", "search", q], queryFn: () => myTasks.search(q), enabled: status === "live" && q.length > 0 });
   const list = useQuery({ queryKey: ["my-tasks"], queryFn: myTasks.list, enabled: status === "live", refetchInterval: 5_000 });
   const refresh = () => { qc.invalidateQueries({ queryKey: ["my-tasks"] }); qc.invalidateQueries({ queryKey: ["my-task"] }); };
   const add = useMutation({ mutationFn: () => myTasks.add(text), onSuccess: () => { setText(""); setPreview(null); refresh(); } });

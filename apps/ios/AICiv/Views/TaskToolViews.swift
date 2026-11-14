@@ -688,25 +688,35 @@ enum DigestScheduler {
     @discardableResult
     static func schedule(_ api: APIClient) async -> String? {
         let center = UNUserNotificationCenter.current()
-        guard enabled else { center.removePendingNotificationRequests(withIdentifiers: [id]); return nil }
+        guard enabled else { center.removePendingNotificationRequests(withIdentifiers: [id] + (0..<8).map { "\(id)-\($0)" }); return nil }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "digestScheduledAt")
         let m = minutes
-        let day = nextDay(minutes: m)
-        guard let d = try? await api.dayDigest(tz: TimeZone.current.identifier, day: day) else { return "Couldn't reach your Mac; the last digest stays scheduled." }
-        let content = UNMutableNotificationContent()
-        content.title = d.title
-        content.body = d.body
-        content.sound = .default
-        content.threadIdentifier = "digest"
-        var parts = DateComponents()
-        parts.hour = m / 60
-        parts.minute = m % 60
-        let base = Calendar.current.date(byAdding: .day, value: day == "today" ? 0 : 1, to: Date()) ?? Date()
-        let ymd = Calendar.current.dateComponents([.year, .month, .day], from: base)
-        parts.year = ymd.year; parts.month = ymd.month; parts.day = ymd.day
-        center.removePendingNotificationRequests(withIdentifiers: [id])
-        try? await center.add(UNNotificationRequest(identifier: id, content: content,
-                                                    trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
-        return "Next digest: \(day) at \(String(format: "%d:%02d", m / 60, m % 60))."
+        let first = nextDay(minutes: m) == "today" ? 0 : 1
+        // the next three mornings, so a day without an app update still gets one (later days say how old they are)
+        var made: [(Int, DayDigest)] = []
+        for ahead in first..<(first + 3) {
+            let key = ahead == 0 ? "today" : ahead == 1 ? "tomorrow" : String(ahead)
+            guard let d = try? await api.dayDigest(tz: TimeZone.current.identifier, day: key) else { break }
+            made.append((ahead, d))
+        }
+        guard !made.isEmpty else { return "Couldn't reach your Mac; the last digest stays scheduled." }
+        center.removePendingNotificationRequests(withIdentifiers: [id] + (0..<8).map { "\(id)-\($0)" })
+        let stamp = Date().formatted(.dateTime.weekday(.abbreviated).hour().minute())
+        for (n, (ahead, d)) in made.enumerated() {
+            let content = UNMutableNotificationContent()
+            content.title = d.title
+            content.body = d.body + (n == 0 ? "" : " (From your list as of \(stamp); open AI Civ for the latest.)")
+            content.sound = .default
+            content.threadIdentifier = "digest"
+            var parts = DateComponents()
+            parts.hour = m / 60
+            parts.minute = m % 60
+            let base = Calendar.current.date(byAdding: .day, value: ahead, to: Date()) ?? Date()
+            let ymd = Calendar.current.dateComponents([.year, .month, .day], from: base)
+            parts.year = ymd.year; parts.month = ymd.month; parts.day = ymd.day
+            try? await center.add(UNNotificationRequest(identifier: "\(id)-\(n)", content: content,
+                                                        trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)))
+        }
+        return "Next digest: \(first == 0 ? "today" : "tomorrow") at \(String(format: "%d:%02d", m / 60, m % 60))."
     }
 }
