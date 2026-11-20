@@ -125,7 +125,11 @@ class HardeningMiddleware:
         if path.startswith("/api/") and scope.get("method") != "OPTIONS":
             client = _client(scope)
             # the owner's own Mac (loopback) gets a larger budget: a few open tabs polling it are not an attack
-            if not request_budget.allow(client, 4 if client in ("127.0.0.1", "::1") else 1):
+            # (not when a tunnel or proxy forwarded it: then "loopback" could be anyone)
+            hdrs = {k.lower() for k, _ in scope.get("headers") or []}
+            proxied = bool(hdrs & {b"x-forwarded-for", b"forwarded", b"cf-connecting-ip", b"x-real-ip"})
+            local = client in ("127.0.0.1", "::1", "::ffff:127.0.0.1") and not proxied
+            if not request_budget.allow(client, 4 if local else 1):
                 return await respond(429, "too many requests", [(b"retry-after", b"60")])
             left = auth_failures.locked(_client(scope))
             if left:

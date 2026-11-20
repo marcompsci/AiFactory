@@ -41,7 +41,17 @@ def _cat(v) -> str:
     s = " ".join(str(v or "").split())[:40]
     if not s:
         raise PlusError("pick a category")
-    return s[:1].upper() + s[1:]
+    return (s[:1].upper() + s[1:])[:40]  # some letters grow when capitalized ("ß" → "SS")
+
+
+NUMBERISH = re.compile(r"(?:\d[ -]?){12,}")
+
+
+def _note(v) -> str:
+    n = str(v or "")[:300]
+    if NUMBERISH.search(n):
+        raise PlusError("leave card and account numbers out of notes")
+    return n
 
 
 def _month_bounds(month: str | None, today: date) -> tuple[date, date]:
@@ -76,7 +86,7 @@ def log_expense(p: Principal, amount, category: str, day: str | None = None, not
     c = _cents(amount)
     with transaction() as conn:
         conn.execute(insert(db.expenses).values(id=eid, organization_id=p.organization_id, amount_cents=c, category=_cat(category),
-                                                day=d.isoformat(), note=(note or "")[:300], created_by=p.user_id,
+                                                day=d.isoformat(), note=_note(note), created_by=p.user_id,
                                                 created_at=_now().isoformat()))
         _changed(conn, p.organization_id, "spending")
     return {"id": eid, "amount": c / 100, "category": _cat(category), "day": d.isoformat()}
@@ -234,8 +244,11 @@ def safe_to_spend(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     if not have:
         return {**out, "ready": False, "reason": "Add a checking account and its balance to see this."}
     bal = sum(round(a["balance"] * 100) for a in have)
+    # spending after the newest check-in (anything before it is already in that balance; an older balance on
+    # another account may miss a little spending, which is why a stale balance is flagged below)
+    newest = max(date.fromisoformat(a["as_of"]) for a in have)
     oldest = min(date.fromisoformat(a["as_of"]) for a in have)
-    since = sum(r.amount_cents for r in _spent(conn, org, oldest + timedelta(days=1), today))
+    since = sum(r.amount_cents for r in _spent(conn, org, newest + timedelta(days=1), today))
     due = []
     for b in bills(conn, org, tz):
         for d in bill_dates(b, today, until, include_overdue=True):
@@ -278,8 +291,11 @@ def save_debt(p: Principal, did: str | None, fields: dict) -> dict:
         if fields["kind"] not in ("card", "loan", "other"):
             raise PlusError("a debt is a card, a loan or other")
         vals["kind"] = fields["kind"]
+    for key, label in (("balance", "balance"), ("min_payment", "minimum payment")):
+        if (did is None or key in fields) and fields.get(key) in (None, ""):
+            raise PlusError(f"enter the {label}")
     if "balance" in fields or did is None:
-        vals["balance_cents"] = _cents(fields.get("balance") or 0, "balance", allow_zero=True)
+        vals["balance_cents"] = _cents(fields.get("balance"), "balance", allow_zero=True)
     if "apr" in fields or did is None:
         try:
             apr = float(fields.get("apr") or 0)
@@ -289,7 +305,7 @@ def save_debt(p: Principal, did: str | None, fields: dict) -> dict:
             raise PlusError("the APR is 0 to 100 percent")
         vals["apr"] = round(apr, 3)
     if "min_payment" in fields or did is None:
-        vals["min_payment_cents"] = _cents(fields.get("min_payment") or 0, "minimum payment", allow_zero=True)
+        vals["min_payment_cents"] = _cents(fields.get("min_payment"), "minimum payment", allow_zero=True)
     vals["updated_at"] = _now().isoformat()
     with transaction() as conn:
         if "card_id" in fields:
@@ -316,7 +332,8 @@ def remove_debt(p: Principal, did: str) -> None:
         _changed(conn, p.organization_id, "debts")
 
 
-def simulate(debts: list[dict], extra_cents: int, method: str, start: date, cap_months: int = 600) -> dict:
+def simulate(debts: list[dict], extra_cents: int, method: str, start: date, cap_months: int = 600,
+             rollover: bool = True) -> dict:
     """Month by month: interest accrues (APR / 12), every debt gets its minimum, and the extra (plus the minimums of
     debts already paid off) goes to the target: the highest APR first (avalanche) or the smallest balance first
     (snowball). Returns when each is paid off and the interest along the way. Simple monthly interest; real
@@ -327,6 +344,7 @@ def simulate(debts: list[dict], extra_cents: int, method: str, start: date, cap_
     interest = 0
     month = 0
     budget = sum(round(d["min_payment"] * 100) for d in debts) + max(0, extra_cents)
+    # rollover=False: each debt only ever gets its own minimum (money freed by a paid-off debt isn't reused)
     while any(v > 0 for v in bal.values()) and month < cap_months:
         month += 1
         for k in bal:
@@ -334,7 +352,7 @@ def simulate(debts: list[dict], extra_cents: int, method: str, start: date, cap_
                 i = round(bal[k] * info[k]["apr"] / 1200)
                 bal[k] += i
                 interest += i
-        pool = budget
+        pool = budget if rollover else sum(min(bal[k], round(info[k]["min_payment"] * 100)) for k in bal if bal[k] > 0)
         for k in bal:  # minimums first
             if bal[k] > 0:
                 pay = min(bal[k], round(info[k]["min_payment"] * 100), pool)
@@ -378,7 +396,7 @@ def payoff(conn: Connection, org: str, tz: str | None = "UTC", extra: float = 0)
     if not ds:
         return {"debts": 0, "note": ESTIMATE}
     ex = round(extra * 100)
-    base = simulate(ds, 0, "avalanche", start)
+    base = simulate(ds, 0, "avalanche", start, rollover=False)
     ava = simulate(ds, ex, "avalanche", start)
     sno = simulate(ds, ex, "snowball", start)
     saved = round(base["interest"] - ava["interest"], 2) if base["interest"] is not None and ava["interest"] is not None else None
@@ -445,7 +463,20 @@ def calendar_ics(conn: Connection, org: str, tz: str | None = "UTC", months: int
             lines.append(f"DESCRIPTION:{_ics_text(desc)}")
         lines.append("END:VEVENT")
     lines.append("END:VCALENDAR")
-    return "\r\n".join(lines) + "\r\n"
+    return "\r\n".join(_fold(x) for x in lines) + "\r\n"
+
+
+def _fold(line: str) -> str:
+    """RFC 5545: lines longer than 75 octets continue on the next line after a space."""
+    out, cur = [], b""
+    for ch in line:
+        e = ch.encode()
+        if len(cur) + len(e) > (75 if not out else 74):
+            out.append(cur.decode())
+            cur = b""
+        cur += e
+    out.append(cur.decode())
+    return "\r\n ".join(out)
 
 
 # ---------------------------------------------------------------- V6.141 autopay, V6.142 amount changes, V6.143 late cost
@@ -503,25 +534,33 @@ def bill_checks(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
                 {"bill_id": b["id"], "name": b["name"], "due": d.isoformat(), "amount": b["amount"]})
     cover = []
     checking = [a for a in accts.values() if a["kind"] in ("checking", "cash") and a["balance"] is not None]
-    for aid, due in per_acct.items():
-        need = sum(round(x["amount"] * 100) for x in due if x["amount"] is not None)
+
+    def needs(due: list) -> int:
+        return sum(round(x["amount"] * 100) for x in due if x["amount"] is not None)
+
+    # bills tied to a checking account use up that money first; unassigned bills get what's left of all checking
+    tied = sum(needs(due) for aid, due in per_acct.items() if aid and aid in accts and accts[aid] in checking)
+    for aid, due in sorted(per_acct.items(), key=lambda kv: kv[0] is None):
+        need = needs(due)
         if aid and aid in accts:
             name, bal = accts[aid]["name"], accts[aid]["balance"]
         else:
-            name, bal = "Your checking", round(sum(a["balance"] for a in checking), 2) if checking else None
+            name = "Your checking (after autopay from named accounts)" if tied else "Your checking"
+            bal = round((sum(round(a["balance"] * 100) for a in checking) - tied) / 100, 2) if checking else None
         cover.append({"account_id": aid, "account": name, "balance": bal, "bills": due, "needed": need / 100,
                       "covered": None if bal is None else round(bal * 100) >= need,
                       "short_by": round(max(0, need - round(bal * 100)) / 100, 2) if bal is not None else None})
     changes = []
     for b in items:
-        amts = [x["amount_cents"] for x in b["payments"] if x["amount_cents"]]
+        paid = [x for x in b["payments"] if x["amount_cents"]]
+        amts = [x["amount_cents"] for x in paid]
         if not amts:
             continue
         last = amts[0]
         before = amts[1] if len(amts) > 1 else b["amount_cents"]
         if before and abs(last - before) * 10 >= before:
             changes.append({"bill_id": b["id"], "name": b["name"], "last": last / 100, "before": before / 100,
-                            "change": round((last - before) / before, 3), "period": b["payments"][0]["period"]})
+                            "change": round((last - before) / before, 3), "period": paid[0]["period"]})
     late = []
     for b in items:
         e = ex.get(b["id"], {})
@@ -597,7 +636,7 @@ def log_gig_cost(p: Principal, source: str, amount=None, miles=None, day: str | 
     cid = db.new_id()
     with transaction() as conn:
         conn.execute(insert(db.gig_costs).values(id=cid, organization_id=p.organization_id, source=src, day=d.isoformat(),
-                                                 amount_cents=c, miles=round(mi, 1), note=(note or "")[:300],
+                                                 amount_cents=c, miles=round(mi, 1), note=_note(note),
                                                  created_at=_now().isoformat()))
         _changed(conn, p.organization_id, "gigs")
     return {"id": cid}
@@ -623,7 +662,7 @@ def gigs(conn: Connection, org: str, tz: str | None = "UTC", days: int = 30) -> 
     inc = conn.execute(select(I).where(I.c.organization_id == org, I.c.day >= since.isoformat())).fetchall()
     costs = conn.execute(select(G).where(G.c.organization_id == org, G.c.day >= since.isoformat())
                          .order_by(G.c.day.desc(), G.c.created_at.desc())).fetchall()
-    names = list(dict.fromkeys(st["gig_sources"] + sorted({c.source for c in costs})))
+    names = list({n.lower(): n for n in reversed(st["gig_sources"] + sorted({c.source for c in costs}))}.values())[::-1]
     win = (today - timedelta(days=days)).isoformat()
 
     def figures(src: str, start: str) -> dict:
@@ -633,12 +672,16 @@ def gigs(conn: Connection, org: str, tz: str | None = "UTC", days: int = 30) -> 
         spent = sum(c.amount_cents for c in cs)
         miles = sum(c.miles for c in cs)
         mileage = round(miles * rate)
-        hours = sum(r.hours or 0 for r in rows)
+        timed = [r for r in rows if r.hours]
+        hours = sum(r.hours for r in timed)
+        timed_earned = sum(r.amount_cents for r in timed)
         net = earned - spent - mileage
+        # per hour from the entries with hours only; costs are shared out in proportion to those earnings
+        timed_net = round(timed_earned * net / earned) if earned else 0
         return {"earned": earned / 100, "costs": spent / 100, "miles": round(miles, 1), "mileage": mileage / 100,
                 "net": net / 100, "hours": round(hours, 2),
-                "hourly_gross": round(earned / hours / 100, 2) if hours else None,
-                "hourly_net": round(net / hours / 100, 2) if hours else None}
+                "hourly_gross": round(timed_earned / hours / 100, 2) if hours else None,
+                "hourly_net": round(timed_net / hours / 100, 2) if hours else None}
 
     out = [{"source": n, "recent": figures(n, win), "year": figures(n, year0.isoformat())} for n in names]
     profit = sum(max(0, round(x["year"]["net"] * 100)) for x in out)
@@ -809,9 +852,11 @@ def _totals(conn: Connection, org: str, tz: str | None) -> tuple[int, int, list,
     for r in conn.execute(select(A).where(A.c.organization_id == org).order_by(A.c.name)):
         have.append({"id": r.id, "name": r.name, "value": r.value_cents / 100, "kind": "asset"})
     owe = [{"name": d["name"], "value": d["balance"], "kind": "debt"} for d in debt_list(conn, org)]
-    linked = {d["card_id"] for d in debt_list(conn, org) if d["card_id"]}
-    for c in credit(conn, org, tz)["cards"]:
-        if c["id"] not in linked and c["balance"]:
+    ds = debt_list(conn, org)
+    linked = {d["card_id"] for d in ds if d["card_id"]}
+    named = {d["name"].strip().lower() for d in ds if d["kind"] == "card"}
+    for c in credit(conn, org, tz)["cards"]:  # a card already entered as a debt (linked, or same name) counts once
+        if c["id"] not in linked and c["name"].strip().lower() not in named and c["balance"]:
             owe.append({"name": c["name"], "value": c["balance"], "kind": "card"})
     return (sum(round(x["value"] * 100) for x in have), sum(round(x["value"] * 100) for x in owe), have, owe)
 
@@ -924,6 +969,8 @@ def add_split(p: Principal, bid: str, person: str, share) -> dict:
     n = " ".join(str(person or "").split())[:40]
     if not n:
         raise PlusError("say who pays part")
+    if sum(ch.isdigit() for ch in n) >= 8:
+        raise PlusError("a first name is enough; leave numbers out")
     sid = db.new_id()
     with transaction() as conn:
         _row(conn, db.my_bills, p.organization_id, bid, "bill")

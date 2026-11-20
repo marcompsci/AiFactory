@@ -115,7 +115,7 @@ class ProcessSandbox:
             try:
                 soft, hard = resource.getrlimit(which)
                 cap = value if hard == resource.RLIM_INFINITY else min(value, hard)
-                resource.setrlimit(which, (cap, cap if hard == resource.RLIM_INFINITY else hard))
+                resource.setrlimit(which, (cap, cap))  # lowering the hard limit too, so the child can't raise it back
             except (ValueError, OSError):
                 pass
 

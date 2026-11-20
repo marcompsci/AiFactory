@@ -974,6 +974,10 @@ function MoneyMore() {
   const [eAmt, setEAmt] = useState(""); const [eCat, setECat] = useState("Groceries");
   const [aName, setAName] = useState(""); const [aBal, setABal] = useState("");
   const [dName, setDName] = useState(""); const [dBal, setDBal] = useState(""); const [dApr, setDApr] = useState(""); const [dMin, setDMin] = useState("");
+  const cards = useQuery({ queryKey: ["money", "credit"], queryFn: myTasks.credit });
+  const [dCard, setDCard] = useState("");
+  // "$1,200" → 1200; anything that isn't a number → null (never sent as 0)
+  const num = (v: string): number | null => { const n = Number(v.replace(/[$,\s]/g, "")); return v.trim() !== "" && Number.isFinite(n) ? n : null; };
   const input = "rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink";
   const pct = (x: number | null | undefined) => (x == null ? "—" : `${Math.round(x * 100)}%`);
   const h = "text-xs font-semibold text-ink-2";
@@ -1001,10 +1005,10 @@ function MoneyMore() {
         <h5 className={h}>Balances</h5>
         {(acc.data?.accounts ?? []).map((a: Json) => (
           <p key={a.id} className="text-xs">{a.name} ({a.kind}): {money(a.balance)}{a.as_of ? ` as of ${a.as_of}` : ""}{" "}
-            <button type="button" className="underline" onClick={() => { const v = window.prompt(`Balance today for ${a.name}`); if (v != null && v !== "" && !Number.isNaN(Number(v))) act.mutate(() => myTasks.checkIn(a.id, Number(v))); }}>update</button>{" "}
+            <button type="button" className="underline" onClick={() => { const v = window.prompt(`Balance today for ${a.name}`); const n = v == null ? null : num(v); if (n != null) act.mutate(() => myTasks.checkIn(a.id, n)); }}>update</button>{" "}
             <button type="button" className="text-ink-3" aria-label={`Delete ${a.name}`} onClick={() => act.mutate(() => myTasks.removeAccount(a.id))}>×</button></p>
         ))}
-        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (aName.trim()) { act.mutate(() => myTasks.addAccount(aName.trim(), "checking", aBal ? Number(aBal) : null)); setAName(""); setABal(""); } }}>
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (aName.trim()) { act.mutate(() => myTasks.addAccount(aName.trim(), "checking", num(aBal))); setAName(""); setABal(""); } }}>
           <input aria-label="Account nickname" value={aName} onChange={(e) => setAName(e.target.value)} placeholder="checking nickname" className={`w-36 ${input}`} />
           <input aria-label="Balance today" value={aBal} onChange={(e) => setABal(e.target.value)} placeholder="balance" inputMode="decimal" className={`w-24 ${input}`} />
           <Button type="submit" disabled={!aName.trim()}>Add account</Button>
@@ -1014,14 +1018,14 @@ function MoneyMore() {
         <h5 className={h}>Spending · {money(sp.data?.total)} this month{sp.data?.pace ? ` · on pace for ${money(sp.data.pace)}` : ""}</h5>
         {(sp.data?.categories ?? []).map((c: Json) => (
           <p key={c.category} className={`text-xs ${c.over ? "text-bad" : ""}`}>{c.category}: {money(c.spent)}{c.limit != null ? ` of ${money(c.limit)}` : ""}{" "}
-            <button type="button" className="underline" onClick={() => { const v = window.prompt(`Monthly limit for ${c.category} (empty for none)`); if (v != null) act.mutate(() => myTasks.setLimit(c.category, v === "" ? null : Number(v))); }}>limit</button></p>
+            <button type="button" className="underline" onClick={() => { const v = window.prompt(`Monthly limit for ${c.category} (empty for none)`); if (v == null) return; const n = num(v); if (v.trim() === "" || n != null) act.mutate(() => myTasks.setLimit(c.category, v.trim() === "" ? null : n)); }}>limit</button></p>
         ))}
-        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (Number(eAmt) > 0) { act.mutate(() => myTasks.logExpense(Number(eAmt), eCat)); setEAmt(""); } }}>
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); const n = num(eAmt); if (n != null && n > 0) { act.mutate(() => myTasks.logExpense(n, eCat)); setEAmt(""); } }}>
           <input aria-label="Amount spent" value={eAmt} onChange={(e) => setEAmt(e.target.value)} placeholder="amount" inputMode="decimal" className={`w-20 ${input}`} />
           <select aria-label="Category" value={eCat} onChange={(e) => setECat(e.target.value)} className={input}>
             {(sp.data?.suggested_categories ?? ["Groceries"]).map((c: string) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <Button type="submit" disabled={!(Number(eAmt) > 0)}>Log spending</Button>
+          <Button type="submit" disabled={!((num(eAmt) ?? 0) > 0)}>Log spending</Button>
         </form>
       </div>
       <div>
@@ -1038,12 +1042,18 @@ function MoneyMore() {
             <p className="text-xs text-ink-3">{p.note}</p>
           </>
         ) : null}
-        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (dName.trim() && dBal && dMin) { act.mutate(() => myTasks.addDebt({ name: dName.trim(), balance: Number(dBal), apr: Number(dApr || 0), min_payment: Number(dMin) })); setDName(""); setDBal(""); setDApr(""); setDMin(""); } }}>
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); const b = num(dBal), m = num(dMin); if (dName.trim() && b != null && m != null) { act.mutate(() => myTasks.addDebt({ name: dName.trim(), balance: b, apr: num(dApr) ?? 0, min_payment: m, card_id: dCard || null })); setDName(""); setDBal(""); setDApr(""); setDMin(""); setDCard(""); } }}>
           <input aria-label="Debt name" value={dName} onChange={(e) => setDName(e.target.value)} placeholder="name" className={`w-28 ${input}`} />
           <input aria-label="Balance owed" value={dBal} onChange={(e) => setDBal(e.target.value)} placeholder="balance" inputMode="decimal" className={`w-20 ${input}`} />
           <input aria-label="APR percent" value={dApr} onChange={(e) => setDApr(e.target.value)} placeholder="APR %" inputMode="decimal" className={`w-16 ${input}`} />
           <input aria-label="Minimum payment" value={dMin} onChange={(e) => setDMin(e.target.value)} placeholder="minimum" inputMode="decimal" className={`w-20 ${input}`} />
-          <Button type="submit" disabled={!dName.trim() || !dBal || !dMin}>Add debt</Button>
+          {cards.data?.cards?.length ? (
+            <select aria-label="Same as a card under Credit" value={dCard} onChange={(e) => setDCard(e.target.value)} className={input}>
+              <option value="">not one of my cards</option>
+              {cards.data.cards.map((c: Json) => <option key={c.id} value={c.id}>same as {c.name}</option>)}
+            </select>
+          ) : null}
+          <Button type="submit" disabled={!dName.trim() || num(dBal) == null || num(dMin) == null}>Add debt</Button>
         </form>
       </div>
       {pd.data?.cards?.length ? (

@@ -214,7 +214,8 @@ struct SafeToSpendIntent: AppIntent {
             guard s.ready, let per = s.perDay else { return .result(dialog: "\(s.reason ?? "Add a checking balance in AI Civ first.")") }
             let until = s.nextPayday != nil ? "until payday" : "until the end of the month"
             if s.short == true {
-                return .result(dialog: "Bills before payday are more than your balance, short by \((s.shortfall ?? 0).formatted(.currency(code: "USD"))). It's an estimate from what you entered.")
+                let why = s.warning ?? "After bills, spending and savings plans, you're short by \((s.shortfall ?? 0).formatted(.currency(code: "USD")))."
+                return .result(dialog: "\(why) It's an estimate from what you entered.")
             }
             return .result(dialog: "About \(per.formatted(.currency(code: "USD"))) a day for \(s.days) days \(until). It's an estimate from what you entered.")
         } catch {

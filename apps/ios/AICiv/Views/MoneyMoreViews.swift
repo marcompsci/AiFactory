@@ -55,7 +55,7 @@ struct MoneyMoreView: View {
             Section {
                 NavigationLink { EmergencyView() } label: { Label("Emergency fund", systemImage: "lifepreserver") }
                 NavigationLink { NetWorthView() } label: { Label("Net worth", systemImage: "chart.bar") }
-                NavigationLink { ReviewView() } label: { Label("Monthly review", systemImage: "calendar.badge.checkmark") }
+                NavigationLink { MoneyReviewView() } label: { Label("Monthly review", systemImage: "calendar.badge.checkmark") }
             } header: { Text("Progress") } footer: {
                 Text("Everything here is worked out from numbers you enter. Nothing is connected to a bank or moves money, and none of it is financial advice.")
             }
@@ -984,7 +984,7 @@ struct NetWorthView: View {
 
 // MARK: - V6.151 monthly review, V6.152 streak
 
-struct ReviewView: View {
+struct MoneyReviewView: View {
     @Environment(AppState.self) private var app
     @State private var s = Loader<MoneyReview>()
     @State private var monthOffset = 1  // 1 = last month

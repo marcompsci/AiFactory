@@ -218,3 +218,47 @@ def test_reads_need_member_and_writes_need_operator(client):
             assert "operator" in deps, r.path
         else:
             assert "member" in deps, r.path
+
+
+def test_review_fixes(client):
+    """V6.157 review: gig names ignoring case, hourly from timed entries, autopay not double counted, card + same-named
+    debt counted once, debts need a balance, minimums-only doesn't roll over, notes refuse account numbers, ICS folding."""
+    _clear()
+    client.patch("/api/money/settings", json={"tax_pct": 25, "gig_sources": ["Uber"]})
+    client.post("/api/money/income", json={"amount": 100, "source": "Uber", "hours": 2, "tz": LA})
+    client.post("/api/money/income", json={"amount": 100, "source": "Uber", "tz": LA})
+    client.post("/api/money/gigs/costs", json={"source": "uber", "amount": 10, "tz": LA})
+    g = client.get("/api/money/gigs", params={"tz": LA}).json()
+    assert len(g["gigs"]) == 1 and g["year_profit"] == 190 and g["tax_set_aside"] == 47.5
+    assert g["gigs"][0]["recent"]["hourly_gross"] == 50 and g["gigs"][0]["recent"]["hourly_net"] == 47.5
+    _clear()
+    assert client.post("/api/money/debts", json={"name": "No balance", "apr": 5}).status_code == 422
+    c = client.post("/api/money/credit/cards", json={"name": "Red card", "limit": 1000, "balance": 300}).json()
+    client.post("/api/money/debts", json={"name": "red card", "balance": 300, "apr": 20, "min_payment": 25})
+    nw = client.get("/api/money/net-worth", params={"tz": LA}).json()
+    assert nw["debts"] == 300
+    client.delete(f"/api/money/credit/cards/{c['id']}")
+    assert client.post("/api/money/spending", json={"amount": 5, "category": "Fun", "note": "card 4111 1111 1111 1111", "tz": LA}).status_code == 422
+    assert client.post("/api/money/spending", json={"amount": 5, "category": "ß" + "a" * 39, "tz": LA}).status_code == 201
+    d = [{"id": "a", "name": "A", "balance": 100, "apr": 0, "min_payment": 50},
+         {"id": "b", "name": "B", "balance": 1000, "apr": 0, "min_payment": 50}]
+    assert money2.simulate(d, 0, "avalanche", date(2026, 1, 1), rollover=False)["months"] == 20
+    assert money2.simulate(d, 0, "avalanche", date(2026, 1, 1))["months"] == 11
+    folded = money2._fold("SUMMARY:" + "x" * 200)
+    assert all(len(line.encode()) <= 75 for line in folded.split("\r\n"))
+
+
+def test_autopay_not_double_counted(client):
+    _clear()
+    t = _today()
+    a = client.post("/api/money/accounts", json={"name": "Main", "balance": 500, "tz": LA}).json()
+    due = t + timedelta(days=2)
+    client.post("/api/money/pay", json={"name": "Job", "cadence": "weekly", "anchor_day": (t + timedelta(days=5)).isoformat()})
+    b1 = client.post("/api/bills", json={"name": "Car", "amount": 400, "due_day": due.day, "autopay": True, "tz": LA}).json()
+    client.post("/api/bills", json={"name": "Phone", "amount": 400, "due_day": due.day, "autopay": True, "tz": LA})
+    bid = b1["id"] if "id" in b1 else b1["bill"]["id"]
+    client.put(f"/api/money/bills/{bid}/extras", json={"autopay_account_id": a["id"]})
+    ch = client.get("/api/money/bill-checks", params={"tz": LA}).json()
+    if due.month == t.month:
+        rest = next(x for x in ch["autopay"] if x["account_id"] is None)
+        assert rest["balance"] == 100 and rest["covered"] is False and rest["short_by"] == 300
