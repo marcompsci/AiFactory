@@ -1534,6 +1534,143 @@ credit_cards = Table(  # V6.120 balances and limits you type in (no bank connect
     Column("updated_at", String, nullable=False, default=utcnow),
 )
 
+# ---- V6.128–V6.157 money, round 2 (all typed in by you; nothing is connected and nothing moves money)
+expenses = Table(  # V6.129 money you spent
+    "expenses", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("amount_cents", Integer, nullable=False),
+    Column("category", String, nullable=False),
+    Column("day", String, nullable=False),
+    Column("note", String, nullable=False, default=""),
+    Column("created_by", String(36), nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+category_budgets = Table(  # V6.130 a monthly limit for a spending category
+    "category_budgets", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("category", String, nullable=False),
+    Column("limit_cents", Integer, nullable=False),
+    UniqueConstraint("organization_id", "category", name="category_budgets_once"),
+)
+
+cash_accounts = Table(  # V6.131 a checking or savings account, or cash, by nickname (no account numbers)
+    "cash_accounts", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("kind", String, nullable=False, default="checking"),   # checking | savings | cash
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+cash_balances = Table(  # V6.131 a balance you checked and typed in
+    "cash_balances", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("account_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("balance_cents", Integer, nullable=False),
+    Column("day", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+debts = Table(  # V6.134 a card or loan balance with its APR and minimum payment
+    "debts", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("kind", String, nullable=False, default="card"),       # card | loan | other
+    Column("balance_cents", Integer, nullable=False),
+    Column("apr", Float, nullable=False, default=0),
+    Column("min_payment_cents", Integer, nullable=False),
+    Column("card_id", String(36)),                                # the credit card it is, if any
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+bill_extras = Table(  # V6.141/V6.143 autopay account, late fee and grace days for a bill
+    "bill_extras", metadata,
+    Column("bill_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("autopay_account_id", String(36)),
+    Column("late_fee_cents", Integer),
+    Column("grace_days", Integer),
+)
+
+money_settings = Table(  # V6.144/V6.145/V6.149 your mileage rate, tax set-aside percent and emergency-fund goal
+    "money_settings", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("mileage_rate_cents", Integer),
+    Column("tax_pct", Float),
+    Column("emergency_goal_id", String(36)),
+    Column("gig_sources", String, nullable=False, default=""),   # income sources that are side gigs, one per line
+)
+
+gig_costs = Table(  # V6.144 a cost or miles for a side gig
+    "gig_costs", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("source", String, nullable=False),
+    Column("day", String, nullable=False),
+    Column("amount_cents", Integer, nullable=False, default=0),
+    Column("miles", Float, nullable=False, default=0),
+    Column("note", String, nullable=False, default=""),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+money_checks = Table(  # V6.146 checklist items you've done
+    "money_checks", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("key", String, primary_key=True),
+    Column("done_at", String, nullable=False),
+)
+
+cashback_entries = Table(  # V6.148 rewards you earned
+    "cashback_entries", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("card", String, nullable=False),
+    Column("amount_cents", Integer, nullable=False),
+    Column("day", String, nullable=False),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+assets = Table(  # V6.150 something you own, at a value you set
+    "assets", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("value_cents", Integer, nullable=False),
+    Column("updated_at", String, nullable=False, default=utcnow),
+)
+
+net_worth_snapshots = Table(  # V6.150
+    "net_worth_snapshots", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("day", String, nullable=False),
+    Column("assets_cents", Integer, nullable=False),
+    Column("debts_cents", Integer, nullable=False),
+    UniqueConstraint("organization_id", "day", name="net_worth_once_a_day"),
+)
+
+bill_splits = Table(  # V6.153 someone who pays part of a bill
+    "bill_splits", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("bill_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("person", String, nullable=False),
+    Column("share_cents", Integer, nullable=False),
+)
+
+split_receipts = Table(  # V6.153 they paid you their share for a period
+    "split_receipts", metadata,
+    Column("split_id", String(36), primary_key=True),
+    Column("period", String, primary_key=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("received_at", String, nullable=False),
+)
+
 list_styles = Table(  # V6.110 a color and an icon for a #list
     "list_styles", metadata,
     Column("organization_id", String(36), primary_key=True),

@@ -346,6 +346,7 @@ def remove_goal(p: Principal, gid: str) -> None:
         _row(conn, db.savings_goals, p.organization_id, gid, "goal")
         conn.execute(delete(db.savings_entries).where(db.savings_entries.c.goal_id == gid))
         conn.execute(delete(db.savings_goals).where(db.savings_goals.c.id == gid))
+        conn.execute(update(db.money_settings).where(db.money_settings.c.emergency_goal_id == gid).values(emergency_goal_id=None))
         _changed(conn, p.organization_id, "savings")
 
 
@@ -528,6 +529,7 @@ def remove_card(p: Principal, cid: str) -> None:
     with transaction() as conn:
         _row(conn, db.credit_cards, p.organization_id, cid, "card")
         conn.execute(delete(db.credit_cards).where(db.credit_cards.c.id == cid))
+        conn.execute(update(db.debts).where(db.debts.c.card_id == cid).values(card_id=None))
         _changed(conn, p.organization_id, "credit")
 
 
@@ -623,4 +625,14 @@ def overview(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
             "bills_due_soon_total": round(sum(b["amount"] or 0 for b in soon), 2),
             "income_this_week": inc["week_total"], "income_this_month": inc["month_total"],
             "next_payday": min(nxt) if nxt else None,
-            "savings": [{"name": x["name"], "progress": x["progress"], "saved": x["saved"], "target": x["target"]} for x in g][:3]}
+            "savings": [{"name": x["name"], "progress": x["progress"], "saved": x["saved"], "target": x["target"]} for x in g][:3],
+            **_round2(conn, org, tz)}
+
+
+def _round2(conn: Connection, org: str, tz: str | None) -> dict:
+    """V6.132/V6.152 on the Home card: spending money per day until payday (when you've entered a balance) and your
+    on-time streak."""
+    from . import money2
+    s = money2.safe_to_spend(conn, org, tz)
+    return {"safe_per_day": s.get("per_day") if s.get("ready") else None, "safe_short": bool(s.get("short")),
+            "on_time_streak": money2.streak(conn, org, tz)["current"]}

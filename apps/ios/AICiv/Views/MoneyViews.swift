@@ -22,7 +22,7 @@ private func isoDay(_ d: Date) -> String {
 
 struct MoneyView: View {
     enum Part: String, CaseIterable, Identifiable {
-        case plan = "Plan", income = "Income", savings = "Savings", subs = "Subscriptions", credit = "Credit"
+        case plan = "Plan", income = "Income", savings = "Savings", subs = "Subs", credit = "Credit", more = "More"
         var id: String { rawValue }
     }
     @State private var part: Part = .plan
@@ -37,8 +37,10 @@ struct MoneyView: View {
             case .savings: SavingsView()
             case .subs: SubscriptionsView()
             case .credit: CreditView()
+            case .more: MoneyMoreView()
             }
         }
+        .task { MonthlyReviewReminder.schedule() }
     }
 }
 
@@ -603,10 +605,19 @@ struct MoneyCard: View {
                             Text(usd(o.incomeThisWeek)).font(.headline.monospacedDigit())
                             Text("earned this week").font(.caption2).foregroundStyle(.secondary)
                         }
+                        if let safe = o.safePerDay {
+                            VStack(alignment: .leading) {
+                                Text(usd(safe)).font(.headline.monospacedDigit()).foregroundStyle(o.safeShort == true ? Theme.bad : Theme.ok)
+                                Text("safe a day").font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
                         VStack(alignment: .leading) {
                             Text(usd(o.billsDueSoonTotal)).font(.headline.monospacedDigit()).foregroundStyle(o.billsDueSoon.contains { $0.overdue } ? Theme.bad : Theme.ink)
                             Text("bills in 7 days").font(.caption2).foregroundStyle(.secondary)
                         }
+                    }
+                    if let st = o.onTimeStreak, st >= 2 {
+                        Label("\(st) bills paid on time in a row", systemImage: "flame.fill").font(.caption).foregroundStyle(Theme.gold)
                     }
                     ForEach(o.billsDueSoon.prefix(3)) { b in
                         Text("\(b.name) · \(b.overdue ? "past due" : shortDay(b.due)) · \(usd(b.amount))\(b.autopay ? " · autopay" : "")")

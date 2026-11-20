@@ -203,6 +203,48 @@ struct LogIncomeIntent: AppIntent {
     }
 }
 
+struct SafeToSpendIntent: AppIntent {
+    static var title: LocalizedStringResource = "How much is safe to spend"
+    static var description = IntentDescription("Spending money per day until payday, from the balance you last entered in AI Civ.")
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let api = await IntentAPI.client() else { return .result(dialog: "AI Civ isn't set up with a server yet.") }
+        do {
+            let s = try await api.safeToSpend()
+            guard s.ready, let per = s.perDay else { return .result(dialog: "\(s.reason ?? "Add a checking balance in AI Civ first.")") }
+            let until = s.nextPayday != nil ? "until payday" : "until the end of the month"
+            if s.short == true {
+                return .result(dialog: "Bills before payday are more than your balance, short by \((s.shortfall ?? 0).formatted(.currency(code: "USD"))). It's an estimate from what you entered.")
+            }
+            return .result(dialog: "About \(per.formatted(.currency(code: "USD"))) a day for \(s.days) days \(until). It's an estimate from what you entered.")
+        } catch {
+            return .result(dialog: "\(IntentAPI.problem(error))")
+        }
+    }
+}
+
+struct LogExpenseIntent: AppIntent {
+    static var title: LocalizedStringResource = "Log an expense"
+    static var description = IntentDescription("Records money you spent today in AI Civ.")
+
+    @Parameter(title: "Amount", requestValueDialog: "How much?")
+    var amount: Double
+    @Parameter(title: "Category", requestValueDialog: "What for? Groceries, gas, eating out…")
+    var category: String
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let api = await IntentAPI.client() else { return .result(dialog: "AI Civ isn't set up with a server yet.") }
+        do {
+            try await api.logExpense(amount: amount, category: category)
+            let left = (try? await api.spending()).flatMap { m in m.categories.first { $0.category.lowercased() == category.lowercased() }?.left }
+            let tail = left.map { $0 >= 0 ? " \($0.formatted(.currency(code: "USD"))) left in that category this month." : " That's over your limit for it this month." } ?? ""
+            return .result(dialog: "Logged \(amount.formatted(.currency(code: "USD"))) for \(category).\(tail)")
+        } catch {
+            return .result(dialog: "\(IntentAPI.problem(error))")
+        }
+    }
+}
+
 struct AICivShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AddTaskIntent(), phrases: ["Add a task in \(.applicationName)", "Add to my \(.applicationName) list"],
@@ -221,5 +263,9 @@ struct AICivShortcuts: AppShortcutsProvider {
                     shortTitle: "Mark a bill paid", systemImageName: "checkmark.seal")
         AppShortcut(intent: LogIncomeIntent(), phrases: ["Log income in \(.applicationName)"],
                     shortTitle: "Log income", systemImageName: "banknote")
+        AppShortcut(intent: SafeToSpendIntent(), phrases: ["How much can I spend in \(.applicationName)", "Safe to spend in \(.applicationName)"],
+                    shortTitle: "Safe to spend", systemImageName: "gauge.with.dots.needle.33percent")
+        AppShortcut(intent: LogExpenseIntent(), phrases: ["Log an expense in \(.applicationName)", "Log spending in \(.applicationName)"],
+                    shortTitle: "Log an expense", systemImageName: "cart")
     }
 }

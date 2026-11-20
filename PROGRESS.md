@@ -718,3 +718,46 @@ financial advice: utilization is a plain ratio with the general rule of thumb le
 
 Server: `services/management/money.py`, `services/api/money.py`, migration `0022_money.sql`, tests in
 `tests/integration/test_v713_v727.py`. New event: `money.changed`.
+
+## V6.128–V6.157: Money, round 2 (iPhone, web, server)
+
+Same rules: worked out from numbers you type in. Nothing is connected to a bank, nothing moves money, and nothing is
+financial, tax or credit advice. On the phone it's Money → More.
+
+- **V6.128 Mission runner fix.** On macOS with Python 3.14 the tool sandbox crashed setting a resource limit the OS
+  refuses; the crashed step stayed "Running" and the runner looped until "internal error in mission runner". Limits
+  the OS won't take are now skipped (the timeout and process kill still apply), an unexpected tool error fails the step
+  with its reason, a mission stops after 200 scheduling steps, and the page batches live refreshes (no 429 storm).
+- **V6.129 Spending log.** Amount and category; the month by category, entries and pace.
+- **V6.130 Category limits.** A monthly limit per category, with over-limit in red.
+- **V6.131 Account balances.** Checking, savings or cash by nickname (account numbers refused); type the balance in.
+- **V6.132 Safe to spend.** Per day until payday: balance − spending logged since − bills due before payday − savings plans.
+- **V6.133 Low-balance warning.** When bills before payday are more than you have.
+- **V6.134 Debts.** Balance, APR, minimum; monthly interest, and a flag when the minimum doesn't cover it.
+- **V6.135 Payoff plan.** Avalanche and snowball side by side: debt-free month, months and interest.
+- **V6.136 Extra payment what-if.** Interest and months saved by paying $X more.
+- **V6.137 Interest per card.** From a debt linked to a card.
+- **V6.138 Paydown targets.** What brings each card (and all of them) under 30% and 10%.
+- **V6.139 Before the statement.** Each card's next statement date with the target to pay before it.
+- **V6.140 Calendar.** A .ics file of the next 12 months of bills and paydays to add to Calendar.
+- **V6.141 Autopay coverage.** Autopay bills before payday against the account they come from.
+- **V6.142 Amount changes.** A bill whose paid amount moved 10% or more.
+- **V6.143 Late cost.** Late fee and grace days per bill; what's at stake for past-due bills.
+- **V6.144 Side gigs.** Costs and miles per gig, with hourly before and after costs (at the mileage rate you set).
+- **V6.145 Tax set-aside.** Your percent of this year's gig profit.
+- **V6.146 Unclaimed money.** A checklist of official free searches (state unclaimed property, IRS refunds, DOL
+  Retirement Savings Lost and Found, Treasury Hunt), plus "never pay a finder's fee".
+- **V6.147 Call script.** A script to ask a provider for a lower rate, filled from the bill. You make the call.
+- **V6.148 Cashback.** Rewards per card, this year.
+- **V6.149 Emergency fund.** Months of bills and spending your chosen goal covers.
+- **V6.150 Net worth.** Balances and assets you set minus debts and card balances; snapshots over time.
+- **V6.151 Monthly review.** Income, spending, bills on time, savings and net worth change; a reminder on the 1st.
+- **V6.152 On-time streak.** Bills paid on time in a row (and on the Home card).
+- **V6.153 Split bills.** Who pays part of a bill and whether they've paid you this period.
+- **V6.154 Paycheck split.** Your next paycheck as bills, savings and spending per day.
+- **V6.155 Website.** The same pieces under the Money panel, plus the calendar download.
+- **V6.156 Siri.** "How much can I spend" and "Log an expense".
+- **V6.157 Polish and checks.** Independent review, fixes, then the phone install.
+
+Server: `services/management/money2.py`, `services/api/money2.py`, migration `0023_money_more.sql`, tests in
+`tests/integration/test_v728_fix.py` and `tests/integration/test_v728_v757.py`.

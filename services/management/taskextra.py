@@ -353,6 +353,11 @@ def remove_bill(p: Principal, bid: str) -> None:
         r = _bill(conn, p.organization_id, bid)
         conn.execute(delete(db.my_bill_payments).where(db.my_bill_payments.c.bill_id == bid))
         conn.execute(delete(db.bill_meta).where(db.bill_meta.c.bill_id == bid))
+        conn.execute(delete(db.bill_extras).where(db.bill_extras.c.bill_id == bid))
+        sids = [x.id for x in conn.execute(select(db.bill_splits.c.id).where(db.bill_splits.c.bill_id == bid))]
+        if sids:
+            conn.execute(delete(db.split_receipts).where(db.split_receipts.c.split_id.in_(sids)))
+            conn.execute(delete(db.bill_splits).where(db.bill_splits.c.bill_id == bid))
         conn.execute(delete(db.my_bills).where(db.my_bills.c.id == bid))
         emit(conn, "bill.changed", org_id=p.organization_id, payload={"bill_id": bid, "name": r.name, "change": "removed"})
 

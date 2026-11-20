@@ -303,6 +303,38 @@ export const myTasks = {
   addCard: (fields: Json) => call<Json>("/api/money/credit/cards", post(fields)),
   editCard: (id: string, fields: Json) => call<Json>(`/api/money/credit/cards/${id}`, { method: "PATCH", body: JSON.stringify(fields) }),
   removeCard: (id: string) => call<Json>(`/api/money/credit/cards/${id}`, { method: "DELETE" }),
+  // V6.128–V6.157 money, round 2 (records what you type in; moves nothing)
+  spending: () => call<Json>(`/api/money/spending?tz=${encodeURIComponent(tz())}`),
+  logExpense: (amount: number, category: string) => call<Json>("/api/money/spending", post({ amount, category, tz: tz() })),
+  removeExpense: (id: string) => call<Json>(`/api/money/spending/${id}`, { method: "DELETE" }),
+  setLimit: (category: string, limit: number | null) => call<Json>("/api/money/spending/limits", { method: "PUT", body: JSON.stringify({ category, limit }) }),
+  accounts: () => call<{ accounts: Json[] }>("/api/money/accounts"),
+  addAccount: (name: string, kind: string, balance: number | null) => call<Json>("/api/money/accounts", post({ name, kind, balance, tz: tz() })),
+  checkIn: (id: string, balance: number) => call<Json>(`/api/money/accounts/${id}/balance`, post({ balance, tz: tz() })),
+  removeAccount: (id: string) => call<Json>(`/api/money/accounts/${id}`, { method: "DELETE" }),
+  safeToSpend: () => call<Json>(`/api/money/safe-to-spend?tz=${encodeURIComponent(tz())}`),
+  paycheckSplit: () => call<Json>(`/api/money/paycheck-split?tz=${encodeURIComponent(tz())}`),
+  debts: (extra: number) => call<Json>(`/api/money/debts?${new URLSearchParams({ tz: tz(), extra: String(extra) })}`),
+  addDebt: (fields: Json) => call<Json>("/api/money/debts", post(fields)),
+  removeDebt: (id: string) => call<Json>(`/api/money/debts/${id}`, { method: "DELETE" }),
+  paydown: () => call<Json>(`/api/money/paydown?tz=${encodeURIComponent(tz())}`),
+  billChecks: () => call<Json>(`/api/money/bill-checks?tz=${encodeURIComponent(tz())}`),
+  gigs: () => call<Json>(`/api/money/gigs?tz=${encodeURIComponent(tz())}`),
+  cashback: () => call<Json>(`/api/money/cashback?tz=${encodeURIComponent(tz())}`),
+  logCashback: (card: string, amount: number) => call<Json>("/api/money/cashback", post({ card, amount, tz: tz() })),
+  checklist: () => call<Json>("/api/money/checklist"),
+  checkItem: (key: string, done: boolean) => call<Json>(`/api/money/checklist/${key}`, { method: "PUT", body: JSON.stringify({ done }) }),
+  emergency: () => call<Json>(`/api/money/emergency?tz=${encodeURIComponent(tz())}`),
+  netWorth: () => call<Json>(`/api/money/net-worth?tz=${encodeURIComponent(tz())}`),
+  snapshotNetWorth: () => call<Json>(`/api/money/net-worth/snapshot?tz=${encodeURIComponent(tz())}`, post()),
+  moneyReview: () => call<Json>(`/api/money/review?tz=${encodeURIComponent(tz())}`),
+  calendarFile: async () => {
+    const { apiUrl, token } = loadConnection();
+    const res = await fetch(apiUrl.replace(/\/$/, "") + `/api/money/calendar.ics?tz=${encodeURIComponent(tz())}`,
+      { headers: token ? { authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) throw new Error(`Calendar failed (${res.status})`);
+    return res.blob();
+  },
   // V6.98–V6.112
   dump: (text: string, format = "lines", dryRun = true) => call<Json>("/api/my-tasks/dump", post({ text, format, tz: tz(), dry_run: dryRun })),
   promote: (id: string, item: string) => call<Json>(`/api/my-tasks/${id}/items/${item}/promote`, post()),

@@ -10,7 +10,7 @@ struct APIError: LocalizedError {
 final class APIClient {
     let baseURL: URL
     let token: String?
-    private let session: URLSession
+    let session: URLSession
 
     static let decoder: JSONDecoder = {
         let d = JSONDecoder()

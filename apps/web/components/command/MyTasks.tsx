@@ -385,7 +385,7 @@ function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
   if (tool === "review") return <Review refresh={refresh} />;
   if (tool === "habits") return <Habits />;
   if (tool === "fit") return <Fit />;
-  if (tool === "money") return <Money />;
+  if (tool === "money") return <><Money /><MoneyMore /></>;
   if (tool === "eod") return <EndOfDay refresh={refresh} />;
   if (tool === "goals") return <Goals />;
   if (tool === "bills") return <Bills />;
@@ -949,6 +949,162 @@ function Money() {
         {cr.data ? <p className="text-xs text-ink-3">{cr.data.note}</p> : null}
       </div>
       <p className="text-xs text-ink-3">Everything here comes from what you enter. AI Civ isn't connected to a bank and never moves money.</p>
+    </div>
+  );
+}
+
+/** V6.128–V6.157: safe to spend, spending limits, balances, debts and payoff, paydown targets, bill checks, gigs,
+ * cashback, emergency fund, net worth, the monthly review and the unclaimed-money checklist. From what you type in. */
+function MoneyMore() {
+  const qc = useQueryClient();
+  const [extra, setExtra] = useState(0);
+  const safe = useQuery({ queryKey: ["money", "safe"], queryFn: myTasks.safeToSpend });
+  const split = useQuery({ queryKey: ["money", "split"], queryFn: myTasks.paycheckSplit });
+  const sp = useQuery({ queryKey: ["money", "spending"], queryFn: myTasks.spending });
+  const acc = useQuery({ queryKey: ["money", "accounts"], queryFn: myTasks.accounts });
+  const debts = useQuery({ queryKey: ["money", "debts", extra], queryFn: () => myTasks.debts(extra) });
+  const pd = useQuery({ queryKey: ["money", "paydown"], queryFn: myTasks.paydown });
+  const checks = useQuery({ queryKey: ["money", "checks"], queryFn: myTasks.billChecks });
+  const gigs = useQuery({ queryKey: ["money", "gigs"], queryFn: myTasks.gigs });
+  const emer = useQuery({ queryKey: ["money", "emergency"], queryFn: myTasks.emergency });
+  const nw = useQuery({ queryKey: ["money", "networth"], queryFn: myTasks.netWorth });
+  const rev = useQuery({ queryKey: ["money", "review"], queryFn: myTasks.moneyReview });
+  const cl = useQuery({ queryKey: ["money", "checklist"], queryFn: myTasks.checklist });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["money"] }) });
+  const [eAmt, setEAmt] = useState(""); const [eCat, setECat] = useState("Groceries");
+  const [aName, setAName] = useState(""); const [aBal, setABal] = useState("");
+  const [dName, setDName] = useState(""); const [dBal, setDBal] = useState(""); const [dApr, setDApr] = useState(""); const [dMin, setDMin] = useState("");
+  const input = "rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink";
+  const pct = (x: number | null | undefined) => (x == null ? "—" : `${Math.round(x * 100)}%`);
+  const h = "text-xs font-semibold text-ink-2";
+  const s = safe.data; const p = debts.data?.payoff;
+  const run = (r: Json | undefined, label: string) => r ? (
+    <p className="text-xs">{label}: {r.never ? <span className="text-bad">not paid off at this payment</span> : `debt-free ${r.finishes} · ${r.months} months · about ${money(r.interest)} interest`}</p>
+  ) : null;
+  const download = async () => {
+    const blob = await myTasks.calendarFile();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "bills-and-paydays.ics"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={act.error} />
+      <div>
+        <h5 className={h}>Safe to spend</h5>
+        {s?.ready ? (
+          <p className="text-xs"><b className={s.short ? "text-bad" : "text-[#5BF2A5]"}>{money(s.per_day)} a day</b> for {s.days} days{s.next_payday ? ` until payday ${s.next_payday}` : ""} · balance {money(s.balance)} − spent since {money(s.spent_since)} − bills {money(s.bills_total)} − savings {money(s.savings_set_aside)}{s.balance_age_days >= 3 ? ` · balance is ${s.balance_age_days} days old` : ""}</p>
+        ) : <p className="text-xs text-ink-3">{s?.reason}</p>}
+        {s?.warning ? <p className="text-xs text-bad">{s.warning}</p> : null}
+        {split.data?.ready ? <p className="text-xs">Paycheck split ({split.data.from} → {split.data.to}): {money(split.data.pay)} = bills {money(split.data.bills)} + savings {money(split.data.savings)} + spending {money(split.data.spending)} ({money(split.data.per_day)}/day)</p> : null}
+      </div>
+      <div>
+        <h5 className={h}>Balances</h5>
+        {(acc.data?.accounts ?? []).map((a: Json) => (
+          <p key={a.id} className="text-xs">{a.name} ({a.kind}): {money(a.balance)}{a.as_of ? ` as of ${a.as_of}` : ""}{" "}
+            <button type="button" className="underline" onClick={() => { const v = window.prompt(`Balance today for ${a.name}`); if (v != null && v !== "" && !Number.isNaN(Number(v))) act.mutate(() => myTasks.checkIn(a.id, Number(v))); }}>update</button>{" "}
+            <button type="button" className="text-ink-3" aria-label={`Delete ${a.name}`} onClick={() => act.mutate(() => myTasks.removeAccount(a.id))}>×</button></p>
+        ))}
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (aName.trim()) { act.mutate(() => myTasks.addAccount(aName.trim(), "checking", aBal ? Number(aBal) : null)); setAName(""); setABal(""); } }}>
+          <input aria-label="Account nickname" value={aName} onChange={(e) => setAName(e.target.value)} placeholder="checking nickname" className={`w-36 ${input}`} />
+          <input aria-label="Balance today" value={aBal} onChange={(e) => setABal(e.target.value)} placeholder="balance" inputMode="decimal" className={`w-24 ${input}`} />
+          <Button type="submit" disabled={!aName.trim()}>Add account</Button>
+        </form>
+      </div>
+      <div>
+        <h5 className={h}>Spending · {money(sp.data?.total)} this month{sp.data?.pace ? ` · on pace for ${money(sp.data.pace)}` : ""}</h5>
+        {(sp.data?.categories ?? []).map((c: Json) => (
+          <p key={c.category} className={`text-xs ${c.over ? "text-bad" : ""}`}>{c.category}: {money(c.spent)}{c.limit != null ? ` of ${money(c.limit)}` : ""}{" "}
+            <button type="button" className="underline" onClick={() => { const v = window.prompt(`Monthly limit for ${c.category} (empty for none)`); if (v != null) act.mutate(() => myTasks.setLimit(c.category, v === "" ? null : Number(v))); }}>limit</button></p>
+        ))}
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (Number(eAmt) > 0) { act.mutate(() => myTasks.logExpense(Number(eAmt), eCat)); setEAmt(""); } }}>
+          <input aria-label="Amount spent" value={eAmt} onChange={(e) => setEAmt(e.target.value)} placeholder="amount" inputMode="decimal" className={`w-20 ${input}`} />
+          <select aria-label="Category" value={eCat} onChange={(e) => setECat(e.target.value)} className={input}>
+            {(sp.data?.suggested_categories ?? ["Groceries"]).map((c: string) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <Button type="submit" disabled={!(Number(eAmt) > 0)}>Log spending</Button>
+        </form>
+      </div>
+      <div>
+        <h5 className={h}>Debts{p?.total ? ` · ${money(p.total)}` : ""}</h5>
+        {(debts.data?.debts ?? []).map((d: Json) => (
+          <p key={d.id} className={`text-xs ${d.min_covers_interest ? "" : "text-bad"}`}>{d.name}: {money(d.balance)} at {d.apr}% · min {money(d.min_payment)} · ~{money(d.monthly_interest)}/mo interest{" "}
+            <button type="button" className="text-ink-3" aria-label={`Delete ${d.name}`} onClick={() => act.mutate(() => myTasks.removeDebt(d.id))}>×</button></p>
+        ))}
+        {p?.debts ? (
+          <>
+            <label className="text-xs">Extra a month: <input aria-label="Extra each month" type="number" min={0} step={25} value={extra} onChange={(e) => setExtra(Math.max(0, Number(e.target.value) || 0))} className={`w-20 ${input}`} /></label>
+            {run(p.avalanche, "Avalanche (highest APR first)")}{run(p.snowball, "Snowball (smallest first)")}{run(p.minimums_only, "Minimums only")}
+            {extra > 0 && p.interest_saved_by_extra != null ? <p className="text-xs text-[#5BF2A5]">The extra saves about {money(p.interest_saved_by_extra)} of interest.</p> : null}
+            <p className="text-xs text-ink-3">{p.note}</p>
+          </>
+        ) : null}
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (dName.trim() && dBal && dMin) { act.mutate(() => myTasks.addDebt({ name: dName.trim(), balance: Number(dBal), apr: Number(dApr || 0), min_payment: Number(dMin) })); setDName(""); setDBal(""); setDApr(""); setDMin(""); } }}>
+          <input aria-label="Debt name" value={dName} onChange={(e) => setDName(e.target.value)} placeholder="name" className={`w-28 ${input}`} />
+          <input aria-label="Balance owed" value={dBal} onChange={(e) => setDBal(e.target.value)} placeholder="balance" inputMode="decimal" className={`w-20 ${input}`} />
+          <input aria-label="APR percent" value={dApr} onChange={(e) => setDApr(e.target.value)} placeholder="APR %" inputMode="decimal" className={`w-16 ${input}`} />
+          <input aria-label="Minimum payment" value={dMin} onChange={(e) => setDMin(e.target.value)} placeholder="minimum" inputMode="decimal" className={`w-20 ${input}`} />
+          <Button type="submit" disabled={!dName.trim() || !dBal || !dMin}>Add debt</Button>
+        </form>
+      </div>
+      {pd.data?.cards?.length ? (
+        <div>
+          <h5 className={h}>Card paydown targets · {pct(pd.data.utilization)} overall</h5>
+          {pd.data.cards.map((c: Json) => (
+            <p key={c.id} className="text-xs">{c.name}: pay {money(c.pay_to_30)} for under 30%, {money(c.pay_to_10)} for under 10%{c.next_statement ? ` · before ${c.next_statement}` : ""}</p>
+          ))}
+          <p className="text-xs text-ink-3">{pd.data.note}</p>
+        </div>
+      ) : null}
+      {checks.data ? (
+        <div>
+          <h5 className={h}>Bill checks</h5>
+          {checks.data.autopay.map((c: Json) => (
+            <p key={c.account_id ?? "all"} className={`text-xs ${c.covered === false ? "text-bad" : ""}`}>Autopay from {c.account} before {checks.data.next_payday}: {money(c.needed)}{c.covered === false ? ` · short ${money(c.short_by)}` : c.covered ? " · covered" : ""}</p>
+          ))}
+          {checks.data.amount_changes.map((c: Json) => <p key={c.bill_id} className="text-xs">{c.name} went from {money(c.before)} to {money(c.last)}</p>)}
+          {checks.data.late.map((l: Json) => <p key={l.bill_id} className="text-xs text-bad">{l.name} is {l.days_late} days past due{l.late_fee != null ? ` · late fee ${money(l.late_fee)}` : ""}</p>)}
+          <button type="button" className="text-xs underline" onClick={() => act.mutate(async () => { await download(); return {}; })}>Download bills and paydays (.ics)</button>
+        </div>
+      ) : null}
+      {gigs.data?.gigs?.length ? (
+        <div>
+          <h5 className={h}>Side gigs · last {gigs.data.days} days</h5>
+          {gigs.data.gigs.map((g: Json) => (
+            <p key={g.source} className="text-xs">{g.source}: earned {money(g.recent.earned)}, kept {money(g.recent.net)}{g.recent.hourly_net != null ? ` · ${money(g.recent.hourly_net)}/hr after costs` : ""}</p>
+          ))}
+          {gigs.data.tax_set_aside != null ? <p className="text-xs">Tax set-aside: {money(gigs.data.tax_set_aside)} ({gigs.data.tax_pct}% of {money(gigs.data.year_profit)} gig profit this year)</p> : null}
+          <p className="text-xs text-ink-3">{gigs.data.note}</p>
+        </div>
+      ) : null}
+      {emer.data?.goal_id ? (
+        <p className="text-xs"><b>Emergency fund:</b> {emer.data.months_covered ?? "—"} months covered ({money(emer.data.saved)} of {money(emer.data.monthly_need)} a month)</p>
+      ) : null}
+      {nw.data ? (
+        <div>
+          <h5 className={h}>Net worth · <span className={nw.data.net < 0 ? "text-bad" : "text-[#5BF2A5]"}>{money(nw.data.net)}</span></h5>
+          <p className="text-xs">{money(nw.data.assets)} owned − {money(nw.data.debts)} owed{nw.data.snapshots.length ? ` · ${nw.data.snapshots.length} snapshots` : ""}{" "}
+            <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.snapshotNetWorth())}>save today's snapshot</button></p>
+        </div>
+      ) : null}
+      {rev.data ? (
+        <div>
+          <h5 className={h}>{rev.data.month} review · {rev.data.streak.current} bills on time in a row</h5>
+          {rev.data.highlights.length ? rev.data.highlights.map((x: string) => <p key={x} className="text-xs">{x}</p>) : <p className="text-xs text-ink-3">Nothing logged that month.</p>}
+        </div>
+      ) : null}
+      {cl.data ? (
+        <div>
+          <h5 className={h}>Find unclaimed money</h5>
+          {cl.data.items.map((i: Json) => (
+            <label key={i.key} className="flex items-start gap-1 text-xs">
+              <input type="checkbox" checked={!!i.done_at} onChange={(e) => act.mutate(() => myTasks.checkItem(i.key, e.target.checked))} />
+              <span>{i.title}{i.url ? <> · <a className="underline" href={i.url} target="_blank" rel="noopener noreferrer">{new URL(i.url).host}</a></> : null}</span>
+            </label>
+          ))}
+          <p className="text-xs text-ink-3">{cl.data.note}</p>
+        </div>
+      ) : null}
+      <p className="text-xs text-ink-3">Estimates from the numbers you enter, not financial, tax or credit advice. Nothing here moves money.</p>
     </div>
   );
 }

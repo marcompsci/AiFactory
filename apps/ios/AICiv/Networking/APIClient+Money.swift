@@ -115,6 +115,9 @@ struct MoneyOverview: Decodable, Hashable {
     let incomeThisMonth: Double
     let nextPayday: String?
     let savings: [Goal]
+    var safePerDay: Double? = nil      // V6.132
+    var safeShort: Bool? = nil
+    var onTimeStreak: Int? = nil       // V6.152
 }
 
 struct BillHint: Decodable, Hashable { let name: String; let amount: Double?; let dueDay: Int?; let cadence: String; var dueMonth: Int? = nil }
