@@ -761,3 +761,45 @@ financial, tax or credit advice. On the phone it's Money → More.
 
 Server: `services/management/money2.py`, `services/api/money2.py`, migration `0023_money_more.sql`, tests in
 `tests/integration/test_v728_fix.py` and `tests/integration/test_v728_v757.py`.
+
+## V6.158–V6.187: Money, round 3 — the assistant (iPhone, web, server)
+
+Same rules: from numbers you type in; nothing is connected to a bank, nothing moves money, nothing is advice. On the
+phone: Money → More (Assistant, Paying on time, Credit, Earn and keep more, Your data).
+
+- **V6.158 Paste a bill.** Paste a bill email or text; it finds the biller, amount, due date and autopay. Nothing saved
+  until you add it; account numbers ignored.
+- **V6.159 Move a due date.** Bills due in the 4 days before a payday, a better day to ask for, and what to say.
+- **V6.160 Past-due nudges.** A morning reminder for up to a week while a bill is past due and not marked paid.
+- **V6.161 Confirmation numbers.** Saved with each payment (card numbers refused).
+- **V6.162 Bill history.** Up to 24 payments: amount, day, on time or late; average and range.
+- **V6.163 30-day forecast.** Balance day by day: paydays in, bills and average spending out.
+- **V6.164 Low points.** The lowest day, days below zero and days under a $100 buffer.
+- **V6.165 Free credit reports.** When you last checked each bureau (free weekly at AnnualCreditReport.com).
+- **V6.166 Disputes.** Errors you disputed, with a follow-up after about 30 days.
+- **V6.167 Freezes.** Which bureaus you've frozen (you do it on their sites; free).
+- **V6.168 Credit habits.** Common habits checked against your own numbers (not a score).
+- **V6.169 Utilization history.** Overall utilization over time from your card updates.
+- **V6.170 Card payments as bills.** A card's payment becomes a bill with reminders and an on-time record.
+- **V6.171 Income goal.** Progress, per day for the rest of the month, and about how many hours at your rate.
+- **V6.172 Best earning days.** Per hour by weekday over the last 90 days, per income source.
+- **V6.173 Money you've saved.** One-time and monthly wins, totalled for the year.
+- **V6.174 Things to sell.** Listed, asking price, sold price.
+- **V6.175 Money owed to you.** Who, how much, expected by, received.
+- **V6.176 Round-ups.** What rounding each logged purchase up to the dollar would come to (move it yourself).
+- **V6.177 No-spend days.** Mark days; this month and in a row; flags marked days with spending logged.
+- **V6.178 Set-asides.** Per month for each yearly bill, and a savings goal for it in one tap.
+- **V6.179 This week.** Bills, safe to spend, income goal, owed to you and top to-dos; a Sunday 6pm reminder.
+- **V6.180 What to do next.** One ranked list from everything (past due, short before payday, autopay, stale balance,
+  card statements, disputes, reports, owed, subscriptions, price jumps, due-date moves, setup).
+- **V6.181 Can I afford it?** Fits, tight or short, with per day before and after and the lowest forecast day.
+- **V6.182 Goal projections.** At your pace, the month each savings goal is reached, against its deadline.
+- **V6.183 Export.** All your money data as JSON.
+- **V6.184 Face ID lock.** Optional lock on Money; locks again when the app goes to the background.
+- **V6.185 Setup checklist.** Eight steps that make the rest useful.
+- **V6.186 Website.** The same pieces on the Money panel.
+- **V6.187 Shortcuts and checks.** "Can I afford it?" in the Shortcuts app (Siri's 10 app phrases are full), an
+  independent review, fixes, then the phone install.
+
+Server: `services/management/money3.py`, `services/api/money3.py`, migration `0024_money_assistant.sql`, tests in
+`tests/integration/test_v758_v787.py`.

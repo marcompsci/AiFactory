@@ -354,6 +354,8 @@ def remove_bill(p: Principal, bid: str) -> None:
         conn.execute(delete(db.my_bill_payments).where(db.my_bill_payments.c.bill_id == bid))
         conn.execute(delete(db.bill_meta).where(db.bill_meta.c.bill_id == bid))
         conn.execute(delete(db.bill_extras).where(db.bill_extras.c.bill_id == bid))
+        conn.execute(delete(db.payment_notes).where(db.payment_notes.c.bill_id == bid))
+        conn.execute(delete(db.card_bills).where(db.card_bills.c.bill_id == bid))
         sids = [x.id for x in conn.execute(select(db.bill_splits.c.id).where(db.bill_splits.c.bill_id == bid))]
         if sids:
             conn.execute(delete(db.split_receipts).where(db.split_receipts.c.split_id.in_(sids)))
@@ -400,6 +402,7 @@ def unmark_paid(p: Principal, bid: str, period: str, tz: str | None = "UTC") -> 
         r = _bill(conn, p.organization_id, bid)
         gone = conn.execute(delete(db.my_bill_payments).where(db.my_bill_payments.c.bill_id == bid,
                                                            db.my_bill_payments.c.period == period)).rowcount
+        conn.execute(delete(db.payment_notes).where(db.payment_notes.c.bill_id == bid, db.payment_notes.c.period == period))
         if not gone:
             raise PlusError("that period wasn't marked paid", 404)
         emit(conn, "bill.changed", org_id=p.organization_id, payload={"bill_id": bid, "name": r.name, "change": "unpaid", "period": period})

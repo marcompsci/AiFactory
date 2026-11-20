@@ -312,6 +312,16 @@ enum BillReminders {
             guard at > now else { continue }
             wanted.append(("\(prefix)\(b.id)-\(b.period)-\(b.autopay ? "a" : "\(b.remindDays)")", b, at))
         }
+        // V6.160: while a bill is past due and not marked paid, a nudge each morning for up to a week
+        for b in bills where b.active && b.overdue {
+            for k in 0..<7 {
+                guard let day = cal.date(byAdding: .day, value: k, to: now),
+                      let ten = cal.date(bySettingHour: 10, minute: 0, second: 0, of: day) else { continue }
+                let at = QuietHours.adjust(ten)
+                guard at > now else { continue }
+                wanted.append(("\(prefix)\(b.id)-\(b.period)-late\(cal.ordinality(of: .day, in: .era, for: at) ?? k)", b, at))
+            }
+        }
         let center = UNUserNotificationCenter.current()
         center.getPendingNotificationRequests { pending in
             let have = Set(pending.map(\.identifier).filter { $0.hasPrefix(prefix) })
@@ -319,8 +329,9 @@ enum BillReminders {
             center.removePendingNotificationRequests(withIdentifiers: Array(have.subtracting(want)))
             for (id, b, at) in wanted where !have.contains(id) {
                 let c = UNMutableNotificationContent()
-                c.title = b.autopay ? "\(b.name) autopays today" : "\(b.name) is due \(b.remindDays == 0 ? "today" : b.remindDays == 1 ? "tomorrow" : "in \(b.remindDays) days")"
-                c.body = b.autopay ? "Check that it went through (\(b.amountText))." : "\(b.amountText). Pay it where you usually do, then mark it paid in AI Civ."
+                let late = id.contains("-late")
+                c.title = late ? "\(b.name) is past due" : b.autopay ? "\(b.name) autopays today" : "\(b.name) is due \(b.remindDays == 0 ? "today" : b.remindDays == 1 ? "tomorrow" : "in \(b.remindDays) days")"
+                c.body = late ? "\(b.amountText). Paying soon limits late fees. Already paid? Mark it paid in AI Civ to stop these." : b.autopay ? "Check that it went through (\(b.amountText))." : "\(b.amountText). Pay it where you usually do, then mark it paid in AI Civ."
                 c.sound = .default
                 c.threadIdentifier = "bills"
                 let parts = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: at)

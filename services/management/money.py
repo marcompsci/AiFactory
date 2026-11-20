@@ -521,14 +521,20 @@ def save_card(p: Principal, cid: str | None, fields: dict) -> dict:
         else:
             _row(conn, C, p.organization_id, cid, "card")
             conn.execute(update(C).where(C.c.id == cid).values(**vals))
+        r = conn.execute(select(C).where(C.c.id == cid)).first()
+        if "balance_cents" in vals or "limit_cents" in vals or fields.get("balance") is not None:
+            from .money3 import record_card  # V6.169 utilization history
+            record_card(conn, p.organization_id, cid, r.balance_cents, r.limit_cents, _today(fields.get("tz") or "UTC"))
         _changed(conn, p.organization_id, "credit")
-        return _card_view(conn.execute(select(C).where(C.c.id == cid)).first())
+        return _card_view(r)
 
 
 def remove_card(p: Principal, cid: str) -> None:
     with transaction() as conn:
         _row(conn, db.credit_cards, p.organization_id, cid, "card")
         conn.execute(delete(db.credit_cards).where(db.credit_cards.c.id == cid))
+        conn.execute(delete(db.card_history).where(db.card_history.c.card_id == cid))
+        conn.execute(delete(db.card_bills).where(db.card_bills.c.card_id == cid))
         conn.execute(update(db.debts).where(db.debts.c.card_id == cid).values(card_id=None))
         _changed(conn, p.organization_id, "credit")
 

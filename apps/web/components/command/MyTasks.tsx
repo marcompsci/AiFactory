@@ -385,7 +385,7 @@ function TaskTools({ tool, refresh }: { tool: string; refresh: () => void }) {
   if (tool === "review") return <Review refresh={refresh} />;
   if (tool === "habits") return <Habits />;
   if (tool === "fit") return <Fit />;
-  if (tool === "money") return <><Money /><MoneyMore /></>;
+  if (tool === "money") return <><MoneyAssistant /><Money /><MoneyMore /></>;
   if (tool === "eod") return <EndOfDay refresh={refresh} />;
   if (tool === "goals") return <Goals />;
   if (tool === "bills") return <Bills />;
@@ -1115,6 +1115,154 @@ function MoneyMore() {
         </div>
       ) : null}
       <p className="text-xs text-ink-3">Estimates from the numbers you enter, not financial, tax or credit advice. Nothing here moves money.</p>
+    </div>
+  );
+}
+
+/** V6.158–V6.187: what to do next, can I afford it, the forecast, paste a bill, credit watch, income goal, wins,
+ * money owed to you, set-asides, no-spend days and setup. From what you type in; nothing moves money. */
+function MoneyAssistant() {
+  const qc = useQueryClient();
+  const todos = useQuery({ queryKey: ["money", "todos"], queryFn: myTasks.moneyTodos });
+  const fc = useQuery({ queryKey: ["money", "forecast"], queryFn: myTasks.forecast });
+  const cw = useQuery({ queryKey: ["money", "creditwatch"], queryFn: myTasks.creditWatch });
+  const ig = useQuery({ queryKey: ["money", "incomegoal"], queryFn: myTasks.incomeGoal });
+  const bd = useQuery({ queryKey: ["money", "bestdays"], queryFn: myTasks.bestDays });
+  const wins = useQuery({ queryKey: ["money", "wins"], queryFn: myTasks.wins });
+  const owed = useQuery({ queryKey: ["money", "owed"], queryFn: myTasks.owed });
+  const sa = useQuery({ queryKey: ["money", "setasides"], queryFn: myTasks.setAsides });
+  const ns = useQuery({ queryKey: ["money", "nospend"], queryFn: myTasks.noSpend });
+  const ru = useQuery({ queryKey: ["money", "roundups"], queryFn: myTasks.roundUps });
+  const setup = useQuery({ queryKey: ["money", "setup"], queryFn: myTasks.moneySetup });
+  const moves = useQuery({ queryKey: ["money", "moves"], queryFn: myTasks.dueDateMoves });
+  const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["money"] }) });
+  const num = (v: string): number | null => { const n = Number(v.replace(/[$,\s]/g, "")); return v.trim() !== "" && Number.isFinite(n) ? n : null; };
+  const [price, setPrice] = useState(""); const [afford, setAfford] = useState<Json | null>(null);
+  const [paste, setPaste] = useState(""); const [parsed, setParsed] = useState<Json | null>(null);
+  const [dBureau, setDBureau] = useState("equifax"); const [dItem, setDItem] = useState("");
+  const [goal, setGoal] = useState(""); const [wTitle, setWTitle] = useState(""); const [wAmt, setWAmt] = useState(""); const [wMonthly, setWMonthly] = useState(false);
+  const [oWho, setOWho] = useState(""); const [oAmt, setOAmt] = useState("");
+  const input = "rounded-md border border-line bg-ground/60 px-2 py-1 text-xs text-ink";
+  const h = "text-xs font-semibold text-ink-2";
+  const f = fc.data;
+  const exportFile = async () => {
+    const data = await myTasks.moneyExport();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    a.download = "money-export.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  return (
+    <div className="mb-3 space-y-3 rounded-lg border border-line p-2 text-sm">
+      <ErrorNote error={act.error} />
+      {setup.data && setup.data.done < setup.data.total ? (
+        <p className="text-xs">Setup {setup.data.done}/{setup.data.total}: next, {setup.data.steps.find((x: Json) => !x.done)?.title.toLowerCase()}.</p>
+      ) : null}
+      <div>
+        <h5 className={h}>What to do next</h5>
+        {(todos.data?.items ?? []).length ? (todos.data?.items ?? []).slice(0, 8).map((t: Json) => (
+          <p key={t.key} className={`text-xs ${t.rank === 0 ? "text-bad" : ""}`}><b>{t.title}</b> · {t.detail}</p>
+        )) : <p className="text-xs text-[#5BF2A5]">Nothing needs you right now.</p>}
+      </div>
+      <div>
+        <h5 className={h}>Can I afford it?</h5>
+        <form className="flex flex-wrap gap-1" onSubmit={async (e) => { e.preventDefault(); const n = num(price); if (n && n > 0) setAfford(await myTasks.afford(n)); }}>
+          <input aria-label="Price" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="price" inputMode="decimal" className={`w-24 ${input}`} />
+          <Button type="submit" disabled={!((num(price) ?? 0) > 0)}>Check</Button>
+        </form>
+        {afford ? <p className={`text-xs ${afford.verdict === "short" ? "text-bad" : afford.verdict === "tight" ? "text-[#FFBD69]" : "text-[#5BF2A5]"}`}>{afford.ready ? afford.why : afford.reason}</p> : null}
+      </div>
+      {f?.ready ? (
+        <div>
+          <h5 className={h}>30-day forecast · lowest {money(f.low.balance)} on {f.low.day}</h5>
+          <svg viewBox={`0 0 ${f.days.length * 4} 40`} className="h-10 w-full" role="img" aria-label="Projected balance over 30 days">
+            {(() => { const vals = f.days.map((d: Json) => d.balance as number); const lo = Math.min(0, ...vals), hi = Math.max(1, ...vals);
+              const y = (v: number) => 38 - ((v - lo) / (hi - lo)) * 36;
+              return <><line x1={0} x2={f.days.length * 4} y1={y(0)} y2={y(0)} stroke="#FF6178" strokeOpacity={0.4} />
+                <polyline fill="none" stroke="#5BF2A5" strokeWidth={1.5} points={vals.map((v: number, i: number) => `${i * 4},${y(v)}`).join(" ")} /></>; })()}
+          </svg>
+          {f.below_zero.length ? <p className="text-xs text-bad">Below zero on {f.below_zero.length} day(s), first {f.below_zero[0]}.</p> : null}
+          <p className="text-xs text-ink-3">{f.note}</p>
+        </div>
+      ) : null}
+      <div>
+        <h5 className={h}>Paste a bill</h5>
+        <textarea aria-label="Bill email or text" value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} className={`w-full ${input}`} placeholder="Paste the bill's email or text (not saved)" />
+        <Button type="button" disabled={!paste.trim()} onClick={async () => setParsed(await myTasks.parseBill(paste))}>Read it</Button>
+        {parsed ? (
+          <p className="text-xs">{parsed.name} · {parsed.amount != null ? money(parsed.amount) : "amount not found"} · {parsed.due_date ? `due ${parsed.due_date}` : "due date not found"}{parsed.autopay ? " · autopay" : ""}{" "}
+            {parsed.due_day ? <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.addBill({ name: parsed.name, amount: parsed.amount, due_day: parsed.due_day, autopay: parsed.autopay, cadence: "monthly" }))}>add this bill</button> : null}</p>
+        ) : null}
+      </div>
+      {moves.data?.moves?.length ? (
+        <div>
+          <h5 className={h}>Due dates right before payday</h5>
+          {moves.data.moves.map((m: Json) => <p key={m.bill_id} className="text-xs">{m.name}: due the {m.due_day}, payday {m.payday}. Ask for the {m.suggested_due_day}. <span className="text-ink-3">"{m.script}"</span></p>)}
+        </div>
+      ) : null}
+      {cw.data ? (
+        <div>
+          <h5 className={h}>Credit watch</h5>
+          {cw.data.bureaus.map((b: Json) => (
+            <p key={b.bureau} className="text-xs capitalize">{b.bureau}: {b.checked_at ? `report checked ${b.days_since}d ago` : "report not checked"}{b.frozen ? " · frozen" : ""}{" "}
+              <button type="button" className="underline normal-case" onClick={() => act.mutate(() => myTasks.markBureau("report", b.bureau, true))}>checked today</button>{" "}
+              <button type="button" className="underline normal-case" onClick={() => act.mutate(() => myTasks.markBureau("freeze", b.bureau, !b.frozen))}>{b.frozen ? "unfrozen" : "frozen"}</button></p>
+          ))}
+          {cw.data.disputes.map((d: Json) => (
+            <p key={d.id} className={`text-xs ${d.follow_up_due ? "text-[#FFBD69]" : ""}`}>{d.bureau}: {d.item} · {d.status}{d.follow_up_due ? " · follow up" : ""}{" "}
+              {d.status === "open" ? <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.updateDispute(d.id, "fixed"))}>fixed</button> : null}</p>
+          ))}
+          <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); if (dItem.trim()) { act.mutate(() => myTasks.addDispute(dBureau, dItem.trim())); setDItem(""); } }}>
+            <select aria-label="Bureau" value={dBureau} onChange={(e) => setDBureau(e.target.value)} className={input}>
+              {["equifax", "experian", "transunion", "other"].map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <input aria-label="What's wrong" value={dItem} onChange={(e) => setDItem(e.target.value)} placeholder="what's wrong (no account numbers)" className={`w-52 ${input}`} />
+            <Button type="submit" disabled={!dItem.trim()}>Add dispute</Button>
+          </form>
+          <p className="text-xs text-ink-3">{cw.data.note} <a className="underline" href={cw.data.reports_url} target="_blank" rel="noopener noreferrer">Free reports</a> · <a className="underline" href={cw.data.freeze_url} target="_blank" rel="noopener noreferrer">Freezes</a></p>
+        </div>
+      ) : null}
+      <div>
+        <h5 className={h}>Income goal{ig.data?.goal ? ` · ${money(ig.data.earned)} of ${money(ig.data.goal)}` : ""}</h5>
+        {ig.data?.goal && !ig.data.reached ? <p className="text-xs">{money(ig.data.left)} to go: {money(ig.data.per_day)} a day for {ig.data.days_left} days{ig.data.hours_needed ? `, about ${ig.data.hours_needed} hours` : ""}.</p> : null}
+        {bd.data?.best?.length ? <p className="text-xs">Best per hour lately: {bd.data.best.join(" and ")}.</p> : null}
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); act.mutate(() => myTasks.setIncomeGoal(num(goal))); }}>
+          <input aria-label="Monthly income goal" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="monthly goal" inputMode="decimal" className={`w-24 ${input}`} />
+          <Button type="submit">Set goal</Button>
+        </form>
+      </div>
+      <div>
+        <h5 className={h}>Money you've saved · {money(wins.data?.this_year)} this year</h5>
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); const n = num(wAmt); if (wTitle.trim() && n && n > 0) { act.mutate(() => myTasks.addWin(wTitle.trim(), n, wMonthly)); setWTitle(""); setWAmt(""); } }}>
+          <input aria-label="What you saved" value={wTitle} onChange={(e) => setWTitle(e.target.value)} placeholder="lowered internet…" className={`w-36 ${input}`} />
+          <input aria-label="Amount saved" value={wAmt} onChange={(e) => setWAmt(e.target.value)} placeholder="amount" inputMode="decimal" className={`w-20 ${input}`} />
+          <label className="text-xs"><input type="checkbox" checked={wMonthly} onChange={(e) => setWMonthly(e.target.checked)} /> monthly</label>
+          <Button type="submit" disabled={!wTitle.trim() || !((num(wAmt) ?? 0) > 0)}>Add win</Button>
+        </form>
+      </div>
+      <div>
+        <h5 className={h}>Owed to you · {money(owed.data?.outstanding)}</h5>
+        {(owed.data?.items ?? []).filter((o: Json) => !o.received_on).map((o: Json) => (
+          <p key={o.id} className={`text-xs ${o.late ? "text-[#FFBD69]" : ""}`}>{o.who}: {money(o.amount)}{o.why ? ` (${o.why})` : ""}{" "}
+            <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.markOwed(o.id, true))}>got it</button></p>
+        ))}
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); const n = num(oAmt); if (oWho.trim() && n && n > 0) { act.mutate(() => myTasks.addOwed(oWho.trim(), n)); setOWho(""); setOAmt(""); } }}>
+          <input aria-label="Who owes you" value={oWho} onChange={(e) => setOWho(e.target.value)} placeholder="who" className={`w-28 ${input}`} />
+          <input aria-label="Amount owed" value={oAmt} onChange={(e) => setOAmt(e.target.value)} placeholder="amount" inputMode="decimal" className={`w-20 ${input}`} />
+          <Button type="submit" disabled={!oWho.trim() || !((num(oAmt) ?? 0) > 0)}>Add</Button>
+        </form>
+      </div>
+      {sa.data?.funds?.length ? (
+        <div>
+          <h5 className={h}>Set-asides for yearly bills · {money(sa.data.per_month_total)} a month</h5>
+          {sa.data.funds.map((x: Json) => <p key={x.bill_id} className="text-xs">{x.name}: {money(x.per_month)}/mo until {x.due}{" "}
+            <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.setAsideGoal(x.bill_id))}>make a goal</button></p>)}
+        </div>
+      ) : null}
+      <p className="text-xs">
+        <label><input type="checkbox" checked={!!ns.data?.today} onChange={(e) => act.mutate(() => myTasks.setNoSpend(e.target.checked))} /> No-spend day today</label>
+        {ns.data ? ` · ${ns.data.this_month} this month · ${ns.data.streak} in a row` : ""}
+        {ru.data?.round_ups ? ` · round-ups this month ${money(ru.data.round_ups)}` : ""}
+      </p>
+      <button type="button" className="text-xs underline" onClick={() => act.mutate(async () => { await exportFile(); return {}; })}>Export your money data (JSON)</button>
     </div>
   );
 }

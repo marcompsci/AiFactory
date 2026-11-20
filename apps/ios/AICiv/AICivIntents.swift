@@ -246,6 +246,26 @@ struct LogExpenseIntent: AppIntent {
     }
 }
 
+/// V6.187: in the Shortcuts app (Siri's list of app phrases is full at 10), so it isn't in AICivShortcuts.
+struct CanIAffordIntent: AppIntent {
+    static var title: LocalizedStringResource = "Can I afford it?"
+    static var description = IntentDescription("Checks a price against what's safe to spend before payday in AI Civ.")
+
+    @Parameter(title: "Price", requestValueDialog: "How much is it?")
+    var amount: Double
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let api = await IntentAPI.client() else { return .result(dialog: "AI Civ isn't set up with a server yet.") }
+        do {
+            let r = try await api.afford(amount)
+            guard r.ready else { return .result(dialog: "\(r.reason ?? "Add a checking balance in AI Civ first.")") }
+            return .result(dialog: "\(r.why ?? "") It's an estimate from what you entered; the call is yours.")
+        } catch {
+            return .result(dialog: "\(IntentAPI.problem(error))")
+        }
+    }
+}
+
 struct AICivShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: AddTaskIntent(), phrases: ["Add a task in \(.applicationName)", "Add to my \(.applicationName) list"],

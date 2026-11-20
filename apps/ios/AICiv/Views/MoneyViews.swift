@@ -28,6 +28,10 @@ struct MoneyView: View {
     @State private var part: Part = .plan
 
     var body: some View {
+        MoneyLockGate { content }
+    }
+
+    private var content: some View {
         VStack(spacing: 0) {
             Picker("Section", selection: $part) { ForEach(Part.allCases) { Text($0.rawValue).tag($0) } }
                 .pickerStyle(.segmented).padding(.horizontal).padding(.vertical, 6)
@@ -40,7 +44,7 @@ struct MoneyView: View {
             case .more: MoneyMoreView()
             }
         }
-        .task { MonthlyReviewReminder.schedule() }
+        .task { MonthlyReviewReminder.schedule(); WeeklyCheckInReminder.schedule() }
     }
 }
 

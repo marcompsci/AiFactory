@@ -35,6 +35,7 @@ private func num(_ s: String) -> Double? { Double(s.replacingOccurrences(of: ","
 struct MoneyMoreView: View {
     var body: some View {
         List {
+            MoneyAssistantSections()
             Section {
                 NavigationLink { SafeToSpendView() } label: { Label("Safe to spend", systemImage: "gauge.with.dots.needle.33percent") }
                 NavigationLink { SpendingView() } label: { Label("Spending and limits", systemImage: "cart") }
@@ -490,6 +491,7 @@ struct BillChecksView: View {
     @State private var accounts: [CashAccount] = []
     @State private var editing: Bill?
     @State private var scriptFor: Bill?
+    @State private var historyFor: Bill?
 
     var body: some View {
         List {
@@ -544,6 +546,7 @@ struct BillChecksView: View {
                             Menu {
                                 Button("Late fee and autopay") { editing = b }
                                 Button("Script to lower this bill") { scriptFor = b }
+                                Button("Payment history") { historyFor = b }
                             } label: { Image(systemName: "ellipsis.circle").accessibilityLabel("Options for \(b.name)") }
                         }
                     }
@@ -553,6 +556,7 @@ struct BillChecksView: View {
         .navigationTitle("Bill checks")
         .sheet(item: $editing) { b in BillExtrasEditor(bill: b, accounts: accounts, extra: s.value?.extras[b.id]) { await load() }.presentationDetents([.medium]) }
         .sheet(item: $scriptFor) { b in CallScriptView(bill: b).presentationDetents([.large]) }
+        .sheet(item: $historyFor) { b in NavigationStack { BillHistoryView(bill: b) }.presentationDetents([.large]) }
         .task { await load() }
         .refreshable { await load() }
     }

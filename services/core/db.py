@@ -1671,6 +1671,91 @@ split_receipts = Table(  # V6.153 they paid you their share for a period
     Column("received_at", String, nullable=False),
 )
 
+# ---- V6.158–V6.187 money, round 3 (typed in by you; nothing is connected and nothing moves money)
+payment_notes = Table(  # V6.161 a confirmation number and how you paid, for a period you marked paid
+    "payment_notes", metadata,
+    Column("bill_id", String(36), primary_key=True),
+    Column("period", String, primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("confirmation", String, nullable=False, default=""),
+    Column("method", String, nullable=False, default=""),
+)
+
+credit_disputes = Table(  # V6.166 an error you disputed with a credit bureau
+    "credit_disputes", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("bureau", String, nullable=False),          # equifax | experian | transunion | other
+    Column("item", String, nullable=False),
+    Column("sent_on", String, nullable=False),
+    Column("status", String, nullable=False, default="open"),   # open | fixed | denied
+    Column("note", String, nullable=False, default=""),
+    Column("closed_on", String),
+)
+
+card_history = Table(  # V6.169 a card's balance and limit each time you updated it
+    "card_history", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("card_id", String(36), nullable=False, index=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("balance_cents", Integer, nullable=False),
+    Column("limit_cents", Integer, nullable=False),
+    Column("day", String, nullable=False),
+)
+
+card_bills = Table(  # V6.170 the bill that's a card's monthly payment
+    "card_bills", metadata,
+    Column("card_id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("bill_id", String(36), nullable=False),
+)
+
+money_targets = Table(  # V6.171 your monthly income goal
+    "money_targets", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("monthly_income_cents", Integer),
+)
+
+money_wins = Table(  # V6.173 money you saved by lowering a bill, cancelling, a refund…
+    "money_wins", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("title", String, nullable=False),
+    Column("amount_cents", Integer, nullable=False),
+    Column("monthly", Integer, nullable=False, default=0),   # 1: saves this much every month
+    Column("day", String, nullable=False),
+)
+
+sell_items = Table(  # V6.174 things you're selling
+    "sell_items", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("name", String, nullable=False),
+    Column("asking_cents", Integer),
+    Column("sold_cents", Integer),
+    Column("where_listed", String, nullable=False, default=""),
+    Column("listed_on", String, nullable=False),
+    Column("sold_on", String),
+)
+
+owed_to_me = Table(  # V6.175 money someone owes you (a loan to a friend, a refund, a reimbursement)
+    "owed_to_me", metadata,
+    Column("id", String(36), primary_key=True),
+    Column("organization_id", String(36), nullable=False, index=True),
+    Column("who", String, nullable=False),
+    Column("amount_cents", Integer, nullable=False),
+    Column("why", String, nullable=False, default=""),
+    Column("expected_on", String),
+    Column("received_on", String),
+    Column("created_at", String, nullable=False, default=utcnow),
+)
+
+no_spend_days = Table(  # V6.177 days you marked as no-spend
+    "no_spend_days", metadata,
+    Column("organization_id", String(36), primary_key=True),
+    Column("day", String, primary_key=True),
+)
+
 list_styles = Table(  # V6.110 a color and an icon for a #list
     "list_styles", metadata,
     Column("organization_id", String(36), primary_key=True),
