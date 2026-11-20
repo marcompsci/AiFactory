@@ -1137,7 +1137,8 @@ function MoneyAssistant() {
   const moves = useQuery({ queryKey: ["money", "moves"], queryFn: myTasks.dueDateMoves });
   const act = useMutation({ mutationFn: (f: () => Promise<Json>) => f(), onSuccess: () => qc.invalidateQueries({ queryKey: ["money"] }) });
   const num = (v: string): number | null => { const n = Number(v.replace(/[$,\s]/g, "")); return v.trim() !== "" && Number.isFinite(n) ? n : null; };
-  const [price, setPrice] = useState(""); const [afford, setAfford] = useState<Json | null>(null);
+  const [price, setPrice] = useState(""); const [afford, setAfford] = useState<Json | null>(null); const [oops, setOops] = useState<unknown>(null);
+  const tryIt = async (f: () => Promise<void>) => { try { setOops(null); await f(); } catch (e) { setOops(e); } };
   const [paste, setPaste] = useState(""); const [parsed, setParsed] = useState<Json | null>(null);
   const [dBureau, setDBureau] = useState("equifax"); const [dItem, setDItem] = useState("");
   const [goal, setGoal] = useState(""); const [wTitle, setWTitle] = useState(""); const [wAmt, setWAmt] = useState(""); const [wMonthly, setWMonthly] = useState(false);
@@ -1152,7 +1153,7 @@ function MoneyAssistant() {
   };
   return (
     <div className="mb-3 space-y-3 rounded-lg border border-line p-2 text-sm">
-      <ErrorNote error={act.error} />
+      <ErrorNote error={act.error ?? oops} />
       {setup.data && setup.data.done < setup.data.total ? (
         <p className="text-xs">Setup {setup.data.done}/{setup.data.total}: next, {setup.data.steps.find((x: Json) => !x.done)?.title.toLowerCase()}.</p>
       ) : null}
@@ -1164,7 +1165,7 @@ function MoneyAssistant() {
       </div>
       <div>
         <h5 className={h}>Can I afford it?</h5>
-        <form className="flex flex-wrap gap-1" onSubmit={async (e) => { e.preventDefault(); const n = num(price); if (n && n > 0) setAfford(await myTasks.afford(n)); }}>
+        <form className="flex flex-wrap gap-1" onSubmit={(e) => { e.preventDefault(); const n = num(price); if (n && n > 0) void tryIt(async () => setAfford(await myTasks.afford(n))); }}>
           <input aria-label="Price" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="price" inputMode="decimal" className={`w-24 ${input}`} />
           <Button type="submit" disabled={!((num(price) ?? 0) > 0)}>Check</Button>
         </form>
@@ -1186,10 +1187,10 @@ function MoneyAssistant() {
       <div>
         <h5 className={h}>Paste a bill</h5>
         <textarea aria-label="Bill email or text" value={paste} onChange={(e) => setPaste(e.target.value)} rows={3} className={`w-full ${input}`} placeholder="Paste the bill's email or text (not saved)" />
-        <Button type="button" disabled={!paste.trim()} onClick={async () => setParsed(await myTasks.parseBill(paste))}>Read it</Button>
+        <Button type="button" disabled={!paste.trim()} onClick={() => void tryIt(async () => setParsed(await myTasks.parseBill(paste)))}>Read it</Button>
         {parsed ? (
-          <p className="text-xs">{parsed.name} · {parsed.amount != null ? money(parsed.amount) : "amount not found"} · {parsed.due_date ? `due ${parsed.due_date}` : "due date not found"}{parsed.autopay ? " · autopay" : ""}{" "}
-            {parsed.due_day ? <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.addBill({ name: parsed.name, amount: parsed.amount, due_day: parsed.due_day, autopay: parsed.autopay, cadence: "monthly" }))}>add this bill</button> : null}</p>
+          <p className="text-xs">{parsed.name}{parsed.cadence === "yearly" ? " (yearly)" : ""} · {parsed.amount != null ? money(parsed.amount) : "amount not found"} · {parsed.due_date ? `due ${parsed.due_date}` : "due date not found"}{parsed.autopay ? " · autopay" : ""}{" "}
+            {parsed.due_day ? <button type="button" className="underline" onClick={() => act.mutate(() => myTasks.addBill({ name: parsed.name, amount: parsed.amount, due_day: parsed.due_day, autopay: parsed.autopay, cadence: parsed.cadence, due_month: parsed.cadence === "yearly" ? parsed.due_month : null }))}>add this bill</button> : null}</p>
         ) : null}
       </div>
       {moves.data?.moves?.length ? (

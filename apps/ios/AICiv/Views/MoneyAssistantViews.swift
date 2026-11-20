@@ -226,6 +226,8 @@ struct PasteBillView: View {
     @State private var amount = ""
     @State private var dueDay = 1
     @State private var autopay = false
+    @State private var cadence = "monthly"
+    @State private var dueMonth = 1
     @State private var added = false
     @State private var error: String?
 
@@ -246,7 +248,8 @@ struct PasteBillView: View {
                     TextField("Amount (empty if it varies)", text: $amount).keyboardType(.decimalPad)
                     Stepper("Due on the \(dueDay)\(suffix(dueDay))", value: $dueDay, in: 1...31)
                     Toggle("Autopay", isOn: $autopay)
-                    if p.cadence == "yearly" { Text("Looks yearly. Add yearly bills from Bills with their month.").font(.caption).foregroundStyle(Theme.gold) }
+                    Picker("How often", selection: $cadence) { Text("Monthly").tag("monthly"); Text("Yearly").tag("yearly") }
+                    if cadence == "yearly" { Stepper("In \(Calendar.current.monthSymbols[dueMonth - 1])", value: $dueMonth, in: 1...12) }
                     Button(added ? "Added" : "Add this bill") { Task { await add() } }.disabled(added || name.trimmingCharacters(in: .whitespaces).isEmpty)
                 } header: { Text("Check before adding") } footer: { Text(p.note) }
             }
@@ -260,16 +263,18 @@ struct PasteBillView: View {
         guard let api = app.api else { return }
         do {
             let p = try await api.parseBill(text)
-            parsed = p; name = p.name; amount = p.amount.map { String(format: "%.2f", $0) } ?? ""; dueDay = p.dueDay ?? 1; autopay = p.autopay; added = false; error = nil
+            parsed = p; name = p.name; amount = p.amount.map { String(format: "%.2f", $0) } ?? ""; dueDay = p.dueDay ?? 1; autopay = p.autopay
+            cadence = p.cadence; dueMonth = p.dueMonth ?? Calendar.current.component(.month, from: .now); added = false; error = nil
         } catch { self.error = oops(error) }
     }
 
     private func add() async {
         guard let api = app.api else { return }
         do {
-            let f: [String: JSONValue] = ["name": .string(name.trimmingCharacters(in: .whitespaces)), "due_day": .number(Double(dueDay)),
-                                          "autopay": .bool(autopay), "cadence": .string("monthly"), "tz": .string(TimeZone.current.identifier),
+            var f: [String: JSONValue] = ["name": .string(name.trimmingCharacters(in: .whitespaces)), "due_day": .number(Double(dueDay)),
+                                          "autopay": .bool(autopay), "cadence": .string(cadence), "tz": .string(TimeZone.current.identifier),
                                           "amount": num(amount).map { .number($0) } ?? .null]
+            if cadence == "yearly" { f["due_month"] = .number(Double(dueMonth)) }
             _ = try await api.json("/api/bills", method: "POST", body: f)
             added = true
             Haptics.success()
@@ -548,9 +553,14 @@ struct CreditHabitsView: View {
                 Section("Utilization over time") {
                     Chart(h.points) { p in
                         LineMark(x: .value("Day", p.day), y: .value("Used", p.utilization)).foregroundStyle(Theme.gold)
-                        RuleMark(y: .value("30%", 0.3)).foregroundStyle(.secondary.opacity(0.5))
+                        RuleMark(y: .value("30%", 0.3)).foregroundStyle(Color.secondary.opacity(0.5))
                     }
-                    .chartYAxis { AxisMarks(format: .percent) }
+                    .chartYAxis {
+                        AxisMarks { value in
+                            AxisGridLine()
+                            AxisValueLabel { if let d = value.as(Double.self) { Text("\(Int((d * 100).rounded()))%") } }
+                        }
+                    }
                     .chartXAxis(.hidden)
                     .frame(height: 150).accessibilityLabel("Overall utilization over time")
                 }
@@ -926,10 +936,13 @@ struct MoneyLockGate<Content: View>: View {
                     Button("Unlock") { Task { await unlock() } }.buttonStyle(.borderedProminent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .task { await unlock() }
+                .task { if phase == .active { await unlock() } }
             }
         }
-        .onChange(of: phase) { if phase == .background { open = false } }
+        .onChange(of: phase) {
+            if phase == .background { open = false }
+            if phase == .active && locked && !open { Task { await unlock() } }
+        }
     }
 
     private func unlock() async {

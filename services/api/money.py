@@ -169,6 +169,7 @@ class CardIn(BaseModel):
     limit: float | None = Field(default=None, gt=0, le=1_000_000)
     balance: float | None = Field(default=None, ge=0, le=1_000_000)
     statement_day: int | None = Field(default=None, ge=1, le=31)
+    tz: str | None = Field(default=None, max_length=64)
 
 
 @router.get("/credit")

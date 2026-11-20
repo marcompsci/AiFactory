@@ -204,6 +204,7 @@ struct LogIncomeIntent: AppIntent {
 }
 
 struct SafeToSpendIntent: AppIntent {
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication  // money: only on an unlocked phone
     static var title: LocalizedStringResource = "How much is safe to spend"
     static var description = IntentDescription("Spending money per day until payday, from the balance you last entered in AI Civ.")
 
@@ -248,6 +249,7 @@ struct LogExpenseIntent: AppIntent {
 
 /// V6.187: in the Shortcuts app (Siri's list of app phrases is full at 10), so it isn't in AICivShortcuts.
 struct CanIAffordIntent: AppIntent {
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication  // money: only on an unlocked phone
     static var title: LocalizedStringResource = "Can I afford it?"
     static var description = IntentDescription("Checks a price against what's safe to spend before payday in AI Civ.")
 

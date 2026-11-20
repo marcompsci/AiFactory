@@ -40,23 +40,24 @@ def _luhn(digits: str) -> bool:
     return total % 10 == 0
 
 
-def _no_card_number(text: str, what: str) -> str:
+def _no_card_number(text: str, what: str, strict: bool = True) -> str:
     """Refuse text that holds what looks like a card number (13–19 digits that pass the card checksum) or a long run
-    of digits such as an account number."""
+    of digits such as an account number. Not strict (confirmation numbers, which are often long): only a 15–16 digit
+    number that passes the checksum, the length of nearly all cards."""
     for m in re.finditer(r"(?:\d[ -]?){13,19}", text):
         d = re.sub(r"\D", "", m.group())
-        if 13 <= len(d) <= 19 and _luhn(d):
+        if (13 <= len(d) <= 19 if strict else 15 <= len(d) <= 16) and _luhn(d):
             raise PlusError(f"that looks like a card number; leave it out of the {what}")
-    if re.search(r"\d{17,}", re.sub(r"[ -]", "", text)):
+    if strict and re.search(r"\d{17,}", re.sub(r"[ -]", "", text)):
         raise PlusError(f"leave account numbers out of the {what}")
     return text
 
 
-def _text(v, n: int, what: str, required: bool = False) -> str:
+def _text(v, n: int, what: str, required: bool = False, strict: bool = True) -> str:
     s = " ".join(str(v or "").split())[:n]
     if required and not s:
         raise PlusError(f"enter the {what}")
-    return _no_card_number(s, what)
+    return _no_card_number(s, what, strict)
 
 
 # ---------------------------------------------------------------- V6.158 paste a bill
@@ -88,10 +89,16 @@ def _dates(text: str, today: date) -> list[tuple[int, date]]:
                     if yy:
                         y = int(yy) + (2000 if len(yy) == 2 else 0)
                         d = date(y, mo, dd)
-                    else:
-                        d = date(today.year, mo, dd)
-                        if d < today - timedelta(days=15):
-                            d = date(today.year + 1, mo, dd)
+                    else:  # no year: the nearest one to today (Dec 31 read on Jan 3 is last year's)
+                        cands = []
+                        for y in (today.year - 1, today.year, today.year + 1):
+                            try:
+                                cands.append(date(y, mo, dd))
+                            except ValueError:
+                                pass
+                        if not cands:
+                            continue
+                        d = min(cands, key=lambda c: abs((c - today).days))
             except (ValueError, StopIteration):
                 continue
             out.append((m.start(), d))
@@ -106,14 +113,20 @@ def parse_bill(text: str, tz: str | None = "UTC") -> dict:
         raise PlusError("paste the bill's email or text")
     today = _today(tz)
     low = raw.lower()
-    amounts = [(m.start(), float(m.group(1).replace(",", ""))) for m in re.finditer(r"\$\s?(\d{1,6}(?:,\d{3})*(?:\.\d{2})?)", raw)]
-    key_rx = re.compile(r"(amount due|total due|balance due|payment due|minimum payment|amount|total|balance|due)")
-    keys = [m.start() for m in key_rx.finditer(low)]
+    amounts = [(m.start(), float(m.group(1).replace(",", ""))) for m in re.finditer(r"\$\s?(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d{1,7}(?:\.\d{2})?)", raw)]
+    strong = re.compile(r"(amount due|total due|total amount due|balance due|new balance|statement balance|minimum payment due|payment due|amount of|payment of|will be charged|will be debited|you owe)")
+    weak = re.compile(r"(due|total|amount|balance|pay)")
+    skip = re.compile(r"(previous balance|last payment|payment received|thank you for your payment|credit|past due amount|last month|prior)")
 
-    def near(pos: int) -> int:
-        return min((abs(pos - k) for k in keys), default=10_000)
+    def score(pos: int) -> int:
+        before = low[max(0, pos - 45):pos]  # only the words before the amount, on its own line
+        before = before.rsplit("\n", 1)[-1]
+        if skip.search(before):
+            return 9
+        return 0 if strong.search(before) else 1 if weak.search(before) else 2
 
-    amount = min(amounts, key=lambda a: (near(a[0]), a[0]))[1] if amounts else None
+    ranked = sorted(amounts, key=lambda a: (score(a[0]), a[0]))
+    amount = ranked[0][1] if ranked and score(ranked[0][0]) < 9 else None
     due_keys = [m.start() for m in re.finditer(r"\bdue\b|\bpay by\b|\bpayment date\b|\bwill be (?:charged|debited|drafted)", low)]
     ds = _dates(raw, today)
     due = None
@@ -130,9 +143,13 @@ def parse_bill(text: str, tz: str | None = "UTC") -> dict:
     if not name:
         first = next((ln.strip() for ln in raw.splitlines() if ln.strip()), "Bill")
         name = re.sub(r"(?i)\b(re|fwd?|subject):\s*", "", first)[:40]
-    name = re.sub(r"\d{6,}", "", name).strip(" -:,.") or "Bill"
+    # no account or card numbers in the name: cut at "account", "acct", "ending in", "#", then drop digit runs
+    name = re.split(r"(?i)\b(?:account|acct|card ending|ending in|ending|no\.|number)\b|#", name)[0]
+    name = re.sub(r"(?:\d[ -]?){4,}", "", name)
+    name = " ".join(name.split()).strip(" -:,.") or "Bill"
     autopay = bool(re.search(r"auto ?pay|automatic payment|will be (?:automatically )?(?:charged|debited|drafted)|auto-?draft", low))
-    yearly = bool(re.search(r"\b(annual|yearly|per year|12[- ]month)\b", low))
+    plain = re.sub(r"annual percentage rate|annual fee|\bapr\b|annual(?:ized)? interest", " ", low)
+    yearly = bool(re.search(r"\b(annual premium|annual renewal|renews? (?:annually|yearly|every year)|per year|yearly|annually|12[- ]month (?:policy|plan|term))\b", plain))
     return {"name": name[:60], "amount": amount, "due_date": due.isoformat() if due else None,
             "due_day": due.day if due else None, "due_month": due.month if due and yearly else None,
             "cadence": "yearly" if yearly else "monthly", "autopay": autopay,
@@ -149,7 +166,7 @@ def due_date_moves(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     scheds = schedules(conn, org, tz)
     if not scheds:
         return {"ready": False, "reason": "Add when you get paid first.", "moves": []}
-    days = sorted({d for s in scheds for d in paydays(s, today - timedelta(days=31), 8)})
+    days = sorted({d for s in scheds for d in paydays(s, today - timedelta(days=31), 14)})
     out = []
     for b in bills(conn, org, tz):
         if b["cadence"] != "monthly" or b["amount_cents"] is None:
@@ -163,7 +180,7 @@ def due_date_moves(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
                 hits += 1
                 payday = nxt
         if hits:
-            suggest = min(28, payday.day + 3)
+            suggest = payday.day + 3 if payday.day + 3 <= 28 else 3  # late-month paydays: early next month
             out.append({"bill_id": b["id"], "name": b["name"], "amount": b["amount"], "due_day": b["due_day"],
                         "payday": payday.isoformat(), "suggested_due_day": suggest,
                         "script": (f"Hi, I'd like to change the due date on my {b['name']} account. I get paid around the "
@@ -180,7 +197,7 @@ def _ordinal(n: int) -> str:
 # ---------------------------------------------------------------- V6.161 confirmation numbers, V6.162 bill history
 
 def set_payment_note(p: Principal, bid: str, period: str, confirmation: str | None, method: str | None) -> None:
-    conf = _text(confirmation, 60, "confirmation number")
+    conf = _text(confirmation, 60, "confirmation number", strict=False)
     meth = _text(method, 40, "payment method")
     N, P = db.payment_notes, db.my_bill_payments
     with transaction() as conn:
@@ -220,8 +237,13 @@ def bill_history(conn: Connection, org: str, bid: str, tz: str | None = "UTC") -
 # ---------------------------------------------------------------- V6.163 30-day forecast, V6.164 low points
 
 def _avg_daily_spend(conn: Connection, org: str, today: date) -> int:
+    """Average a day over the last 60 days, or since your first logged expense if that's more recent (at least 7)."""
     rows = _spent(conn, org, today - timedelta(days=59), today)
-    return round(sum(r.amount_cents for r in rows) / 60) if rows else 0
+    if not rows:
+        return 0
+    first = min(date.fromisoformat(_day(r.day)) for r in rows)
+    covered = max(7, min(60, (today - first).days + 1))
+    return round(sum(r.amount_cents for r in rows) / covered)
 
 
 def forecast(conn: Connection, org: str, tz: str | None = "UTC", days: int = 30, buffer: float = 100) -> dict:
@@ -382,7 +404,7 @@ def habits(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
         add("disputes", "Follow up on disputes", "attention" if any(d["follow_up_due"] for d in open_d) else "good",
             f"{len(open_d)} open" + ("; one is past about 30 days, so follow up." if any(d["follow_up_due"] for d in open_d) else "."))
     add("accounts", "Keep older accounts open when you can", "info",
-        "The age of your accounts is part of most credit scores; closing an old card can shorten it and raise utilization.")
+        "Closing a card removes its limit, which can raise your utilization. Account age is part of most scores; a closed account in good standing usually stays on your report for years.")
     add("applications", "Apply for new credit only when you need it", "info",
         "Each application can add a hard inquiry, which may lower a score a little for a while.")
     return {"items": items, "note": "General information about common credit habits, not advice and not a score."}
@@ -401,10 +423,14 @@ def utilization_history(conn: Connection, org: str, tz: str | None = "UTC", mont
     that day (cards count from the day you first entered them)."""
     today = _today(tz)
     H = db.card_history
-    rows = conn.execute(select(H).where(H.c.organization_id == org, H.c.day >= (today - timedelta(days=31 * months)).isoformat())
-                        .order_by(H.c.day)).fetchall()
-    cards = {c["id"] for c in credit(conn, org, tz)["cards"]}
+    start = (today - timedelta(days=31 * months)).isoformat()
+    rows = conn.execute(select(H).where(H.c.organization_id == org, H.c.day >= start).order_by(H.c.day)).fetchall()
+    current = {c["id"]: c for c in credit(conn, org, tz)["cards"]}
+    cards = set(current)
     latest: dict[str, tuple[int, int]] = {}
+    for r in conn.execute(select(H).where(H.c.organization_id == org, H.c.day < start).order_by(H.c.day)):  # before the window
+        if r.card_id in cards:
+            latest[r.card_id] = (r.balance_cents, r.limit_cents)
     points = []
     for day in sorted({_day(r.day) for r in rows}):
         for r in rows:
@@ -414,6 +440,15 @@ def utilization_history(conn: Connection, org: str, tz: str | None = "UTC", mont
         lim = sum(v[1] for v in latest.values())
         if lim:
             points.append({"day": day, "utilization": round(bal / lim, 3), "balance": bal / 100, "limit": lim / 100})
+    missing = cards - set(latest)
+    if missing:  # cards with no history yet (added before history began): today's figures, all cards
+        for cid in cards:
+            latest[cid] = (round(current[cid]["balance"] * 100), round(current[cid]["limit"] * 100))
+        bal = sum(v[0] for v in latest.values())
+        lim = sum(v[1] for v in latest.values())
+        if lim:
+            pt = {"day": today.isoformat(), "utilization": round(bal / lim, 3), "balance": bal / 100, "limit": lim / 100}
+            points = [x for x in points if x["day"] != pt["day"]] + [pt]
     return {"points": points}
 
 
@@ -433,7 +468,7 @@ def card_bill(p: Principal, cid: str, due_day: int, tz: str | None = "UTC") -> d
     if live:
         return taskextra.edit_bill(p, link.bill_id, {"due_day": due_day}, tz)
     b = taskextra.add_bill(p, {"name": f"{card.name} payment", "amount": None, "due_day": due_day, "cadence": "monthly",
-                               "notes": "Card payment: at least the minimum. Paying the statement balance avoids interest on most cards."},
+                               "notes": "Card payment: at least the minimum. On most cards, paying the statement balance in full by the due date avoids interest on purchases."},
                            tz)
     with transaction() as conn:
         conn.execute(delete(CB).where(CB.c.card_id == cid))
@@ -747,9 +782,13 @@ def projections(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     for g in goals(conn, org, tz):
         if g["done"]:
             continue
-        recent = sum(r.amount_cents for r in conn.execute(select(E.c.amount_cents).where(
-            E.c.goal_id == g["id"], E.c.organization_id == org, E.c.day >= (today - timedelta(days=90)).isoformat())))
-        pace = round(recent / 3) if recent > 0 else round((g["monthly_plan"] or 0) * 100)
+        dep = conn.execute(select(E.c.amount_cents, E.c.day).where(
+            E.c.goal_id == g["id"], E.c.organization_id == org, E.c.day >= (today - timedelta(days=89)).isoformat())).fetchall()
+        recent = sum(r.amount_cents for r in dep)
+        # over the days the deposits cover (since the first one in the window; at least 30, at most 90)
+        first = min((date.fromisoformat(_day(r.day)) for r in dep), default=today)
+        covered = max(30, min(90, (today - first).days + 1))
+        pace = round(recent * 30 / covered) if recent > 0 else round((g["monthly_plan"] or 0) * 100)
         left = round(g["left"] * 100)
         months = -(-left // pace) if pace > 0 else None
         reach = None
@@ -846,7 +885,7 @@ EXPORT_TABLES = ("income_entries", "pay_schedules", "savings_goals", "savings_en
                  "payment_notes", "bill_meta", "bill_extras", "bill_splits", "split_receipts", "credit_cards", "card_history",
                  "debts", "expenses", "category_budgets", "cash_accounts", "cash_balances", "gig_costs", "cashback_entries",
                  "assets", "net_worth_snapshots", "credit_disputes", "money_wins", "sell_items", "owed_to_me", "no_spend_days",
-                 "money_settings", "money_targets")
+                 "money_settings", "money_targets", "money_checks", "card_bills")
 
 
 def export(conn: Connection, org: str) -> dict:

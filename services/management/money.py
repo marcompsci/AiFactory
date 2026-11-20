@@ -534,6 +534,10 @@ def remove_card(p: Principal, cid: str) -> None:
         _row(conn, db.credit_cards, p.organization_id, cid, "card")
         conn.execute(delete(db.credit_cards).where(db.credit_cards.c.id == cid))
         conn.execute(delete(db.card_history).where(db.card_history.c.card_id == cid))
+        link = conn.execute(select(db.card_bills.c.bill_id).where(db.card_bills.c.card_id == cid)).first()
+        if link:  # its payment bill stops reminding (kept, switched off, so your on-time record stays)
+            conn.execute(update(db.my_bills).where(db.my_bills.c.id == link.bill_id,
+                                                   db.my_bills.c.organization_id == p.organization_id).values(active=0))
         conn.execute(delete(db.card_bills).where(db.card_bills.c.card_id == cid))
         conn.execute(update(db.debts).where(db.debts.c.card_id == cid).values(card_id=None))
         _changed(conn, p.organization_id, "credit")

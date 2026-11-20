@@ -168,6 +168,8 @@ def _clean_bill(f: dict, partial: bool = False) -> dict:
         n = " ".join(str(f.get("name") or "").split())
         if not 1 <= len(n) <= 80:
             raise PlusError("give the bill a name of up to 80 characters")
+        if sum(ch.isdigit() for ch in n) >= 8:
+            raise PlusError("leave account and card numbers out of the bill's name")
         out["name"] = n
     if "amount" in f:
         a = f["amount"]
@@ -201,7 +203,10 @@ def _clean_bill(f: dict, partial: bool = False) -> dict:
     if "link_url" in f:
         out["link_url"] = clean_url(f["link_url"]) if f["link_url"] else None
     if "notes" in f:
-        out["notes"] = str(f["notes"] or "")[:1000]
+        notes = str(f["notes"] or "")[:1000]
+        if re.search(r"(?:\d[ -]?){12,}", notes):
+            raise PlusError("leave account and card numbers out of the notes")
+        out["notes"] = notes
     if "remind_days" in f:
         r = f["remind_days"]
         if not isinstance(r, int) or not 0 <= r <= 14:

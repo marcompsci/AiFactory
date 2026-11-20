@@ -192,3 +192,51 @@ def test_money_routes_need_member_or_operator(client):
             continue
         deps = [p.default.dependency.__name__ for p in inspect.signature(r.endpoint).parameters.values() if hasattr(p.default, "dependency")]
         assert ("operator" if r.methods & {"POST", "PUT", "PATCH", "DELETE"} else "member") in deps, r.path
+
+
+def test_review_fixes_parsing():
+    """V6.187 review: amount due not the previous balance, no account numbers in the name, card statements aren't
+    yearly, yearless dates nearest today."""
+    r = money3.parse_bill("Previous balance $500.00\nAmount due $120.00\nDue Dec 15", LA)
+    assert r["amount"] == 120.0
+    r = money3.parse_bill("Your Comcast account 8155 1234 5678 9012 bill is ready. Amount due: $1,234.56 by 12/20", LA)
+    assert r["name"] == "Comcast" and r["amount"] == 1234.56
+    r = money3.parse_bill("Your Chase Freedom card ending in 4821 statement. New balance $310.22. Annual Percentage Rate 24.99%. Payment due 12/18", LA)
+    assert r["cadence"] == "monthly" and "4821" not in r["name"] and r["amount"] == 310.22
+    assert money3.parse_bill("Your home insurance renews annually. Annual premium $900 due March 3", LA)["cadence"] == "yearly"
+    ds = money3._dates("is due Dec 31", date(2027, 1, 3))
+    assert ds[0][1] == date(2026, 12, 31)
+    ds = money3._dates("due Jan 5", date(2026, 12, 30))
+    assert ds[0][1] == date(2027, 1, 5)
+
+
+def test_review_fixes_data(client):
+    _clear()
+    # account numbers can't get into a bill
+    assert client.post("/api/bills", json={"name": "Comcast 8155 1234 5678", "amount": 10, "due_day": 3}).status_code == 422
+    # long confirmation numbers are fine; a card number isn't
+    b = client.post("/api/bills", json={"name": "Electric", "amount": 60, "due_day": 3, "tz": LA}).json()
+    bid = _bid(b)
+    client.post(f"/api/bills/{bid}/paid", json={"period": "2026-03", "amount": 60, "tz": LA})
+    assert client.put(f"/api/money/bills/{bid}/payment-note", json={"period": "2026-03", "confirmation": "202611201234567890"}).status_code == 200
+    # removing a card switches its payment bill off (history kept)
+    c = client.post("/api/money/credit/cards", json={"name": "Green", "limit": 500, "balance": 100}).json()
+    cb = client.put(f"/api/money/credit/cards/{c['id']}/bill", json={"due_day": 9, "tz": LA}).json()
+    client.delete(f"/api/money/credit/cards/{c['id']}")
+    all_bills = client.get("/api/bills", params={"tz": LA, "include_inactive": True}).json()["bills"]
+    hit = [x for x in all_bills if x["id"] == cb["id"]]
+    assert not hit or hit[0]["active"] is False
+    ex = client.get("/api/money/export").json()["tables"]
+    assert "money_checks" in ex and "card_bills" in ex
+
+
+def test_every_money_table_has_row_level_security():
+    """Each table created in the money migrations turns on row-level security with a members-only read policy."""
+    import pathlib
+    import re
+    sql = "\n".join(p.read_text() for p in sorted(pathlib.Path("infrastructure/migrations").glob("*.sql")))
+    for f in ("0022_money.sql", "0023_money_more.sql", "0024_money_assistant.sql"):
+        text = pathlib.Path("infrastructure/migrations", f).read_text()
+        for t in re.findall(r"create table (\w+)", text):
+            assert f"alter table {t} enable row level security" in sql, t
+            assert re.search(rf"create policy \w+ on {t} for select using \(public\.is_member\(organization_id\)\)", sql), t
