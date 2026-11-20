@@ -82,6 +82,9 @@ def reset_checkpointer() -> None:
         _saver, _saver_key = None, None
 
 
+MAX_WAVES = 200
+
+
 def build_graph(runner):
     from .runner import Cancelled
 
@@ -109,6 +112,9 @@ def build_graph(runner):
             return {"outcome": "FAILED"}
 
     def execute(state: MissionState) -> MissionState:
+        if state.get("waves", 0) >= MAX_WAVES:  # a safety net: never spin until LangGraph's recursion limit
+            runner._fail(f"stopped after {MAX_WAVES} scheduling steps without finishing; see the trace")
+            return {"outcome": "FAILED", "waves": state.get("waves", 0)}
         try:
             out = runner._wave()
         except Cancelled:

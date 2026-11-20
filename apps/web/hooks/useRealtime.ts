@@ -25,18 +25,28 @@ export function useRealtime(reconnectKey: number) {
     let retry = 0;
     const store = useStore.getState;
 
+    // A burst of events (a busy mission can emit hundreds a minute) refreshes each view at most once a second and a
+    // half, instead of once per event, so the browser never floods the server.
+    const pending = new Set<string>();
+    let flush: number | null = null;
+    const mark = (...keys: string[][]) => {
+      for (const k of keys) pending.add(JSON.stringify(k));
+      if (flush === null)
+        flush = window.setTimeout(() => {
+          flush = null;
+          const keys2 = [...pending];
+          pending.clear();
+          for (const k of keys2) qc.invalidateQueries({ queryKey: JSON.parse(k) });
+        }, 1500);
+    };
     const invalidateFor = (events: EventEnvelope[]) => {
       const missions = new Set(events.map((e) => e.mission_id).filter(Boolean) as string[]);
-      if (events.some((e) => e.event_type.startsWith("mission.") || e.event_type.startsWith("approval.")))
-        qc.invalidateQueries({ queryKey: ["snapshot"] });
-      for (const m of missions) qc.invalidateQueries({ queryKey: ["mission", m] });
-      if (events.some((e) => e.event_type === "usage.recorded")) qc.invalidateQueries({ queryKey: ["costs"] });
-      if (events.some((e) => e.agent_id)) qc.invalidateQueries({ queryKey: ["agent"] });
-      if (events.some((e) => /^(opportunity|release|manager|research|package)\./.test(e.event_type))) {
-        qc.invalidateQueries({ queryKey: ["opportunity"] });
-        qc.invalidateQueries({ queryKey: ["opportunities"] });
-        qc.invalidateQueries({ queryKey: ["hierarchy"] });
-      }
+      if (events.some((e) => e.event_type.startsWith("mission.") || e.event_type.startsWith("approval."))) mark(["snapshot"]);
+      for (const m of missions) mark(["mission", m]);
+      if (events.some((e) => e.event_type === "usage.recorded")) mark(["costs"]);
+      if (events.some((e) => e.agent_id)) mark(["agent"]);
+      if (events.some((e) => /^(opportunity|release|manager|research|package)\./.test(e.event_type)))
+        mark(["opportunity"], ["opportunities"], ["hierarchy"]);
     };
 
     const replay = async () => {
@@ -145,6 +155,7 @@ export function useRealtime(reconnectKey: number) {
     void connect();
     return () => {
       closed = true;
+      if (flush !== null) clearTimeout(flush);
       es?.close();
       timers.current.forEach((t) => clearTimeout(t));
       timers.current = [];

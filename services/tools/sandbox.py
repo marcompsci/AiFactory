@@ -103,12 +103,21 @@ class ProcessSandbox:
         import resource
 
         os.setsid()
-        resource.setrlimit(resource.RLIMIT_CPU, (self.cpu_seconds, self.cpu_seconds))
         mem = self.memory_mb * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_AS, (mem, mem))
         fsz = self.file_size_mb * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_FSIZE, (fsz, fsz))
-        resource.setrlimit(resource.RLIMIT_NOFILE, (256, 256))
+        # Each limit is applied on its own. macOS refuses some (RLIMIT_AS can't be lowered there, and a limit above the
+        # current hard limit is refused everywhere); one the OS won't take is skipped rather than failing the command.
+        # The wall-clock timeout in run() and the process-group kill still apply.
+        for name, value in (("RLIMIT_CPU", self.cpu_seconds), ("RLIMIT_AS", mem), ("RLIMIT_FSIZE", fsz), ("RLIMIT_NOFILE", 256)):
+            which = getattr(resource, name, None)
+            if which is None:
+                continue
+            try:
+                soft, hard = resource.getrlimit(which)
+                cap = value if hard == resource.RLIM_INFINITY else min(value, hard)
+                resource.setrlimit(which, (cap, cap if hard == resource.RLIM_INFINITY else hard))
+            except (ValueError, OSError):
+                pass
 
     def run(self, argv: list[str], cwd: Path, timeout: int, workspace_root: Path) -> CommandResult:
         _validate_argv(argv)

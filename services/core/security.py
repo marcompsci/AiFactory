@@ -80,7 +80,7 @@ class _Window:
         self._hits: dict[str, tuple[float, int]] = {}
         self._lock = threading.Lock()
 
-    def allow(self, key: str) -> bool:
+    def allow(self, key: str, scale: int = 1) -> bool:
         now = time.monotonic()
         with self._lock:
             start, n = self._hits.get(key, (now, 0))
@@ -88,7 +88,7 @@ class _Window:
                 start, n = now, 0
             n += 1
             self._hits[key] = (start, n)
-            return n <= self.per_minute
+            return n <= self.per_minute * scale
 
     def clear(self) -> None:
         with self._lock:
@@ -123,7 +123,9 @@ class HardeningMiddleware:
             await send({"type": "http.response.body", "body": body})
 
         if path.startswith("/api/") and scope.get("method") != "OPTIONS":
-            if not request_budget.allow(_client(scope)):
+            client = _client(scope)
+            # the owner's own Mac (loopback) gets a larger budget: a few open tabs polling it are not an attack
+            if not request_budget.allow(client, 4 if client in ("127.0.0.1", "::1") else 1):
                 return await respond(429, "too many requests", [(b"retry-after", b"60")])
             left = auth_failures.locked(_client(scope))
             if left:

@@ -270,6 +270,13 @@ class MissionRunner:
                     raise exc
                 if exc:
                     log.exception("task crashed", exc_info=exc)
+                    # A crash outside the task's own handler would leave it RUNNING, and the next wave would pick it up
+                    # again forever. Fail it with the reason instead, so the mission ends with an explanation.
+                    t = futures[f]
+                    with transaction() as conn:
+                        cur = conn.execute(select(db.tasks.c.status).where(db.tasks.c.id == t.id)).scalar()
+                        if cur == "RUNNING":
+                            ops.set_task_status(conn, t.id, "FAILED", error=f"crashed: {type(exc).__name__}: {str(exc)[:200]}")
         finally:
             pool.shutdown(wait=False, cancel_futures=True)
         return "continue"
@@ -331,6 +338,11 @@ class MissionRunner:
                 outcome, error = "BUDGET", str(be)
             except TaskError as te:
                 outcome, error = "FAILED", str(te)
+            except Cancelled:
+                raise
+            except Exception as exc:  # a bug or an environment problem: fail this attempt (retries are bounded)
+                log.exception("task %s hit an unexpected error", task.key)
+                outcome, error = "FAILED", f"unexpected error in {task.key}: {type(exc).__name__}: {str(exc)[:200]}"
             self.check_cancel()
 
             with transaction() as conn:
