@@ -76,12 +76,14 @@ def test_saved_requests_start_from_the_api_and_the_city(client):
     listed = client.get("/api/saved-requests").json()["saved_requests"][0]
     assert listed["uses"] == 1 and listed["last_mission_id"] == mid
 
+    from services.core import auth as _auth
     c = None
     for _ in range(3):  # past the double-tap window (a background thread may touch the request in between: try again)
         prop = _talk(client, ATLAS, "start nightly tests")["proposal"]
         assert prop["kind"] == "start_saved" and prop["params"]["saved_request_id"] == sid
         with transaction() as conn:
             conn.execute(update(db.saved_requests).where(db.saved_requests.c.id == sid).values(last_used_at="2020-01-01T00:00:00+00:00"))
+        _auth.mutation_limiter._state.clear()  # this test makes more changes than the burst allows
         resp = client.post(f"/api/play/proposals/{prop['id']}/confirm")
         c = resp.json() if resp.status_code == 200 else {"status": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
         if c.get("status") == "CONFIRMED" and c["result"]["mission_id"] != mid:
