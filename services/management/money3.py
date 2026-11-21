@@ -300,13 +300,15 @@ def _checks(conn: Connection, org: str, prefix: str) -> dict[str, str]:
 
 def credit_watch(conn: Connection, org: str, tz: str | None = "UTC") -> dict:
     """When you last checked each bureau's free report, whether each file is frozen, and your disputes."""
+    from .taskplus import _zone
     today = _today(tz)
     checked = _checks(conn, org, "report")
     frozen = _checks(conn, org, "freeze")
     rows = []
     for b in BUREAUS:
         at = checked.get(b)
-        age = (today - datetime.fromisoformat(str(at).replace("Z", "+00:00")).date()).days if at else None
+        # the day you checked, in your time zone (a UTC date is "tomorrow" in the US evening)
+        age = (today - datetime.fromisoformat(str(at).replace("Z", "+00:00")).astimezone(_zone(tz)).date()).days if at else None
         rows.append({"bureau": b, "checked_at": at, "days_since": age, "due": age is None or age > 30,
                      "frozen": b in frozen, "frozen_at": frozen.get(b)})
     D = db.credit_disputes
