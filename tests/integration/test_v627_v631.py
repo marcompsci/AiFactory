@@ -82,10 +82,11 @@ def test_saved_requests_start_from_the_api_and_the_city(client):
         assert prop["kind"] == "start_saved" and prop["params"]["saved_request_id"] == sid
         with transaction() as conn:
             conn.execute(update(db.saved_requests).where(db.saved_requests.c.id == sid).values(last_used_at="2020-01-01T00:00:00+00:00"))
-        c = client.post(f"/api/play/proposals/{prop['id']}/confirm").json()
-        if c["status"] == "CONFIRMED" and c["result"]["mission_id"] != mid:
+        resp = client.post(f"/api/play/proposals/{prop['id']}/confirm")
+        c = resp.json() if resp.status_code == 200 else {"status": f"HTTP {resp.status_code}", "detail": resp.text[:300]}
+        if c.get("status") == "CONFIRMED" and c["result"]["mission_id"] != mid:
             break
-    assert c["status"] == "CONFIRMED" and c["result"]["mission_id"] != mid
+    assert c["status"] == "CONFIRMED" and c["result"]["mission_id"] != mid, c
     assert _talk(client, ATLAS, "start something nobody saved")["proposal"] is None or \
         _talk(client, ATLAS, "start something nobody saved")["proposal"]["kind"] != "start_saved"
     from services.core import auth
